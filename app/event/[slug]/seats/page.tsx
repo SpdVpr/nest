@@ -9,17 +9,15 @@ import { formatDate } from '@/lib/utils'
 import { guestStorage } from '@/lib/guest-storage'
 import EventGuestHeader from '@/components/EventGuestHeader'
 
-// Define the seat layout based on the image
-const SEAT_LAYOUT = {
-  rows: [
-    { name: 'A', seats: ['A1', 'A2', 'A3', 'A4', 'A5', 'A6'] },
-    { name: 'B', seats: ['B1', 'B2', 'B3', 'B4', 'B5', 'B6'] },
-    { name: 'C', seats: ['C1', 'C2', 'C3', 'C4', 'C5', 'C6'] },
-    { name: 'D', seats: ['D1', 'D2', 'D3', 'D4', 'D5', 'D6'] },
-    { name: 'E', seats: ['E1', 'E2', 'E3', 'E4', 'E5', 'E6'] },
-    { name: 'F', seats: ['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8'] },
-  ]
-}
+// Define all seats for validation
+const ALL_SEATS = [
+  'A1', 'A2', 'A3', 'A4', 'A5', 'A6',
+  'B1', 'B2', 'B3', 'B4', 'B5', 'B6',
+  'C1', 'C2', 'C3', 'C4', 'C5', 'C6',
+  'D1', 'D2', 'D3', 'D4', 'D5', 'D6',
+  'E1', 'E2', 'E3', 'E4', 'E5', 'E6',
+  'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8'
+]
 
 export default function EventSeatsPage() {
   const params = useParams()
@@ -264,39 +262,239 @@ export default function EventSeatsPage() {
             </div>
           </div>
 
-          <div className="space-y-4">
-            {SEAT_LAYOUT.rows.map((row) => (
-              <div key={row.name} className="flex items-center gap-2">
-                <div className="w-8 font-bold text-gray-700">{row.name}</div>
-                <div className="flex flex-wrap gap-2">
-                  {row.seats.map((seatId) => {
-                    const { status, guestName, isOwn } = getSeatStatus(seatId)
-                    return (
-                      <button
-                        key={seatId}
-                        onClick={() => handleSeatClick(seatId)}
-                        disabled={!selectedGuest}
-                        className={`relative w-16 h-16 rounded-lg font-bold text-sm transition-all ${
-                          status === 'available'
-                            ? 'bg-green-500 hover:bg-green-600 text-white'
-                            : isOwn
-                            ? 'bg-blue-500 hover:bg-blue-600 text-white'
-                            : 'bg-red-500 text-white cursor-not-allowed'
-                        } ${!selectedGuest ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        title={guestName || 'Volné místo'}
-                      >
-                        <div>{seatId}</div>
-                        {guestName && (
-                          <div className="absolute bottom-0 left-0 right-0 text-[8px] bg-black bg-opacity-50 px-1 truncate">
-                            {guestName}
-                          </div>
-                        )}
-                      </button>
-                    )
-                  })}
+          {/* Room Layout - Exact replica of the image */}
+          <div className="bg-gray-100 rounded-xl p-4 border-4 border-gray-800 overflow-x-auto">
+            <div className="inline-block min-w-max relative">
+              {/* Top section with Chodba label */}
+              <div className="flex gap-1 mb-1">
+                <div className="flex gap-1">
+                  {/* Markers above A row */}
+                  {['•', '•', '•', '•', '•', '•'].map((m, i) => (
+                    <div key={i} className="w-16 h-4 flex items-center justify-center text-gray-400 text-xs">
+                      {m}
+                    </div>
+                  ))}
+                </div>
+                <div className="w-16"></div>
+                <div className="w-16"></div>
+                <div className="w-40 h-8 flex items-center justify-center bg-gray-300 text-gray-700 font-bold text-xs rounded border-2 border-gray-400">
+                  Chodba
                 </div>
               </div>
-            ))}
+
+              {/* Row A */}
+              <div className="flex gap-1 mb-1">
+                {['A1', 'A2', 'A3', 'A4', 'A5', 'A6'].map((seatId) => {
+                  const { status, guestName, isOwn } = getSeatStatus(seatId)
+                  return (
+                    <button
+                      key={seatId}
+                      onClick={() => handleSeatClick(seatId)}
+                      disabled={!selectedGuest}
+                      className={`relative w-16 h-10 rounded font-bold text-xs transition-all border-2 ${
+                        status === 'available'
+                          ? 'bg-green-500 hover:bg-green-600 text-white border-green-700'
+                          : isOwn
+                          ? 'bg-blue-500 hover:bg-blue-600 text-white border-blue-700'
+                          : 'bg-red-500 text-white cursor-not-allowed border-red-700'
+                      } ${!selectedGuest ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      title={guestName || 'Volné místo'}
+                    >
+                      <div>{seatId}</div>
+                      {guestName && (
+                        <div className="absolute bottom-0 left-0 right-0 text-[7px] bg-black bg-opacity-50 px-0.5 truncate">
+                          {guestName}
+                        </div>
+                      )}
+                    </button>
+                  )
+                })}
+                <div className="w-16"></div>
+                <div className="w-16"></div>
+                <div className="w-40 h-10 flex items-center justify-center bg-red-600 text-white font-bold text-xs rounded border-2 border-red-800">
+                  Dveře 1
+                </div>
+              </div>
+
+              {/* Row B */}
+              <div className="flex gap-1 mb-1">
+                {['B1', 'B2', 'B3', 'B4', 'B5', 'B6'].map((seatId) => {
+                  const { status, guestName, isOwn } = getSeatStatus(seatId)
+                  return (
+                    <button
+                      key={seatId}
+                      onClick={() => handleSeatClick(seatId)}
+                      disabled={!selectedGuest}
+                      className={`relative w-16 h-10 rounded font-bold text-xs transition-all border-2 ${
+                        status === 'available'
+                          ? 'bg-green-500 hover:bg-green-600 text-white border-green-700'
+                          : isOwn
+                          ? 'bg-blue-500 hover:bg-blue-600 text-white border-blue-700'
+                          : 'bg-red-500 text-white cursor-not-allowed border-red-700'
+                      } ${!selectedGuest ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      title={guestName || 'Volné místo'}
+                    >
+                      <div>{seatId}</div>
+                      {guestName && (
+                        <div className="absolute bottom-0 left-0 right-0 text-[7px] bg-black bg-opacity-50 px-0.5 truncate">
+                          {guestName}
+                        </div>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Row C */}
+              <div className="flex gap-1 mb-1">
+                {['C1', 'C2', 'C3', 'C4', 'C5', 'C6'].map((seatId) => {
+                  const { status, guestName, isOwn } = getSeatStatus(seatId)
+                  return (
+                    <button
+                      key={seatId}
+                      onClick={() => handleSeatClick(seatId)}
+                      disabled={!selectedGuest}
+                      className={`relative w-16 h-10 rounded font-bold text-xs transition-all border-2 ${
+                        status === 'available'
+                          ? 'bg-green-500 hover:bg-green-600 text-white border-green-700'
+                          : isOwn
+                          ? 'bg-blue-500 hover:bg-blue-600 text-white border-blue-700'
+                          : 'bg-red-500 text-white cursor-not-allowed border-red-700'
+                      } ${!selectedGuest ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      title={guestName || 'Volné místo'}
+                    >
+                      <div>{seatId}</div>
+                      {guestName && (
+                        <div className="absolute bottom-0 left-0 right-0 text-[7px] bg-black bg-opacity-50 px-0.5 truncate">
+                          {guestName}
+                        </div>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Corridor markers */}
+              <div className="flex gap-1 mb-1">
+                {['•', '•', '•', '•', '•', '•', '•', '•'].map((m, i) => (
+                  <div key={i} className="w-16 h-4 flex items-center justify-center text-gray-400 text-xs">
+                    {m}
+                  </div>
+                ))}
+              </div>
+
+              {/* Deskovky room - positioned absolutely to span 3 rows */}
+              <div className="absolute right-4 top-[200px] w-40 h-[140px] flex items-center justify-center bg-blue-200 text-blue-900 font-bold text-sm rounded border-4 border-blue-400 z-10">
+                Deskovky
+              </div>
+
+              {/* Row D */}
+              <div className="flex gap-1 mb-1">
+                {['D1', 'D2', 'D3', 'D4', 'D5', 'D6'].map((seatId) => {
+                  const { status, guestName, isOwn } = getSeatStatus(seatId)
+                  return (
+                    <button
+                      key={seatId}
+                      onClick={() => handleSeatClick(seatId)}
+                      disabled={!selectedGuest}
+                      className={`relative w-16 h-10 rounded font-bold text-xs transition-all border-2 ${
+                        status === 'available'
+                          ? 'bg-green-500 hover:bg-green-600 text-white border-green-700'
+                          : isOwn
+                          ? 'bg-blue-500 hover:bg-blue-600 text-white border-blue-700'
+                          : 'bg-red-500 text-white cursor-not-allowed border-red-700'
+                      } ${!selectedGuest ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      title={guestName || 'Volné místo'}
+                    >
+                      <div>{seatId}</div>
+                      {guestName && (
+                        <div className="absolute bottom-0 left-0 right-0 text-[7px] bg-black bg-opacity-50 px-0.5 truncate">
+                          {guestName}
+                        </div>
+                      )}
+                    </button>
+                  )
+                })}
+                <div className="w-16"></div>
+                <div className="w-40 h-10 flex items-center justify-center bg-red-600 text-white font-bold text-xs rounded border-2 border-red-800">
+                  Dveře 2
+                </div>
+              </div>
+
+              {/* Row E */}
+              <div className="flex gap-1 mb-1">
+                {['E1', 'E2', 'E3', 'E4', 'E5', 'E6'].map((seatId) => {
+                  const { status, guestName, isOwn } = getSeatStatus(seatId)
+                  return (
+                    <button
+                      key={seatId}
+                      onClick={() => handleSeatClick(seatId)}
+                      disabled={!selectedGuest}
+                      className={`relative w-16 h-10 rounded font-bold text-xs transition-all border-2 ${
+                        status === 'available'
+                          ? 'bg-green-500 hover:bg-green-600 text-white border-green-700'
+                          : isOwn
+                          ? 'bg-blue-500 hover:bg-blue-600 text-white border-blue-700'
+                          : 'bg-red-500 text-white cursor-not-allowed border-red-700'
+                      } ${!selectedGuest ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      title={guestName || 'Volné místo'}
+                    >
+                      <div>{seatId}</div>
+                      {guestName && (
+                        <div className="absolute bottom-0 left-0 right-0 text-[7px] bg-black bg-opacity-50 px-0.5 truncate">
+                          {guestName}
+                        </div>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Corridor markers */}
+              <div className="flex gap-1 mb-1">
+                {['•', '•', '•', '•', '•', '•', '•', '•'].map((m, i) => (
+                  <div key={i} className="w-16 h-4 flex items-center justify-center text-gray-400 text-xs">
+                    {m}
+                  </div>
+                ))}
+              </div>
+
+              {/* Row F */}
+              <div className="flex gap-1 mb-2">
+                {['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8'].map((seatId) => {
+                  const { status, guestName, isOwn } = getSeatStatus(seatId)
+                  return (
+                    <button
+                      key={seatId}
+                      onClick={() => handleSeatClick(seatId)}
+                      disabled={!selectedGuest}
+                      className={`relative w-16 h-10 rounded font-bold text-xs transition-all border-2 ${
+                        status === 'available'
+                          ? 'bg-green-500 hover:bg-green-600 text-white border-green-700'
+                          : isOwn
+                          ? 'bg-blue-500 hover:bg-blue-600 text-white border-blue-700'
+                          : 'bg-red-500 text-white cursor-not-allowed border-red-700'
+                      } ${!selectedGuest ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      title={guestName || 'Volné místo'}
+                    >
+                      <div>{seatId}</div>
+                      {guestName && (
+                        <div className="absolute bottom-0 left-0 right-0 text-[7px] bg-black bg-opacity-50 px-0.5 truncate">
+                          {guestName}
+                        </div>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Entrance label at bottom */}
+              <div className="text-center mt-2">
+                <div className="inline-block bg-purple-600 text-white px-8 py-2 rounded-lg font-bold border-2 border-purple-800">
+                  ← Vchod
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
