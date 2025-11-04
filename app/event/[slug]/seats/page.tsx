@@ -265,25 +265,8 @@ export default function EventSeatsPage() {
           {/* Room Layout - Exact replica of the image */}
           <div className="bg-gray-100 rounded-xl p-4 border-4 border-gray-800 overflow-x-auto">
             <div className="inline-block min-w-max relative">
-              {/* Top section with Chodba label */}
-              <div className="flex gap-1 mb-1">
-                <div className="flex gap-1">
-                  {/* Markers above A row */}
-                  {['•', '•', '•', '•', '•', '•'].map((m, i) => (
-                    <div key={i} className="w-16 h-4 flex items-center justify-center text-gray-400 text-xs">
-                      {m}
-                    </div>
-                  ))}
-                </div>
-                <div className="w-16"></div>
-                <div className="w-16"></div>
-                <div className="w-40 h-8 flex items-center justify-center bg-gray-300 text-gray-700 font-bold text-xs rounded border-2 border-gray-400">
-                  Chodba
-                </div>
-              </div>
-
               {/* Row A */}
-              <div className="flex gap-1 mb-2">
+              <div className="flex gap-1 mb-1">
                 {['A1', 'A2', 'A3', 'A4', 'A5', 'A6'].map((seatId) => {
                   const { status, guestName, isOwn } = getSeatStatus(seatId)
                   return (
@@ -309,24 +292,19 @@ export default function EventSeatsPage() {
                     </button>
                   )
                 })}
-                <div className="w-16"></div>
-                <div className="w-16"></div>
-                <div className="w-40 h-10 flex items-center justify-center bg-red-600 text-white font-bold text-xs rounded border-2 border-red-800">
-                  Dveře 1
-                </div>
               </div>
 
               {/* Corridor between A and B */}
-              <div className="flex gap-1 mb-2">
+              <div className="flex gap-1 mb-3">
                 {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <div key={i} className="w-16 h-3 flex items-center justify-center text-gray-400 text-xs">
+                  <div key={i} className="w-16 h-6 flex items-center justify-center text-gray-400 text-lg">
                     ↕
                   </div>
                 ))}
               </div>
 
               {/* Row B */}
-              <div className="flex gap-1 mb-2">
+              <div className="flex gap-1 mb-1">
                 {['B1', 'B2', 'B3', 'B4', 'B5', 'B6'].map((seatId) => {
                   const { status, guestName, isOwn } = getSeatStatus(seatId)
                   return (
@@ -354,17 +332,8 @@ export default function EventSeatsPage() {
                 })}
               </div>
 
-              {/* Corridor between B and C */}
-              <div className="flex gap-1 mb-2">
-                {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <div key={i} className="w-16 h-3 flex items-center justify-center text-gray-400 text-xs">
-                    ↕
-                  </div>
-                ))}
-              </div>
-
               {/* Row C */}
-              <div className="flex gap-1 mb-3">
+              <div className="flex gap-1 mb-2">
                 {['C1', 'C2', 'C3', 'C4', 'C5', 'C6'].map((seatId) => {
                   const { status, guestName, isOwn } = getSeatStatus(seatId)
                   return (
@@ -392,24 +361,17 @@ export default function EventSeatsPage() {
                 })}
               </div>
 
-              {/* Large corridor between C and D */}
+              {/* Large corridor between C and D with arrows */}
               <div className="flex gap-1 mb-3">
-                {['•', '•', '•', '•', '•', '•', '•', '•'].map((m, i) => (
+                {[1, 2, 3, 4, 5, 6].map((i) => (
                   <div key={i} className="w-16 h-6 flex items-center justify-center text-gray-400 text-lg">
-                    {m}
+                    ↕
                   </div>
                 ))}
               </div>
 
-              {/* Deskovky room - positioned absolutely to span rows D, E, F */}
-              <div className="absolute right-4" style={{ top: '395px', width: '160px', height: '140px' }}>
-                <div className="w-full h-full flex items-center justify-center bg-blue-200 text-blue-900 font-bold text-sm rounded border-4 border-blue-400">
-                  Deskovky
-                </div>
-              </div>
-
               {/* Row D */}
-              <div className="flex gap-1 mb-2">
+              <div className="flex gap-1 mb-1">
                 {['D1', 'D2', 'D3', 'D4', 'D5', 'D6'].map((seatId) => {
                   const { status, guestName, isOwn } = getSeatStatus(seatId)
                   return (
@@ -435,23 +397,10 @@ export default function EventSeatsPage() {
                     </button>
                   )
                 })}
-                <div className="w-16"></div>
-                <div className="w-40 h-10 flex items-center justify-center bg-red-600 text-white font-bold text-xs rounded border-2 border-red-800">
-                  Dveře 2
-                </div>
-              </div>
-
-              {/* Corridor between D and E */}
-              <div className="flex gap-1 mb-2">
-                {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <div key={i} className="w-16 h-3 flex items-center justify-center text-gray-400 text-xs">
-                    ↕
-                  </div>
-                ))}
               </div>
 
               {/* Row E */}
-              <div className="flex gap-1 mb-3">
+              <div className="flex gap-1 mb-2">
                 {['E1', 'E2', 'E3', 'E4', 'E5', 'E6'].map((seatId) => {
                   const { status, guestName, isOwn } = getSeatStatus(seatId)
                   return (
@@ -479,17 +428,17 @@ export default function EventSeatsPage() {
                 })}
               </div>
 
-              {/* Large corridor between E and F */}
+              {/* Large corridor between E and F with arrows */}
               <div className="flex gap-1 mb-3">
-                {['•', '•', '•', '•', '•', '•', '•', '•'].map((m, i) => (
+                {[1, 2, 3, 4, 5, 6].map((i) => (
                   <div key={i} className="w-16 h-6 flex items-center justify-center text-gray-400 text-lg">
-                    {m}
+                    ↕
                   </div>
                 ))}
               </div>
 
               {/* Row F */}
-              <div className="flex gap-1 mb-3">
+              <div className="flex gap-1 mb-2">
                 {['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8'].map((seatId) => {
                   const { status, guestName, isOwn } = getSeatStatus(seatId)
                   return (
@@ -515,13 +464,6 @@ export default function EventSeatsPage() {
                     </button>
                   )
                 })}
-              </div>
-
-              {/* Entrance label at bottom */}
-              <div className="text-center mt-2">
-                <div className="inline-block bg-purple-600 text-white px-8 py-2 rounded-lg font-bold border-2 border-purple-800">
-                  ← Vchod
-                </div>
               </div>
             </div>
           </div>
