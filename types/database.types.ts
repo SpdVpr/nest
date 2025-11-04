@@ -234,6 +234,35 @@ export interface Database {
           updated_at?: string
         }
       }
+      seat_reservations: {
+        Row: {
+          id: string
+          seat_id: string
+          guest_id: string
+          session_id: string
+          guest_name: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          seat_id: string
+          guest_id: string
+          session_id: string
+          guest_name: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          seat_id?: string
+          guest_id?: string
+          session_id?: string
+          guest_name?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
   }
 }
@@ -246,6 +275,7 @@ export type Product = Database['public']['Tables']['products']['Row']
 export type Consumption = Database['public']['Tables']['consumption']['Row']
 export type HardwareItem = Database['public']['Tables']['hardware_items']['Row']
 export type HardwareReservation = Database['public']['Tables']['hardware_reservations']['Row']
+export type SeatReservation = Database['public']['Tables']['seat_reservations']['Row']
 
 export type InsertSession = Database['public']['Tables']['sessions']['Insert']
 export type InsertSessionStock = Database['public']['Tables']['session_stock']['Insert']
@@ -254,3 +284,4 @@ export type InsertProduct = Database['public']['Tables']['products']['Insert']
 export type InsertConsumption = Database['public']['Tables']['consumption']['Insert']
 export type InsertHardwareItem = Database['public']['Tables']['hardware_items']['Insert']
 export type InsertHardwareReservation = Database['public']['Tables']['hardware_reservations']['Insert']
+export type InsertSeatReservation = Database['public']['Tables']['seat_reservations']['Insert']

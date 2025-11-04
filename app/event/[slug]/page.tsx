@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Calendar, Pizza, MonitorSmartphone, Users, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Calendar, Pizza, MonitorSmartphone, Users, AlertCircle, Armchair } from 'lucide-react'
 import { Session } from '@/types/database.types'
 import { formatDate } from '@/lib/utils'
 import EventGuestHeader from '@/components/EventGuestHeader'
@@ -173,6 +173,17 @@ export default function EventPage() {
             <div className="text-center">
               <h2 className="text-2xl font-bold mb-1">Rezervace HW</h2>
               <p className="text-orange-100 text-sm">Zapůjč si monitor nebo PC</p>
+            </div>
+          </Link>
+
+          <Link
+            href={`/event/${slug}/seats`}
+            className="group bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 text-white rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-8 flex flex-col items-center space-y-4 hover:scale-105"
+          >
+            <Armchair className="w-16 h-16" />
+            <div className="text-center">
+              <h2 className="text-2xl font-bold mb-1">Rezervace Míst</h2>
+              <p className="text-indigo-100 text-sm">Vyber si své místo k sezení</p>
             </div>
           </Link>
 
