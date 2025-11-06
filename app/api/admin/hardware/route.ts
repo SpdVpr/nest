@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
+import { getFirebaseAdminDb } from '@/lib/firebase/admin'
+import { Timestamp } from 'firebase-admin/firestore'
 
 // Verify admin authentication
 function verifyAuth(request: NextRequest): boolean {
@@ -16,17 +17,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = createAdminClient()
+    const db = getFirebaseAdminDb()
 
-    const { data: items, error } = await supabase
-      .from('hardware_items')
-      .select('*')
-      .order('category', { ascending: true })
-      .order('name', { ascending: true })
+    const snapshot = await db.collection('hardware_items').get()
 
-    if (error) throw error
+    const items = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      created_at: doc.data()?.created_at?.toDate?.()?.toISOString() || doc.data()?.created_at,
+    }))
 
-    return NextResponse.json({ items: items || [] })
+    // Sort by category, then by name
+    items.sort((a, b) => {
+      const categoryCompare = a.category.localeCompare(b.category)
+      if (categoryCompare !== 0) return categoryCompare
+      return a.name.localeCompare(b.name)
+    })
+
+    return NextResponse.json({ items })
   } catch (error) {
     console.error('Error fetching hardware items:', error)
     return NextResponse.json(
@@ -44,7 +52,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, type, category, price_per_night, is_available } = body
+    const { name, type, category, price_per_night, is_available, description } = body
 
     if (!name || !type || !category || price_per_night === undefined) {
       return NextResponse.json(
@@ -53,21 +61,26 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const supabase = createAdminClient()
+    const db = getFirebaseAdminDb()
 
-    const { data: item, error } = await supabase
-      .from('hardware_items')
-      .insert({
-        name,
-        type,
-        category,
-        price_per_night,
-        is_available: is_available !== undefined ? is_available : true,
-      })
-      .select()
-      .single()
+    const itemData = {
+      name,
+      type,
+      category,
+      price_per_night: parseFloat(price_per_night),
+      is_available: is_available !== undefined ? is_available : true,
+      description: description || null,
+      created_at: Timestamp.now(),
+    }
 
-    if (error) throw error
+    const docRef = await db.collection('hardware_items').add(itemData)
+    const newDoc = await docRef.get()
+
+    const item = {
+      id: newDoc.id,
+      ...newDoc.data(),
+      created_at: newDoc.data()?.created_at?.toDate?.()?.toISOString() || newDoc.data()?.created_at,
+    }
 
     return NextResponse.json({ item }, { status: 201 })
   } catch (error) {

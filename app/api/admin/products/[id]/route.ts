@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
+import { getFirebaseAdminDb } from '@/lib/firebase/admin'
+import { Timestamp } from 'firebase-admin/firestore'
 
 function verifyAuth(request: NextRequest): boolean {
   const authHeader = request.headers.get('authorization')
@@ -20,24 +21,32 @@ export async function PATCH(
 
     const { id } = await context.params
     const body = await request.json()
-    
-    const supabase = createAdminClient()
 
-    const updateData: any = {}
+    const db = getFirebaseAdminDb()
+
+    const updateData: any = {
+      updated_at: Timestamp.now()
+    }
     if (body.name !== undefined) updateData.name = body.name
-    if (body.price !== undefined) updateData.price = body.price
+    if (body.price !== undefined) updateData.price = parseFloat(body.price)
     if (body.category !== undefined) updateData.category = body.category
     if (body.image_url !== undefined) updateData.image_url = body.image_url
     if (body.is_available !== undefined) updateData.is_available = body.is_available
 
-    const { data: product, error } = await supabase
-      .from('products')
-      .update(updateData)
-      .eq('id' as any, id)
-      .select()
-      .single()
+    await db.collection('products').doc(id).update(updateData)
 
-    if (error) throw error
+    const updatedDoc = await db.collection('products').doc(id).get()
+
+    if (!updatedDoc.exists) {
+      return NextResponse.json({ error: 'Product not found' }, { status: 404 })
+    }
+
+    const product = {
+      id: updatedDoc.id,
+      ...updatedDoc.data(),
+      created_at: updatedDoc.data()?.created_at?.toDate?.()?.toISOString() || updatedDoc.data()?.created_at,
+      updated_at: updatedDoc.data()?.updated_at?.toDate?.()?.toISOString() || updatedDoc.data()?.updated_at,
+    }
 
     return NextResponse.json({ product })
   } catch (error) {
@@ -60,32 +69,38 @@ export async function DELETE(
     }
 
     const { id } = await context.params
-    const supabase = createAdminClient()
+    const db = getFirebaseAdminDb()
 
     // Get product to delete image from storage
-    const { data: product } = await supabase
-      .from('products')
-      .select('image_url')
-      .eq('id' as any, id)
-      .single()
+    const productDoc = await db.collection('products').doc(id).get()
 
-    // Delete image from storage if exists
-    if (product?.image_url) {
-      const fileName = product.image_url.split('/').pop()
-      if (fileName) {
-        await supabase.storage
-          .from('product-images')
-          .remove([fileName])
+    if (!productDoc.exists) {
+      return NextResponse.json({ error: 'Product not found' }, { status: 404 })
+    }
+
+    const productData = productDoc.data()
+
+    // Delete image from Firebase Storage if exists
+    if (productData?.image_url) {
+      try {
+        const { getStorage } = await import('firebase-admin/storage')
+        const bucket = getStorage().bucket()
+
+        // Extract file path from URL
+        // URL format: https://storage.googleapis.com/{bucket}/{path}
+        const urlParts = productData.image_url.split(`${bucket.name}/`)
+        if (urlParts.length > 1) {
+          const filePath = urlParts[1]
+          await bucket.file(filePath).delete()
+        }
+      } catch (storageError) {
+        console.error('Error deleting image from storage:', storageError)
+        // Continue with product deletion even if image deletion fails
       }
     }
 
     // Delete product
-    const { error } = await supabase
-      .from('products')
-      .delete()
-      .eq('id' as any, id)
-
-    if (error) throw error
+    await db.collection('products').doc(id).delete()
 
     return NextResponse.json({ success: true })
   } catch (error) {
@@ -108,15 +123,20 @@ export async function GET(
     }
 
     const { id } = await context.params
-    const supabase = createAdminClient()
+    const db = getFirebaseAdminDb()
 
-    const { data: product, error } = await supabase
-      .from('products')
-      .select('*')
-      .eq('id' as any, id)
-      .single()
+    const productDoc = await db.collection('products').doc(id).get()
 
-    if (error) throw error
+    if (!productDoc.exists) {
+      return NextResponse.json({ error: 'Product not found' }, { status: 404 })
+    }
+
+    const product = {
+      id: productDoc.id,
+      ...productDoc.data(),
+      created_at: productDoc.data()?.created_at?.toDate?.()?.toISOString() || productDoc.data()?.created_at,
+      updated_at: productDoc.data()?.updated_at?.toDate?.()?.toISOString() || productDoc.data()?.updated_at,
+    }
 
     return NextResponse.json({ product })
   } catch (error) {

@@ -1,6 +1,5 @@
-// @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getSessionBySlug } from '@/lib/firebase/queries'
 
 // GET /api/event/[slug] - Get event details by slug
 export async function GET(
@@ -8,23 +7,14 @@ export async function GET(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
-    const supabase = await createClient()
     const { slug } = await params
+    const session = await getSessionBySlug(slug)
 
-    const { data: session, error } = await supabase
-      .from('sessions')
-      .select('*')
-      .eq('slug', slug)
-      .single()
-
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return NextResponse.json(
-          { error: 'Event not found' },
-          { status: 404 }
-        )
-      }
-      throw error
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Event not found' },
+        { status: 404 }
+      )
     }
 
     return NextResponse.json({ session })

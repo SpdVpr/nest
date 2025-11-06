@@ -1,0 +1,58 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Sessions - read only for everyone (for public event pages)
+    match /sessions/{sessionId} {
+      allow read: true;
+      allow write: if false; // Only via Admin SDK
+    }
+    
+    // Guests - read only for everyone
+    match /guests/{guestId} {
+      allow read: true;
+      allow write: if false; // Only via Admin SDK
+    }
+    
+    // Products - read only for everyone
+    match /products/{productId} {
+      allow read: true;
+      allow write: if false; // Only via Admin SDK
+    }
+    
+    // Consumption - read only for everyone
+    match /consumption/{consumptionId} {
+      allow read: true;
+      allow write: if false; // Only via Admin SDK
+    }
+    
+    // Hardware Items - read only for everyone
+    match /hardware_items/{itemId} {
+      allow read: true;
+      allow write: if false; // Only via Admin SDK
+    }
+    
+    // Hardware Reservations - read only for everyone
+    match /hardware_reservations/{reservationId} {
+      allow read: true;
+      allow write: if false; // Only via Admin SDK
+    }
+    
+    // Seat Reservations - read only for everyone
+    match /seat_reservations/{reservationId} {
+      allow read: true;
+      allow write: if false; // Only via Admin SDK
+    }
+    
+    // Deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

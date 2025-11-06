@@ -84,7 +84,7 @@ export default function EventPage() {
     )
   }
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status?: string) => {
     switch (status) {
       case 'active': return 'bg-green-500'
       case 'upcoming': return 'bg-blue-500'
@@ -93,13 +93,13 @@ export default function EventPage() {
     }
   }
 
-  const getStatusLabel = (status: string) => {
+  const getStatusLabel = (status?: string) => {
     switch (status) {
       case 'active': return 'Probíhá'
       case 'upcoming': return 'Nadcházející'
       case 'completed': return 'Ukončeno'
       case 'draft': return 'Koncept'
-      default: return status
+      default: return status || 'Neznámý'
     }
   }
 

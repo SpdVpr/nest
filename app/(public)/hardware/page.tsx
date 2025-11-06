@@ -222,17 +222,17 @@ export default function HardwarePage() {
                       <h3 className="font-bold text-gray-900">{item.name}</h3>
                       {isSelected && <Check className="w-5 h-5 text-green-600" />}
                     </div>
-                    {item.type === 'monitor' ? (
+                    {item.type === 'monitor' && item.specs ? (
                       <div className="text-sm text-gray-600">
                         <p>{item.specs.resolution} • {item.specs.diagonal}"</p>
                         <p>{item.specs.hz} Hz</p>
                       </div>
-                    ) : (
+                    ) : item.type === 'pc' && item.specs ? (
                       <div className="text-sm text-gray-600">
                         <p>{item.specs.cpu}</p>
                         <p>{item.specs.ram} • {item.specs.gpu}</p>
                       </div>
-                    )}
+                    ) : null}
                     <p className="text-lg font-bold text-orange-600 mt-2">
                       {item.price_per_night} Kč/noc
                     </p>

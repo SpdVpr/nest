@@ -58,7 +58,7 @@ export default function AdminProductsPage() {
     setEditingProduct({
       name: '',
       price: 0,
-      category: 'Nápoje',
+      category: 'Ostatní',
       image_url: '',
       is_available: true,
     })
@@ -177,7 +177,7 @@ export default function AdminProductsPage() {
     }
   }
 
-  const categories = ['Nápoje', 'Jídlo', 'Sladkosti', 'Ostatní']
+  const categories = ['Pivo', 'Alkoholické nápoje', 'Nealkoholické nápoje', 'Jídlo', 'Sladkosti', 'Ostatní']
 
   if (loading) {
     return (
@@ -245,8 +245,8 @@ export default function AdminProductsPage() {
 
         {/* Editing Modal */}
         {editingProduct && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+            <div className="bg-white rounded-2xl shadow-xl p-8 max-w-2xl w-full my-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-6">
                 {isCreating ? 'Nový produkt' : 'Upravit produkt'}
               </h2>
@@ -283,7 +283,7 @@ export default function AdminProductsPage() {
                     Kategorie
                   </label>
                   <select
-                    value={editingProduct.category || 'Nápoje'}
+                    value={editingProduct.category || 'Ostatní'}
                     onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
                   >
@@ -298,11 +298,11 @@ export default function AdminProductsPage() {
                     Obrázek
                   </label>
                   {editingProduct.image_url && (
-                    <div className="mb-3">
+                    <div className="mb-3 bg-gray-50 rounded-lg p-3 border border-gray-200 flex items-center justify-center">
                       <img
                         src={editingProduct.image_url}
                         alt="Náhled"
-                        className="w-full h-32 object-cover rounded-lg"
+                        className="max-w-xs max-h-48 object-contain rounded-lg"
                       />
                     </div>
                   )}
@@ -378,11 +378,13 @@ export default function AdminProductsPage() {
                 className="bg-white rounded-xl shadow-sm p-4 hover:shadow-md transition-shadow"
               >
                 {product.image_url && (
-                  <img
-                    src={product.image_url}
-                    alt={product.name}
-                    className="w-full h-32 object-cover rounded-lg mb-3"
-                  />
+                  <div className="w-full bg-gray-50 rounded-lg mb-3 flex items-center justify-center p-2">
+                    <img
+                      src={product.image_url}
+                      alt={product.name}
+                      className="w-full h-auto max-h-48 object-contain rounded-lg"
+                    />
+                  </div>
                 )}
                 <h3 className="font-bold text-lg text-gray-900 mb-1">{product.name}</h3>
                 <p className="text-sm text-gray-600 mb-2">{product.category}</p>

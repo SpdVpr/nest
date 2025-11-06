@@ -24,6 +24,9 @@ export default function AdminDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [sessions, setSessions] = useState<Session[]>([])
   const [guestsCount, setGuestsCount] = useState(0)
+  const [productsCount, setProductsCount] = useState(0)
+  const [totalRevenue, setTotalRevenue] = useState(0)
+  const [todayConsumption, setTodayConsumption] = useState(0)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [newSessionName, setNewSessionName] = useState('')
   const [newSessionStartDate, setNewSessionStartDate] = useState('')
@@ -43,10 +46,12 @@ export default function AdminDashboard() {
 
   const fetchDashboardData = async () => {
     try {
+      const token = localStorage.getItem('admin_token')
+
       // Fetch all sessions (not just upcoming)
       const sessionResponse = await fetch('/api/admin/sessions', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('admin_token')}`
+          'Authorization': `Bearer ${token}`
         }
       })
       if (sessionResponse.ok) {
@@ -60,6 +65,79 @@ export default function AdminDashboard() {
         const guestsData = await guestsResponse.json()
         setGuestsCount(guestsData.guests?.length || 0)
       }
+
+      // Fetch products count
+      const productsResponse = await fetch('/api/admin/products', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      if (productsResponse.ok) {
+        const productsData = await productsResponse.json()
+        setProductsCount(productsData.products?.length || 0)
+      }
+
+      // Fetch consumption data for revenue and today's consumption
+      const consumptionResponse = await fetch('/api/admin/consumption', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      let consumptionRevenue = 0
+      let todayConsumptionTotal = 0
+
+      if (consumptionResponse.ok) {
+        const consumptionData = await consumptionResponse.json()
+        const records = consumptionData.records || []
+
+        // Calculate consumption revenue
+        consumptionRevenue = records.reduce((sum: number, record: any) => {
+          return sum + (record.quantity * (record.products?.price || 0))
+        }, 0)
+
+        // Calculate today's consumption
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        const todayRecords = records.filter((record: any) => {
+          const recordDate = new Date(record.consumed_at)
+          recordDate.setHours(0, 0, 0, 0)
+          return recordDate.getTime() === today.getTime()
+        })
+        todayConsumptionTotal = todayRecords.reduce((sum: number, record: any) => {
+          return sum + (record.quantity * (record.products?.price || 0))
+        }, 0)
+      }
+
+      // Fetch hardware reservations revenue
+      const hardwareResponse = await fetch('/api/admin/hardware-revenue', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      let hardwareRevenue = 0
+      if (hardwareResponse.ok) {
+        const hardwareData = await hardwareResponse.json()
+        hardwareRevenue = hardwareData.totalRevenue || 0
+      }
+
+      // Fetch accommodation revenue (guests * nights * price_per_night)
+      const accommodationResponse = await fetch('/api/admin/accommodation-revenue', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      let accommodationRevenue = 0
+      if (accommodationResponse.ok) {
+        const accommodationData = await accommodationResponse.json()
+        accommodationRevenue = accommodationData.totalRevenue || 0
+      }
+
+      // Set total revenue (consumption + hardware + accommodation)
+      setTotalRevenue(consumptionRevenue + hardwareRevenue + accommodationRevenue)
+      setTodayConsumption(todayConsumptionTotal)
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error)
     }
@@ -382,7 +460,7 @@ export default function AdminDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Produkty</p>
-                <p className="text-2xl font-bold text-gray-900">-</p>
+                <p className="text-2xl font-bold text-gray-900">{productsCount}</p>
               </div>
               <Package className="w-10 h-10 text-green-500" />
             </div>
@@ -392,7 +470,7 @@ export default function AdminDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Celkový obrat</p>
-                <p className="text-2xl font-bold text-gray-900">-</p>
+                <p className="text-2xl font-bold text-gray-900">{totalRevenue.toFixed(0)} Kč</p>
               </div>
               <DollarSign className="w-10 h-10 text-purple-500" />
             </div>
@@ -402,7 +480,7 @@ export default function AdminDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Spotřeba dnes</p>
-                <p className="text-2xl font-bold text-gray-900">-</p>
+                <p className="text-2xl font-bold text-gray-900">{todayConsumption.toFixed(0)} Kč</p>
               </div>
               <TrendingUp className="w-10 h-10 text-orange-500" />
             </div>

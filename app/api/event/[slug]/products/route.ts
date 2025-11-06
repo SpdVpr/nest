@@ -1,54 +1,31 @@
-// @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getSessionBySlug, getAvailableProducts } from '@/lib/firebase/queries'
 
-// GET /api/event/[slug]/products - Get products with stock for specific event
+// GET /api/event/[slug]/products - Get products for specific event
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
-    const supabase = await createClient()
     const { slug } = await params
 
     // First get the session
-    const { data: session, error: sessionError } = await supabase
-      .from('sessions')
-      .select('id')
-      .eq('slug', slug)
-      .single()
+    const session = await getSessionBySlug(slug)
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Event not found' },
+        { status: 404 }
+      )
+    }
 
-    if (sessionError) throw sessionError
+    // Get all available products
+    // Note: Firebase doesn't have session_stock table like Supabase
+    // We're just returning all available products for now
+    const products = await getAvailableProducts()
 
-    // Get products with their stock information for this session
-    const { data: stockData, error: stockError } = await supabase
-      .from('session_stock')
-      .select(`
-        *,
-        products (*)
-      `)
-      .eq('session_id', session.id)
-
-    if (stockError) throw stockError
-
-    // Transform data to include stock info with products
-    const productsWithStock = stockData.map(stock => ({
-      ...stock.products,
-      stock: {
-        initial_quantity: stock.initial_quantity,
-        consumed_quantity: stock.consumed_quantity,
-        remaining_quantity: stock.remaining_quantity,
-      }
-    }))
-
-    // Filter only products that are available (no stock limit)
-    const availableProducts = productsWithStock.filter(
-      p => p.is_available
-    )
-
-    return NextResponse.json({ 
-      products: availableProducts,
-      session_id: session.id 
+    return NextResponse.json({
+      products,
+      session_id: session.id
     })
   } catch (error) {
     console.error('Error fetching event products:', error)

@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
+import { getFirebaseAdminDb } from '@/lib/firebase/admin'
+import { Timestamp } from 'firebase-admin/firestore'
 
 // Verify admin authentication
 function verifyAuth(request: NextRequest): boolean {
@@ -16,16 +17,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = createAdminClient()
+    const db = getFirebaseAdminDb()
 
-    const { data: products, error } = await supabase
-      .from('products')
-      .select('*')
-      .order('name', { ascending: true })
+    const snapshot = await db.collection('products').get()
 
-    if (error) throw error
+    const products = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      created_at: doc.data()?.created_at?.toDate?.()?.toISOString() || doc.data()?.created_at,
+      updated_at: doc.data()?.updated_at?.toDate?.()?.toISOString() || doc.data()?.updated_at,
+    }))
 
-    return NextResponse.json({ products: products || [] })
+    // Sort by name
+    products.sort((a, b) => a.name.localeCompare(b.name))
+
+    return NextResponse.json({ products })
   } catch (error) {
     console.error('Error fetching products:', error)
     return NextResponse.json(
@@ -52,21 +58,54 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const supabase = createAdminClient()
+    const db = getFirebaseAdminDb()
 
-    const { data: product, error } = await supabase
-      .from('products')
-      .insert({
-        name,
-        price,
-        category: category || 'Ostatní',
-        image_url: image_url || null,
-        is_available: is_available !== undefined ? is_available : true,
-      })
-      .select()
-      .single()
+    const now = Timestamp.now()
+    const productData = {
+      name,
+      price: parseFloat(price),
+      category: category || 'Ostatní',
+      image_url: image_url || null,
+      is_available: is_available !== undefined ? is_available : true,
+      created_at: now,
+      updated_at: now,
+    }
 
-    if (error) throw error
+    const docRef = await db.collection('products').add(productData)
+    const newDoc = await docRef.get()
+
+    const product = {
+      id: newDoc.id,
+      ...newDoc.data(),
+      created_at: newDoc.data()?.created_at?.toDate?.()?.toISOString() || newDoc.data()?.created_at,
+      updated_at: newDoc.data()?.updated_at?.toDate?.()?.toISOString() || newDoc.data()?.updated_at,
+    }
+
+    // Auto-add this product to all existing sessions
+    if (productData.is_available) {
+      try {
+        const sessionsSnapshot = await db.collection('sessions').get()
+
+        const batch = db.batch()
+        sessionsSnapshot.docs.forEach(sessionDoc => {
+          const stockRef = db.collection('session_stock').doc()
+          batch.set(stockRef, {
+            session_id: sessionDoc.id,
+            product_id: docRef.id,
+            initial_quantity: 0,
+            consumed_quantity: 0,
+            created_at: now,
+            updated_at: now,
+          })
+        })
+
+        await batch.commit()
+        console.log(`✅ Product ${product.name} added to ${sessionsSnapshot.size} sessions`)
+      } catch (syncError) {
+        console.error('Error syncing product to sessions:', syncError)
+        // Don't fail the request if sync fails
+      }
+    }
 
     return NextResponse.json({ product }, { status: 201 })
   } catch (error) {

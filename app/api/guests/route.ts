@@ -1,18 +1,13 @@
-// @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getFirebaseAdminDb } from '@/lib/firebase/admin'
+import { getActiveSession, getGuestsBySessionId } from '@/lib/firebase/queries'
+import { Timestamp } from 'firebase-admin/firestore'
+import { Guest } from '@/types/database.types'
 
 // GET /api/guests - Get all guests from active session
 export async function GET() {
   try {
-    const supabase = await createClient()
-
-    // First, get the active session
-    const { data: activeSession } = await supabase
-      .from('sessions')
-      .select('id')
-      .eq('is_active', true)
-      .single()
+    const activeSession = await getActiveSession()
 
     if (!activeSession) {
       return NextResponse.json(
@@ -21,17 +16,9 @@ export async function GET() {
       )
     }
 
-    // Get guests from active session
-    const { data: guests, error } = await supabase
-      .from('guests')
-      .select('*')
-      .eq('session_id', activeSession.id)
-      .eq('is_active', true)
-      .order('name', { ascending: true })
+    const guests = await getGuestsBySessionId(activeSession.id, true)
 
-    if (error) throw error
-
-    return NextResponse.json({ guests: guests || [] })
+    return NextResponse.json({ guests })
   } catch (error) {
     console.error('Error fetching guests:', error)
     return NextResponse.json(
@@ -53,14 +40,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const supabase = await createClient()
-
-    // Get active session
-    const { data: activeSession } = await supabase
-      .from('sessions')
-      .select('id')
-      .eq('is_active', true)
-      .single()
+    const activeSession = await getActiveSession()
 
     if (!activeSession) {
       return NextResponse.json(
@@ -69,17 +49,24 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create guest
-    const { data: guest, error } = await supabase
-      .from('guests')
-      .insert({
-        name: name.trim(),
-        session_id: activeSession.id,
-      })
-      .select()
-      .single()
+    const db = getFirebaseAdminDb()
+    const guestsRef = db.collection('guests')
 
-    if (error) throw error
+    const now = Timestamp.now()
+    const guestData = {
+      name: name.trim(),
+      session_id: activeSession.id,
+      nights_count: 1,
+      is_active: true,
+      created_at: now,
+    }
+
+    const docRef = await guestsRef.add(guestData)
+    const guest: Guest = {
+      id: docRef.id,
+      ...guestData,
+      created_at: now.toDate().toISOString(),
+    }
 
     return NextResponse.json({ guest }, { status: 201 })
   } catch (error) {

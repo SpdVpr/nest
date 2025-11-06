@@ -1,21 +1,28 @@
-// @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { getFirebaseAdminDb } from '@/lib/firebase/admin'
+import { Timestamp } from 'firebase-admin/firestore'
+import { Product } from '@/types/database.types'
 
 // GET /api/products - Get all available products
 export async function GET() {
   try {
-    const supabase = await createClient()
+    const db = getFirebaseAdminDb()
+    const productsRef = db.collection('products')
+    const snapshot = await productsRef
+      .where('is_available', '==', true)
+      .get()
 
-    const { data: products, error } = await supabase
-      .from('products')
-      .select('*')
-      .eq('is_available', true)
-      .order('name', { ascending: true })
+    // Sort in memory to avoid composite index requirement
+    const products: Product[] = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      created_at: doc.data().created_at?.toDate().toISOString() || new Date().toISOString(),
+      updated_at: doc.data().updated_at?.toDate().toISOString() || new Date().toISOString(),
+    })) as Product[]
 
-    if (error) throw error
+    products.sort((a, b) => a.name.localeCompare(b.name))
 
-    return NextResponse.json({ products: products || [] })
+    return NextResponse.json({ products })
   } catch (error) {
     console.error('Error fetching products:', error)
     return NextResponse.json(
@@ -54,21 +61,28 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const supabase = createAdminClient()
+    const db = getFirebaseAdminDb()
+    const productsRef = db.collection('products')
 
-    const { data: product, error } = await supabase
-      .from('products')
-      .insert({
-        name: name.trim(),
-        price,
-        category: category?.trim() || null,
-        image_url: image_url || null,
-        is_available: is_available ?? true,
-      })
-      .select()
-      .single()
+    const now = Timestamp.now()
+    const productData = {
+      name: name.trim(),
+      price,
+      category: category?.trim() || null,
+      image_url: image_url || null,
+      is_available: is_available ?? true,
+      purchase_price: null,
+      created_at: now,
+      updated_at: now,
+    }
 
-    if (error) throw error
+    const docRef = await productsRef.add(productData)
+    const product: Product = {
+      id: docRef.id,
+      ...productData,
+      created_at: now.toDate().toISOString(),
+      updated_at: now.toDate().toISOString(),
+    }
 
     return NextResponse.json({ product }, { status: 201 })
   } catch (error) {

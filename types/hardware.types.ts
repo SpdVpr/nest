@@ -15,13 +15,13 @@ export interface HardwareSpecs {
 export interface HardwareItem {
   id: string
   name: string
-  type: 'monitor' | 'pc'
-  category: '100' | '200' | '250'
+  type: 'monitor' | 'pc' | 'accessory'
+  category: string
   price_per_night: number
-  specs: HardwareSpecs
+  specs?: HardwareSpecs
   is_available: boolean
-  created_at: string
-  updated_at: string
+  created_at?: string
+  updated_at?: string
 }
 
 export interface HardwareReservation {

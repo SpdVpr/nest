@@ -3,12 +3,38 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Monitor, Cpu, Check } from 'lucide-react'
+import { ArrowLeft, Monitor, Cpu, Check, Gamepad2, Keyboard, Mouse, Headphones, Cable } from 'lucide-react'
 import { Session, Guest } from '@/types/database.types'
 import { HardwareItem } from '@/types/hardware.types'
 import { formatDate } from '@/lib/utils'
 import { guestStorage } from '@/lib/guest-storage'
 import EventGuestHeader from '@/components/EventGuestHeader'
+
+// Helper function to get icon based on item name
+const getItemIcon = (item: HardwareItem, className: string = "w-5 h-5") => {
+  const name = item.name.toLowerCase()
+
+  if (item.type === 'pc') {
+    return <Cpu className={className} />
+  } else if (item.type === 'monitor') {
+    return <Monitor className={className} />
+  } else if (item.type === 'accessory') {
+    // Check name for specific accessories
+    if (name.includes('klávesnic')) {
+      return <Keyboard className={className} />
+    } else if (name.includes('myš')) {
+      return <Mouse className={className} />
+    } else if (name.includes('sluchátk')) {
+      return <Headphones className={className} />
+    } else if (name.includes('kabel') || name.includes('napájec')) {
+      return <Cable className={className} />
+    } else {
+      return <Gamepad2 className={className} />
+    }
+  }
+
+  return <Gamepad2 className={className} />
+}
 
 export default function EventHardwarePage() {
   const params = useParams()
@@ -17,9 +43,10 @@ export default function EventHardwarePage() {
   const [session, setSession] = useState<Session | null>(null)
   const [guests, setGuests] = useState<Guest[]>([])
   const [hardwareItems, setHardwareItems] = useState<HardwareItem[]>([])
+  const [reservations, setReservations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedGuest, setSelectedGuest] = useState<Guest | null>(null)
-  const [selectedCategory, setSelectedCategory] = useState<'200' | '100' | '250'>('200')
+  const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [selectedItems, setSelectedItems] = useState<string[]>([])
   const [nightsCount, setNightsCount] = useState(1)
   const [showConfirm, setShowConfirm] = useState(false)
@@ -51,11 +78,18 @@ export default function EventHardwarePage() {
   const fetchData = async () => {
     try {
       setLoading(true)
-      
+
       const sessionRes = await fetch(`/api/event/${slug}`)
       if (sessionRes.ok) {
         const sessionData = await sessionRes.json()
         setSession(sessionData.session)
+
+        // Fetch reservations for this session
+        const reservationsRes = await fetch(`/api/hardware/reservations?session_id=${sessionData.session.id}`)
+        if (reservationsRes.ok) {
+          const reservationsData = await reservationsRes.json()
+          setReservations(reservationsData.reservations || [])
+        }
       }
 
       const guestsRes = await fetch(`/api/event/${slug}/guests`)
@@ -123,9 +157,21 @@ export default function EventHardwarePage() {
     }
   }
 
-  const filteredItems = hardwareItems.filter(item => item.category === selectedCategory && item.is_available)
+  // Group hardware by category
+  const categories = Array.from(new Set(hardwareItems.map(item => item.category))).sort()
+
+  // Set initial category when hardware items are loaded
+  useEffect(() => {
+    if (categories.length > 0 && !selectedCategory) {
+      setSelectedCategory(categories[0])
+    }
+  }, [categories, selectedCategory])
+
+  const filteredItems = hardwareItems.filter(item =>
+    item.category === selectedCategory && item.is_available
+  )
   const selectedItemsDetails = hardwareItems.filter(item => selectedItems.includes(item.id))
-  const totalPrice = selectedItems.length * parseInt(selectedCategory) * nightsCount
+  const totalPrice = selectedItemsDetails.reduce((sum, item) => sum + (item.price_per_night * nightsCount), 0)
 
   if (loading) {
     return (
@@ -141,7 +187,7 @@ export default function EventHardwarePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-red-50 p-4">
       <EventGuestHeader session_slug={slug} />
-      <div className="max-w-7xl mx-auto py-6">
+      <div className="max-w-5xl mx-auto py-6">
         <Link
           href={`/event/${slug}`}
           className="inline-flex items-center text-gray-600 hover:text-gray-900 mb-6"
@@ -188,56 +234,58 @@ export default function EventHardwarePage() {
         <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
           <h2 className="text-xl font-bold text-gray-900 mb-4">Vyber kategorii</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <button
-              onClick={() => setSelectedCategory('200')}
-              className={`p-6 rounded-xl border-2 transition-all ${
-                selectedCategory === '200'
-                  ? 'border-orange-500 bg-orange-50 shadow-lg'
-                  : 'border-gray-200 hover:border-orange-300'
-              }`}
-            >
-              <Monitor className="w-12 h-12 text-orange-600 mx-auto mb-3" />
-              <h3 className="text-lg font-bold text-gray-900">Monitory Premium</h3>
-              <p className="text-3xl font-bold text-orange-600 my-2">200 Kč</p>
-              <p className="text-sm text-gray-600">za noc</p>
-              <p className="text-xs text-gray-500 mt-2">QHD/WQHD • 144-240Hz</p>
-            </button>
+            {categories.map((category) => {
+              const categoryItems = hardwareItems.filter(item => item.category === category && item.is_available)
+              const hasPC = categoryItems.some(item => item.type === 'pc')
+              const hasAccessory = categoryItems.some(item => item.type === 'accessory')
+              const hasMonitor = categoryItems.some(item => item.type === 'monitor')
 
-            <button
-              onClick={() => setSelectedCategory('100')}
-              className={`p-6 rounded-xl border-2 transition-all ${
-                selectedCategory === '100'
-                  ? 'border-purple-500 bg-purple-50 shadow-lg'
-                  : 'border-gray-200 hover:border-purple-300'
-              }`}
-            >
-              <Monitor className="w-12 h-12 text-purple-600 mx-auto mb-3" />
-              <h3 className="text-lg font-bold text-gray-900">Monitory Standard</h3>
-              <p className="text-3xl font-bold text-purple-600 my-2">100 Kč</p>
-              <p className="text-sm text-gray-600">za noc</p>
-              <p className="text-xs text-gray-500 mt-2">Full HD/WQHD • 165Hz</p>
-            </button>
+              // Get icon for category - use first item's icon
+              const firstItem = categoryItems[0]
 
-            <button
-              onClick={() => setSelectedCategory('250')}
-              className={`p-6 rounded-xl border-2 transition-all ${
-                selectedCategory === '250'
-                  ? 'border-blue-500 bg-blue-50 shadow-lg'
-                  : 'border-gray-200 hover:border-blue-300'
-              }`}
-            >
-              <Cpu className="w-12 h-12 text-blue-600 mx-auto mb-3" />
-              <h3 className="text-lg font-bold text-gray-900">Gaming PC</h3>
-              <p className="text-3xl font-bold text-blue-600 my-2">250 Kč</p>
-              <p className="text-sm text-gray-600">za noc</p>
-              <p className="text-xs text-gray-500 mt-2">i5 14400F • RTX 5070</p>
-            </button>
+              // Calculate price range for monitors
+              const prices = categoryItems.map(item => item.price_per_night)
+              const minPrice = Math.min(...prices)
+              const maxPrice = Math.max(...prices)
+              const isFree = minPrice === 0 && maxPrice === 0
+
+              return (
+                <button
+                  key={category}
+                  onClick={() => {
+                    setSelectedCategory(category)
+                    setSelectedItems([])
+                  }}
+                  className={`p-6 rounded-xl border-2 transition-all ${
+                    selectedCategory === category
+                      ? 'border-orange-500 bg-orange-50 shadow-lg'
+                      : 'border-gray-200 hover:border-orange-300'
+                  }`}
+                >
+                  {firstItem && (
+                    <div className="text-orange-600 flex justify-center mb-3">
+                      {getItemIcon(firstItem, "w-12 h-12")}
+                    </div>
+                  )}
+                  <h3 className="text-lg font-bold text-gray-900">{category}</h3>
+                  <p className="text-3xl font-bold text-orange-600 my-2">
+                    {isFree ? 'Zdarma' : hasMonitor && minPrice !== maxPrice ? `${minPrice}-${maxPrice} Kč` : `${minPrice} Kč`}
+                  </p>
+                  {!isFree && (
+                    <p className="text-sm text-gray-600">za noc</p>
+                  )}
+                  <p className="text-xs text-gray-500 mt-2">
+                    {categoryItems.length} ks dostupných
+                  </p>
+                </button>
+              )
+            })}
           </div>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
           <h2 className="text-xl font-bold text-gray-900 mb-4">
-            Dostupné {selectedCategory === '250' ? 'PC' : 'monitory'} ({filteredItems.length} ks)
+            {selectedCategory} ({filteredItems.length} ks dostupných)
           </h2>
           
           {filteredItems.length === 0 ? (
@@ -257,22 +305,19 @@ export default function EventHardwarePage() {
                     }`}
                   >
                     <div className="flex items-start justify-between mb-2">
-                      <h3 className="font-bold text-gray-900">{item.name}</h3>
+                      <div className="flex items-center gap-2">
+                        <div className="text-orange-600">
+                          {getItemIcon(item, "w-5 h-5")}
+                        </div>
+                        <h3 className="font-bold text-gray-900">{item.name}</h3>
+                      </div>
                       {isSelected && <Check className="w-5 h-5 text-green-600" />}
                     </div>
-                    {item.type === 'monitor' ? (
-                      <div className="text-sm text-gray-600">
-                        <p>{item.specs.resolution} • {item.specs.diagonal}"</p>
-                        <p>{item.specs.hz} Hz</p>
-                      </div>
-                    ) : (
-                      <div className="text-sm text-gray-600">
-                        <p>{item.specs.cpu}</p>
-                        <p>{item.specs.ram} • {item.specs.gpu}</p>
-                      </div>
-                    )}
+                    <div className="text-sm text-gray-600">
+                      <p>{(item as any).description || 'Bez popisu'}</p>
+                    </div>
                     <p className="text-lg font-bold text-orange-600 mt-2">
-                      {item.price_per_night} Kč/noc
+                      {item.price_per_night === 0 ? 'Zdarma' : `${item.price_per_night} Kč/noc`}
                     </p>
                   </button>
                 )
@@ -287,7 +332,7 @@ export default function EventHardwarePage() {
               <div>
                 <h3 className="text-xl font-bold mb-2">Vybrané položky</h3>
                 <p className="text-green-100">
-                  {selectedItems.length}× {selectedCategory === '250' ? 'PC' : 'monitor'} • {nightsCount}× noc
+                  {selectedItems.length}× položka • {nightsCount}× noc
                 </p>
               </div>
               
@@ -315,6 +360,49 @@ export default function EventHardwarePage() {
                   Rezervovat
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Reservations List */}
+        {reservations.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-xl p-6 mt-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">
+              Rezervace hardware ({reservations.length})
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {reservations.map((reservation) => (
+                <div
+                  key={reservation.id}
+                  className="p-4 bg-gray-50 rounded-lg border border-gray-200"
+                >
+                  <div className="flex items-start gap-3 mb-3">
+                    <div className="flex-shrink-0">
+                      {reservation.hardware_items?.type === 'pc' ? (
+                        <Cpu className="w-5 h-5 text-blue-600" />
+                      ) : (
+                        <Monitor className="w-5 h-5 text-orange-600" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-gray-900 text-sm truncate">
+                        {reservation.hardware_items?.name || 'Neznámé zařízení'}
+                      </h3>
+                      <p className="text-xs text-gray-600 truncate">
+                        {(reservation.hardware_items as any)?.description || ''}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="border-t border-gray-200 pt-2">
+                    <p className="font-semibold text-gray-900 text-sm">
+                      {reservation.guests?.name || 'Neznámý host'}
+                    </p>
+                    <p className="text-xs text-gray-600">
+                      {reservation.nights_count}× noc • {reservation.total_price} Kč
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}

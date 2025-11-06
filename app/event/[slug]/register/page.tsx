@@ -184,7 +184,7 @@ export default function RegisterPage() {
             <form onSubmit={handleSubmit}>
               <div className="mb-6">
                 <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                  Tvoje jméno
+                  Tvoje jméno <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -200,7 +200,7 @@ export default function RegisterPage() {
 
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-3">
-                  Kdy přijedeš a odjedeš?
+                  Kdy přijedeš a odjedeš? <span className="text-red-500">*</span>
                 </label>
                 <DateRangeCalendar
                   startDate={new Date(session.start_date)}
@@ -238,7 +238,7 @@ export default function RegisterPage() {
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={submitting || !name.trim()}
+                disabled={submitting || !name.trim() || !checkedInDate || !checkedOutDate}
                 className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
               >
                 {submitting ? (

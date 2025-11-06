@@ -1,6 +1,7 @@
-// @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
+import { getFirebaseAdminDb } from '@/lib/firebase/admin'
+import { Timestamp } from 'firebase-admin/firestore'
+import { Session } from '@/types/database.types'
 
 function verifyAuth(request: NextRequest): boolean {
   const authHeader = request.headers.get('authorization')
@@ -15,16 +16,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = createAdminClient()
+    const db = getFirebaseAdminDb()
+    const snapshot = await db.collection('sessions')
+      .orderBy('start_date', 'desc')
+      .get()
 
-    const { data: sessions, error } = await supabase
-      .from('sessions')
-      .select('*')
-      .order('start_date', { ascending: false })
+    const sessions: Session[] = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      created_at: doc.data().created_at?.toDate().toISOString() || new Date().toISOString(),
+      start_date: doc.data().start_date?.toDate().toISOString() || new Date().toISOString(),
+      end_date: doc.data().end_date?.toDate().toISOString() || null,
+    } as Session))
 
-    if (error) throw error
-
-    return NextResponse.json({ sessions: sessions || [] })
+    return NextResponse.json({ sessions })
   } catch (error) {
     console.error('Error fetching sessions:', error)
     return NextResponse.json(
@@ -47,7 +52,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 })
     }
 
-    const supabase = createAdminClient()
+    const db = getFirebaseAdminDb()
 
     // Generate slug from name and date
     const startDate = start_date || new Date().toISOString()
@@ -57,45 +62,42 @@ export async function POST(request: NextRequest) {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '')
       .substring(0, 50)
-    
+
     // Check for unique slug
     let slug = slugBase
     let counter = 0
     while (true) {
-      const { data } = await supabase
-        .from('sessions')
-        .select('id')
-        .eq('slug', slug)
-        .single()
-      
-      if (!data) break // Slug is unique
-      
+      const existingDoc = await db.collection('sessions')
+        .where('slug', '==', slug)
+        .limit(1)
+        .get()
+
+      if (existingDoc.empty) break // Slug is unique
+
       counter++
       slug = `${slugBase}-${counter}`
     }
 
-    const sessionData: any = { 
-      name, 
+    const now = Timestamp.now()
+    const sessionData = {
+      name,
       slug,
       is_active: true,
-      start_date: startDate,
+      start_date: Timestamp.fromDate(new Date(startDate)),
+      end_date: end_date ? Timestamp.fromDate(new Date(end_date)) : null,
       status: status || 'upcoming',
-      description: description || null
+      description: description || null,
+      price_per_night: 0,
+      created_at: now,
     }
 
-    if (end_date) {
-      sessionData.end_date = end_date
-    }
-
-    const { data: session, error } = await supabase
-      .from('sessions')
-      .insert(sessionData)
-      .select()
-      .single()
-
-    if (error) {
-      console.error('Database error:', error)
-      throw error
+    const docRef = await db.collection('sessions').add(sessionData)
+    const session: Session = {
+      id: docRef.id,
+      ...sessionData,
+      created_at: now.toDate().toISOString(),
+      start_date: sessionData.start_date.toDate().toISOString(),
+      end_date: sessionData.end_date?.toDate().toISOString() || null,
     }
 
     return NextResponse.json({ session }, { status: 201 })

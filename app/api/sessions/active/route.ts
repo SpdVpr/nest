@@ -1,24 +1,32 @@
-// @ts-nocheck
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getFirebaseAdminDb } from '@/lib/firebase/admin'
+import { Session } from '@/types/database.types'
 
 // GET /api/sessions/active - Get active session
 export async function GET() {
   try {
-    const supabase = await createClient()
+    const db = getFirebaseAdminDb()
+    const sessionsRef = db.collection('sessions')
+    const snapshot = await sessionsRef
+      .where('is_active', '==', true)
+      .limit(1)
+      .get()
 
-    const { data: session, error } = await supabase
-      .from('sessions')
-      .select('*')
-      .eq('is_active', true)
-      .single()
-
-    if (error || !session) {
+    if (snapshot.empty) {
       return NextResponse.json(
         { error: 'No active session found' },
         { status: 404 }
       )
     }
+
+    const doc = snapshot.docs[0]
+    const session: Session = {
+      id: doc.id,
+      ...doc.data(),
+      created_at: doc.data().created_at?.toDate().toISOString() || new Date().toISOString(),
+      start_date: doc.data().start_date?.toDate().toISOString() || new Date().toISOString(),
+      end_date: doc.data().end_date?.toDate().toISOString() || null,
+    } as Session
 
     return NextResponse.json({ session })
   } catch (error) {

@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
+import { getFirebaseAdminDb } from '@/lib/firebase/admin'
 
 function verifyAuth(request: NextRequest): boolean {
   const authHeader = request.headers.get('authorization')
@@ -19,16 +19,21 @@ export async function GET(
     }
 
     const { id } = await context.params
-    const supabase = createAdminClient()
+    const db = getFirebaseAdminDb()
 
-    const { data: session, error } = await supabase
-      .from('sessions')
-      .select('*')
-      .eq('id', id)
-      .single()
+    const doc = await db.collection('sessions').doc(id).get()
 
-    if (error) throw error
-    if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 })
+    if (!doc.exists) {
+      return NextResponse.json({ error: 'Session not found' }, { status: 404 })
+    }
+
+    const session = {
+      id: doc.id,
+      ...doc.data(),
+      start_date: doc.data()?.start_date?.toDate?.()?.toISOString() || doc.data()?.start_date,
+      end_date: doc.data()?.end_date?.toDate?.()?.toISOString() || doc.data()?.end_date,
+      created_at: doc.data()?.created_at?.toDate?.()?.toISOString() || doc.data()?.created_at,
+    }
 
     return NextResponse.json({ session })
   } catch (error) {
@@ -53,15 +58,17 @@ export async function PATCH(
     const { id } = await context.params
     const body = await request.json()
     console.log('Updating session with data:', body)
-    
-    const supabase = createAdminClient()
+
+    const db = getFirebaseAdminDb()
 
     const updateData: any = {}
     if (body.name !== undefined) updateData.name = body.name
     if (body.is_active !== undefined) updateData.is_active = body.is_active
-    if (body.start_date !== undefined) updateData.start_date = body.start_date
+    if (body.start_date !== undefined) {
+      updateData.start_date = body.start_date ? new Date(body.start_date) : null
+    }
     if (body.end_date !== undefined) {
-      updateData.end_date = body.end_date === null ? null : body.end_date
+      updateData.end_date = body.end_date ? new Date(body.end_date) : null
     }
     if (body.description !== undefined) {
       updateData.description = body.description || null
@@ -85,16 +92,17 @@ export async function PATCH(
     }
 
     console.log('Sending to database:', updateData)
-    const { data: session, error } = await supabase
-      .from('sessions')
-      .update(updateData)
-      .eq('id', id)
-      .select()
-      .single()
 
-    if (error) {
-      console.error('Supabase error:', error)
-      throw error
+    const docRef = db.collection('sessions').doc(id)
+    await docRef.update(updateData)
+
+    const updatedDoc = await docRef.get()
+    const session = {
+      id: updatedDoc.id,
+      ...updatedDoc.data(),
+      start_date: updatedDoc.data()?.start_date?.toDate?.()?.toISOString() || updatedDoc.data()?.start_date,
+      end_date: updatedDoc.data()?.end_date?.toDate?.()?.toISOString() || updatedDoc.data()?.end_date,
+      created_at: updatedDoc.data()?.created_at?.toDate?.()?.toISOString() || updatedDoc.data()?.created_at,
     }
 
     return NextResponse.json({ session })
@@ -118,17 +126,9 @@ export async function DELETE(
     }
 
     const { id } = await context.params
-    const supabase = createAdminClient()
+    const db = getFirebaseAdminDb()
 
-    const { error } = await supabase
-      .from('sessions')
-      .delete()
-      .eq('id', id)
-
-    if (error) {
-      console.error('Supabase error:', error)
-      throw error
-    }
+    await db.collection('sessions').doc(id).delete()
 
     return NextResponse.json({ success: true })
   } catch (error) {

@@ -1,13 +1,14 @@
 // @ts-nocheck
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getFirebaseAdminDb } from '@/lib/firebase/admin'
+import { Timestamp } from 'firebase-admin/firestore'
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient()
+    const db = getFirebaseAdminDb()
     const { id } = await params
     const body = await request.json()
     const { status } = body
@@ -16,19 +17,23 @@ export async function PATCH(
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
     }
 
-    const { data, error } = await supabase
-      .from('hardware_reservations')
-      .update({ status })
-      .eq('id', id)
-      .select()
-      .single()
+    const docRef = db.collection('hardware_reservations').doc(id)
+    await docRef.update({
+      status,
+      updated_at: Timestamp.now(),
+    })
 
-    if (error) {
-      console.error('Error updating reservation:', error)
-      return NextResponse.json({ error: 'Failed to update reservation' }, { status: 500 })
-    }
+    const updatedDoc = await docRef.get()
+    const data = updatedDoc.data()
 
-    return NextResponse.json({ reservation: data })
+    return NextResponse.json({
+      reservation: {
+        id: updatedDoc.id,
+        ...data,
+        created_at: data?.created_at?.toDate?.()?.toISOString() || data?.created_at,
+        updated_at: data?.updated_at?.toDate?.()?.toISOString() || data?.updated_at,
+      }
+    })
   } catch (error) {
     console.error('Error in reservation PATCH API:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -40,18 +45,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient()
+    const db = getFirebaseAdminDb()
     const { id } = await params
 
-    const { error } = await supabase
-      .from('hardware_reservations')
-      .delete()
-      .eq('id', id)
-
-    if (error) {
-      console.error('Error deleting reservation:', error)
-      return NextResponse.json({ error: 'Failed to delete reservation' }, { status: 500 })
-    }
+    await db.collection('hardware_reservations').doc(id).delete()
 
     return NextResponse.json({ success: true })
   } catch (error) {

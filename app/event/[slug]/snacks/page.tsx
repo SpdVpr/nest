@@ -364,32 +364,38 @@ export default function EventSnacksPage() {
                                 <h3 className="text-lg font-bold text-gray-800 mb-3 pb-2 border-b-2 border-orange-300">
                                   {category}
                                 </h3>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                                   {categoryProducts.map((product) => (
                                     <button
                                       key={product.id}
                                       onClick={() => handleAddProduct(product.id)}
-                                      className={`relative rounded-xl p-4 text-center transition-all transform hover:scale-105 active:scale-95 ${
+                                      className={`relative rounded-xl p-5 text-center transition-all transform hover:scale-105 active:scale-95 shadow-md ${
                                         justAdded === product.id
-                                          ? 'bg-green-500 text-white shadow-lg scale-105'
-                                          : 'bg-gradient-to-br from-orange-100 to-red-100 hover:from-orange-200 hover:to-red-200 border-2 border-orange-300 text-gray-900'
+                                          ? 'bg-green-500 text-white shadow-xl scale-105'
+                                          : 'bg-white hover:shadow-xl border-2 border-gray-200 hover:border-orange-400 text-gray-900'
                                       }`}
                                     >
-                                      {product.image_url && (
-                                        <img
-                                          src={product.image_url}
-                                          alt={product.name}
-                                          className="w-full h-20 object-contain mb-2"
-                                        />
+                                      {product.image_url ? (
+                                        <div className="bg-white rounded-lg p-3 mb-3">
+                                          <img
+                                            src={product.image_url}
+                                            alt={product.name}
+                                            className="w-full h-32 object-contain"
+                                          />
+                                        </div>
+                                      ) : (
+                                        <div className="bg-gray-100 rounded-lg p-3 mb-3 h-32 flex items-center justify-center">
+                                          <span className="text-4xl">🍽️</span>
+                                        </div>
                                       )}
-                                      <p className="font-semibold text-sm mb-1">{product.name}</p>
-                                      <p className={`font-bold ${
+                                      <p className="font-semibold text-base mb-2">{product.name}</p>
+                                      <p className={`font-bold text-lg ${
                                         justAdded === product.id ? 'text-white' : 'text-orange-600'
                                       }`}>
                                         {product.price} Kč
                                       </p>
                                       {justAdded === product.id && (
-                                        <div className="absolute inset-0 flex items-center justify-center text-3xl">
+                                        <div className="absolute inset-0 flex items-center justify-center text-5xl">
                                           ✓
                                         </div>
                                       )}

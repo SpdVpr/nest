@@ -1,6 +1,5 @@
-// @ts-nocheck
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getFirebaseAdminDb } from '@/lib/firebase/admin'
 
 // DELETE /api/seats/reservations/[id] - Delete a seat reservation
 export async function DELETE(
@@ -8,18 +7,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient()
     const { id } = await params
+    const db = getFirebaseAdminDb()
 
-    const { error } = await supabase
-      .from('seat_reservations')
-      .delete()
-      .eq('id', id)
-
-    if (error) {
-      console.error('Error deleting seat reservation:', error)
-      return NextResponse.json({ error: 'Failed to delete seat reservation' }, { status: 500 })
-    }
+    await db.collection('seat_reservations').doc(id).delete()
 
     return NextResponse.json({ success: true })
   } catch (error) {

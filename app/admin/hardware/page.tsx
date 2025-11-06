@@ -3,12 +3,12 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Plus, Edit2, Trash2, Monitor, Cpu, Save, X } from 'lucide-react'
+import { ArrowLeft, Plus, Edit2, Trash2, Monitor, Cpu, Save, X, Gamepad2, Keyboard, Mouse, Headphones, Cable } from 'lucide-react'
 
 interface HardwareItem {
   id: string
   name: string
-  type: 'monitor' | 'pc'
+  type: 'monitor' | 'pc' | 'accessory'
   category: string
   price_per_night: number
   is_available: boolean
@@ -18,12 +18,39 @@ interface EditingItem extends Partial<HardwareItem> {
   id?: string
 }
 
+// Helper function to get icon based on item name
+const getItemIcon = (item: HardwareItem, className: string = "w-8 h-8") => {
+  const name = item.name.toLowerCase()
+
+  if (item.type === 'pc') {
+    return <Cpu className={`${className} text-purple-600`} />
+  } else if (item.type === 'monitor') {
+    return <Monitor className={`${className} text-orange-600`} />
+  } else if (item.type === 'accessory') {
+    // Check name for specific accessories
+    if (name.includes('klávesnic')) {
+      return <Keyboard className={`${className} text-blue-600`} />
+    } else if (name.includes('myš')) {
+      return <Mouse className={`${className} text-green-600`} />
+    } else if (name.includes('sluchátk')) {
+      return <Headphones className={`${className} text-purple-600`} />
+    } else if (name.includes('kabel') || name.includes('napájec')) {
+      return <Cable className={`${className} text-yellow-600`} />
+    } else {
+      return <Gamepad2 className={`${className} text-orange-600`} />
+    }
+  }
+
+  return <Gamepad2 className={`${className} text-orange-600`} />
+}
+
 export default function AdminHardwarePage() {
   const router = useRouter()
   const [items, setItems] = useState<HardwareItem[]>([])
   const [loading, setLoading] = useState(true)
   const [editingItem, setEditingItem] = useState<EditingItem | null>(null)
   const [isCreating, setIsCreating] = useState(false)
+  const [activeTab, setActiveTab] = useState<string>('all')
 
   useEffect(() => {
     const token = localStorage.getItem('admin_token')
@@ -55,12 +82,29 @@ export default function AdminHardwarePage() {
     setIsCreating(true)
     setEditingItem({
       name: '',
-      type: 'monitor',
-      category: '',
-      price_per_night: 100,
+      type: 'accessory',
+      category: 'Příslušenství',
+      price_per_night: 0,
       is_available: true,
     })
   }
+
+  // Group items by category
+  const itemsByCategory = items.reduce((acc, item) => {
+    const category = item.category || 'Ostatní'
+    if (!acc[category]) {
+      acc[category] = []
+    }
+    acc[category].push(item)
+    return acc
+  }, {} as Record<string, HardwareItem[]>)
+
+  const categories = Object.keys(itemsByCategory).sort()
+
+  // Filter items based on active tab
+  const filteredCategories = activeTab === 'all'
+    ? categories
+    : categories.filter(cat => cat === activeTab)
 
   const handleEdit = (item: HardwareItem) => {
     setIsCreating(false)
@@ -164,6 +208,35 @@ export default function AdminHardwarePage() {
           </p>
         </div>
 
+        {/* Tabs */}
+        <div className="bg-white rounded-xl shadow-sm p-2 mb-6">
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setActiveTab('all')}
+              className={`px-4 py-2 rounded-lg font-semibold transition ${
+                activeTab === 'all'
+                  ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              Vše ({items.length})
+            </button>
+            {categories.map((category) => (
+              <button
+                key={category}
+                onClick={() => setActiveTab(category)}
+                className={`px-4 py-2 rounded-lg font-semibold transition ${
+                  activeTab === category
+                    ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                {category} ({itemsByCategory[category].length})
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Editing Modal */}
         {editingItem && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -191,12 +264,13 @@ export default function AdminHardwarePage() {
                     Typ *
                   </label>
                   <select
-                    value={editingItem.type || 'monitor'}
-                    onChange={(e) => setEditingItem({ ...editingItem, type: e.target.value as 'monitor' | 'pc' })}
+                    value={editingItem.type || 'accessory'}
+                    onChange={(e) => setEditingItem({ ...editingItem, type: e.target.value as 'monitor' | 'pc' | 'accessory' })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
                   >
-                    <option value="monitor">Monitor</option>
-                    <option value="pc">PC</option>
+                    <option value="monitor">📺 Monitor</option>
+                    <option value="pc">💻 PC</option>
+                    <option value="accessory">🎮 Příslušenství</option>
                   </select>
                 </div>
 
@@ -204,13 +278,25 @@ export default function AdminHardwarePage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Kategorie *
                   </label>
-                  <input
-                    type="text"
-                    value={editingItem.category || ''}
-                    onChange={(e) => setEditingItem({ ...editingItem, category: e.target.value })}
+                  <select
+                    value={editingItem.category || 'Příslušenství'}
+                    onChange={(e) => {
+                      const category = e.target.value
+                      setEditingItem({
+                        ...editingItem,
+                        category,
+                        price_per_night: category === 'Příslušenství' ? 0 : editingItem.price_per_night
+                      })
+                    }}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
-                    placeholder="např. Premium 24&quot; 144Hz"
-                  />
+                  >
+                    <option value="Příslušenství">Příslušenství (zdarma)</option>
+                    <option value="Premium 24&quot; 144Hz">Premium 24&quot; 144Hz</option>
+                    <option value="Standard 24&quot; 60Hz">Standard 24&quot; 60Hz</option>
+                    <option value="Gaming PC">Gaming PC</option>
+                    <option value="Office PC">Office PC</option>
+                    <option value="Ostatní">Ostatní</option>
+                  </select>
                 </div>
 
                 <div>
@@ -223,7 +309,11 @@ export default function AdminHardwarePage() {
                     onChange={(e) => setEditingItem({ ...editingItem, price_per_night: parseInt(e.target.value) })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
                     min="0"
+                    disabled={editingItem.category === 'Příslušenství'}
                   />
+                  {editingItem.category === 'Příslušenství' && (
+                    <p className="text-xs text-gray-500 mt-1">Příslušenství je vždy zdarma</p>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -260,88 +350,72 @@ export default function AdminHardwarePage() {
           </div>
         )}
 
-        {/* Hardware List */}
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Typ
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Název
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Kategorie
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Cena/noc
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                  Akce
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {items.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
-                    Zatím žádné HW položky. Klikni na "Přidat HW" pro vytvoření první.
-                  </td>
-                </tr>
-              ) : (
-                items.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                      {item.type === 'monitor' ? (
-                        <Monitor className="w-6 h-6 text-orange-600" />
-                      ) : (
-                        <Cpu className="w-6 h-6 text-purple-600" />
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="font-semibold text-gray-900">{item.name}</p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="text-gray-700">{item.category}</p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="font-bold text-orange-600">{item.price_per_night} Kč</p>
-                    </td>
-                    <td className="px-6 py-4">
-                      {item.is_available ? (
-                        <span className="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
-                          Dostupné
-                        </span>
-                      ) : (
-                        <span className="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
-                          Nedostupné
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() => handleEdit(item)}
-                        className="text-blue-600 hover:text-blue-800 mr-3"
-                      >
-                        <Edit2 className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(item.id)}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        {/* Hardware List - Grouped by Category */}
+        {items.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-sm p-8 text-center">
+            <p className="text-gray-500">
+              Zatím žádné HW položky. Klikni na &quot;Přidat HW&quot; pro vytvoření první.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {filteredCategories.map((category) => (
+              <div key={category} className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div className="bg-gradient-to-r from-orange-500 to-red-500 px-6 py-3">
+                  <h2 className="text-xl font-bold text-white">
+                    {category} ({itemsByCategory[category].length})
+                  </h2>
+                </div>
+                <div className="divide-y divide-gray-200">
+                  {itemsByCategory[category].map((item) => (
+                    <div key={item.id} className="p-4 hover:bg-gray-50 flex items-center gap-4">
+                      <div className="flex-shrink-0">
+                        {getItemIcon(item, "w-8 h-8")}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-900 text-lg">{item.name}</p>
+                        <p className="text-sm text-gray-600">
+                          {item.type === 'monitor' ? '📺 Monitor' : item.type === 'pc' ? '💻 PC' : '🎮 Příslušenství'}
+                        </p>
+                      </div>
+
+                      <div className="flex-shrink-0 text-right">
+                        <p className="font-bold text-orange-600 text-xl">
+                          {item.price_per_night === 0 ? 'Zdarma' : `${item.price_per_night} Kč/noc`}
+                        </p>
+                        {item.is_available ? (
+                          <span className="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 mt-1">
+                            Dostupné
+                          </span>
+                        ) : (
+                          <span className="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800 mt-1">
+                            Nedostupné
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex-shrink-0 flex gap-2">
+                        <button
+                          onClick={() => handleEdit(item)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                        >
+                          <Edit2 className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(item.id)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

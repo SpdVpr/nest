@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
+import { getFirebaseAdminDb } from '@/lib/firebase/admin'
 
 function verifyAuth(request: NextRequest): boolean {
   const authHeader = request.headers.get('authorization')
@@ -19,15 +19,20 @@ export async function GET(
     }
 
     const { id } = await context.params
-    const supabase = createAdminClient()
+    const db = getFirebaseAdminDb()
 
-    const { data: item, error } = await supabase
-      .from('hardware_items')
-      .select('*')
-      .eq('id' as any, id)
-      .single()
+    const doc = await db.collection('hardware_items').doc(id).get()
 
-    if (error) throw error
+    if (!doc.exists) {
+      return NextResponse.json({ error: 'Hardware item not found' }, { status: 404 })
+    }
+
+    const item = {
+      id: doc.id,
+      ...doc.data(),
+      created_at: doc.data()?.created_at?.toDate?.()?.toISOString(),
+      updated_at: doc.data()?.updated_at?.toDate?.()?.toISOString(),
+    }
 
     return NextResponse.json({ item })
   } catch (error) {
@@ -51,24 +56,28 @@ export async function PATCH(
 
     const { id } = await context.params
     const body = await request.json()
-    
-    const supabase = createAdminClient()
 
-    const updateData: any = {}
+    const db = getFirebaseAdminDb()
+    const { Timestamp } = await import('firebase-admin/firestore')
+
+    const updateData: any = {
+      updated_at: Timestamp.now()
+    }
     if (body.name !== undefined) updateData.name = body.name
     if (body.type !== undefined) updateData.type = body.type
     if (body.category !== undefined) updateData.category = body.category
-    if (body.price_per_night !== undefined) updateData.price_per_night = body.price_per_night
+    if (body.price_per_night !== undefined) updateData.price_per_night = parseFloat(body.price_per_night)
     if (body.is_available !== undefined) updateData.is_available = body.is_available
 
-    const { data: item, error } = await supabase
-      .from('hardware_items')
-      .update(updateData)
-      .eq('id' as any, id)
-      .select()
-      .single()
+    await db.collection('hardware_items').doc(id).update(updateData)
 
-    if (error) throw error
+    const updatedDoc = await db.collection('hardware_items').doc(id).get()
+    const item = {
+      id: updatedDoc.id,
+      ...updatedDoc.data(),
+      created_at: updatedDoc.data()?.created_at?.toDate?.()?.toISOString(),
+      updated_at: updatedDoc.data()?.updated_at?.toDate?.()?.toISOString(),
+    }
 
     return NextResponse.json({ item })
   } catch (error) {
@@ -91,15 +100,10 @@ export async function DELETE(
     }
 
     const { id } = await context.params
-    const supabase = createAdminClient()
+    const db = getFirebaseAdminDb()
 
     // Delete hardware item
-    const { error } = await supabase
-      .from('hardware_items')
-      .delete()
-      .eq('id' as any, id)
-
-    if (error) throw error
+    await db.collection('hardware_items').doc(id).delete()
 
     return NextResponse.json({ success: true })
   } catch (error) {

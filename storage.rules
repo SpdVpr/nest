@@ -1,0 +1,29 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Product images - read by everyone, write only via Admin SDK
+    match /product-images/{imageId} {
+      allow read: true;
+      allow write: if false; // Only via Admin SDK from API routes
+    }
+    
+    // Session/Event images - read by everyone, write only via Admin SDK
+    match /session-images/{imageId} {
+      allow read: true;
+      allow write: if false; // Only via Admin SDK from API routes
+    }
+    
+    // Hardware images - read by everyone, write only via Admin SDK
+    match /hardware-images/{imageId} {
+      allow read: true;
+      allow write: if false; // Only via Admin SDK from API routes
+    }
+    
+    // Deny all other access
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

@@ -1,6 +1,8 @@
-// @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getFirebaseAdminDb } from '@/lib/firebase/admin'
+import { getActiveSession, getProductById } from '@/lib/firebase/queries'
+import { Timestamp } from 'firebase-admin/firestore'
+import { Consumption } from '@/types/database.types'
 
 // POST /api/consumption - Add consumption record
 export async function POST(request: NextRequest) {
@@ -14,17 +16,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const supabase = await createClient()
-
     let sessionToUse = session_id
 
     if (!sessionToUse) {
-      const { data: activeSession } = await supabase
-        .from('sessions')
-        .select('id')
-        .eq('is_active', true)
-        .single()
-
+      const activeSession = await getActiveSession()
       if (!activeSession) {
         return NextResponse.json(
           { error: 'No active session found' },
@@ -34,19 +29,24 @@ export async function POST(request: NextRequest) {
       sessionToUse = activeSession.id
     }
 
-    // Create consumption record
-    const { data: consumption, error } = await supabase
-      .from('consumption')
-      .insert({
-        guest_id,
-        product_id,
-        quantity: quantity || 1,
-        session_id: sessionToUse,
-      })
-      .select()
-      .single()
+    const db = getFirebaseAdminDb()
+    const consumptionRef = db.collection('consumption')
 
-    if (error) throw error
+    const now = Timestamp.now()
+    const consumptionData = {
+      guest_id,
+      product_id,
+      quantity: quantity || 1,
+      session_id: sessionToUse,
+      consumed_at: now,
+    }
+
+    const docRef = await consumptionRef.add(consumptionData)
+    const consumption: Consumption = {
+      id: docRef.id,
+      ...consumptionData,
+      consumed_at: now.toDate().toISOString(),
+    }
 
     return NextResponse.json({ consumption }, { status: 201 })
   } catch (error) {
@@ -71,25 +71,34 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const supabase = await createClient()
+    const db = getFirebaseAdminDb()
+    const consumptionRef = db.collection('consumption')
+    const snapshot = await consumptionRef
+      .where('guest_id', '==', guestId)
+      .orderBy('consumed_at', 'desc')
+      .get()
 
-    const { data: consumption, error } = await supabase
-      .from('consumption')
-      .select(`
-        *,
-        products (
-          id,
-          name,
-          price,
-          image_url
-        )
-      `)
-      .eq('guest_id', guestId)
-      .order('consumed_at', { ascending: false })
+    // Fetch product details for each consumption
+    const consumptionWithProducts = await Promise.all(
+      snapshot.docs.map(async (docSnap) => {
+        const data = docSnap.data()
+        const product = await getProductById(data.product_id)
 
-    if (error) throw error
+        return {
+          id: docSnap.id,
+          ...data,
+          consumed_at: data.consumed_at?.toDate().toISOString() || new Date().toISOString(),
+          products: product ? {
+            id: product.id,
+            name: product.name,
+            price: product.price,
+            image_url: product.image_url,
+          } : null,
+        }
+      })
+    )
 
-    return NextResponse.json({ consumption: consumption || [] })
+    return NextResponse.json({ consumption: consumptionWithProducts })
   } catch (error) {
     console.error('Error fetching consumption:', error)
     return NextResponse.json(
@@ -112,14 +121,8 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    const supabase = await createClient()
-
-    const { error } = await supabase
-      .from('consumption')
-      .delete()
-      .eq('id', consumptionId)
-
-    if (error) throw error
+    const db = getFirebaseAdminDb()
+    await db.collection('consumption').doc(consumptionId).delete()
 
     return NextResponse.json({ success: true }, { status: 200 })
   } catch (error) {

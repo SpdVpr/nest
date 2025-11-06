@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
+import { getFirebaseAdminDb } from '@/lib/firebase/admin'
 
 function verifyAuth(request: NextRequest): boolean {
   const authHeader = request.headers.get('authorization')
@@ -19,36 +19,47 @@ export async function GET(
     }
 
     const { id: sessionId } = await context.params
-    const supabase = createAdminClient()
+    const db = getFirebaseAdminDb()
 
-    // First get all guests for this session
-    const { data: guests, error: guestsError } = await supabase
-      .from('guests')
-      .select('id')
-      .eq('session_id', sessionId)
+    // Get consumption records for this session
+    const consumptionSnapshot = await db.collection('consumption')
+      .where('session_id', '==', sessionId)
+      .get()
 
-    if (guestsError) throw guestsError
+    // Fetch product details for each consumption record
+    const consumption = await Promise.all(
+      consumptionSnapshot.docs.map(async (doc) => {
+        const data = doc.data()
 
-    const guestIds = guests?.map(g => g.id) || []
+        // Fetch product details
+        let product = null
+        if (data.product_id) {
+          const productDoc = await db.collection('products').doc(data.product_id).get()
+          if (productDoc.exists) {
+            product = {
+              name: productDoc.data()?.name,
+              price: productDoc.data()?.price,
+            }
+          }
+        }
 
-    // Get consumption records for these guests with product info
-    let query = supabase
-      .from('consumption')
-      .select('*, products(name, price)')
-      .order('consumed_at', { ascending: false })
+        return {
+          id: doc.id,
+          ...data,
+          consumed_at: data.consumed_at?.toDate?.()?.toISOString() || data.consumed_at,
+          products: product,
+        }
+      })
+    )
 
-    if (guestIds.length > 0) {
-      query = query.in('guest_id', guestIds)
-    } else {
-      // No guests, return empty
-      return NextResponse.json({ consumption: [] })
-    }
+    // Sort by consumed_at descending
+    consumption.sort((a, b) => {
+      const dateA = new Date(a.consumed_at).getTime()
+      const dateB = new Date(b.consumed_at).getTime()
+      return dateB - dateA
+    })
 
-    const { data: consumption, error } = await query
-
-    if (error) throw error
-
-    return NextResponse.json({ consumption: consumption || [] })
+    return NextResponse.json({ consumption })
   } catch (error) {
     console.error('Error fetching consumption:', error)
     return NextResponse.json(

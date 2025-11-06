@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
+import { getFirebaseAdminDb } from '@/lib/firebase/admin'
 
 function verifyAuth(request: NextRequest): boolean {
   const authHeader = request.headers.get('authorization')
@@ -19,35 +19,21 @@ export async function GET(
     }
 
     const { id: sessionId } = await context.params
-    const supabase = createAdminClient()
+    const db = getFirebaseAdminDb()
 
-    // First get all guests for this session
-    const { data: guests, error: guestsError } = await supabase
-      .from('guests')
-      .select('id')
-      .eq('session_id', sessionId)
+    // Get hardware reservations for this session
+    const reservationsSnapshot = await db.collection('hardware_reservations')
+      .where('session_id', '==', sessionId)
+      .get()
 
-    if (guestsError) throw guestsError
+    const reservations = reservationsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      created_at: doc.data()?.created_at?.toDate?.()?.toISOString() || doc.data()?.created_at,
+      updated_at: doc.data()?.updated_at?.toDate?.()?.toISOString() || doc.data()?.updated_at,
+    }))
 
-    const guestIds = guests?.map(g => g.id) || []
-
-    // Get hardware reservations for these guests
-    let query = supabase
-      .from('hardware_reservations')
-      .select('*')
-
-    if (guestIds.length > 0) {
-      query = query.in('guest_id', guestIds)
-    } else {
-      // No guests, return empty
-      return NextResponse.json({ reservations: [] })
-    }
-
-    const { data: reservations, error } = await query
-
-    if (error) throw error
-
-    return NextResponse.json({ reservations: reservations || [] })
+    return NextResponse.json({ reservations })
   } catch (error) {
     console.error('Error fetching reservations:', error)
     return NextResponse.json(

@@ -1,6 +1,7 @@
-// @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getFirebaseAdminDb } from '@/lib/firebase/admin'
+import { getSessionBySlug, getProductById } from '@/lib/firebase/queries'
+import { Guest, Consumption, Product } from '@/types/database.types'
 
 // GET /api/event/[slug]/guests - Get guests for specific event
 export async function GET(
@@ -8,57 +9,85 @@ export async function GET(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
-    const supabase = await createClient()
     const { slug } = await params
+    const db = getFirebaseAdminDb()
 
     // First get the session
-    const { data: session, error: sessionError } = await supabase
-      .from('sessions')
-      .select('id')
-      .eq('slug', slug)
-      .single()
-
-    if (sessionError) throw sessionError
-
-    // Get guests for this session with their consumption
-    const { data: guests, error: guestsError } = await supabase
-      .from('guests')
-      .select(`
-        *,
-        consumption (
-          id,
-          quantity,
-          products:product_id (*)
-        )
-      `)
-      .eq('session_id', session.id)
-      .eq('is_active', true)
-      .order('name', { ascending: true })
-
-    if (guestsError) throw guestsError
-
-    // Calculate totals for each guest
-    const guestsWithTotals = guests.map(guest => {
-      const totalItems = guest.consumption.reduce((sum, c) => sum + c.quantity, 0)
-      const totalPrice = guest.consumption.reduce(
-        (sum, c) => sum + (c.quantity * c.products.price), 
-        0
+    const session = await getSessionBySlug(slug)
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Event not found' },
+        { status: 404 }
       )
-      const totalBeers = guest.consumption
-        .filter(c => c.products.category?.toLowerCase().includes('pivo'))
-        .reduce((sum, c) => sum + c.quantity, 0)
+    }
 
-      return {
-        ...guest,
-        totalItems,
-        totalPrice,
-        totalBeers
-      }
-    })
+    // Get guests for this session
+    const guestsSnapshot = await db.collection('guests')
+      .where('session_id', '==', session.id)
+      .where('is_active', '==', true)
+      .get()
 
-    return NextResponse.json({ 
+    // Get consumption for each guest
+    const guestsWithTotals = await Promise.all(
+      guestsSnapshot.docs.map(async (guestDoc) => {
+        const guestData = guestDoc.data()
+        const guest: Guest = {
+          id: guestDoc.id,
+          ...guestData,
+          created_at: guestData.created_at?.toDate().toISOString() || new Date().toISOString(),
+          check_in_date: guestData.check_in_date?.toDate().toISOString() || null,
+          check_out_date: guestData.check_out_date?.toDate().toISOString() || null,
+        } as Guest
+
+        // Get consumption for this guest
+        const consumptionSnapshot = await db.collection('consumption')
+          .where('guest_id', '==', guestDoc.id)
+          .get()
+
+        const consumption = await Promise.all(
+          consumptionSnapshot.docs.map(async (consDoc) => {
+            const consData = consDoc.data()
+            const product = await getProductById(consData.product_id)
+            return {
+              id: consDoc.id,
+              quantity: consData.quantity || 0,
+              consumed_at: consData.consumed_at?.toDate().toISOString() || new Date().toISOString(),
+              products: product,
+            }
+          })
+        )
+
+        // Calculate totals
+        const totalBeers = consumption
+          .filter(c => c.products?.category?.toLowerCase().includes('pivo'))
+          .reduce((sum, c) => sum + (c.quantity || 0), 0)
+
+        // totalItems = all items EXCEPT beers (only food and snacks)
+        const totalItems = consumption
+          .filter(c => !c.products?.category?.toLowerCase().includes('pivo'))
+          .reduce((sum, c) => sum + (c.quantity || 0), 0)
+
+        const totalPrice = consumption.reduce(
+          (sum, c) => sum + ((c.quantity || 0) * (c.products?.price || 0)),
+          0
+        )
+
+        return {
+          ...guest,
+          totalItems,
+          totalPrice,
+          totalBeers,
+          consumption,
+        }
+      })
+    )
+
+    // Sort by name
+    guestsWithTotals.sort((a, b) => a.name.localeCompare(b.name))
+
+    return NextResponse.json({
       guests: guestsWithTotals,
-      session_id: session.id 
+      session_id: session.id
     })
   } catch (error) {
     console.error('Error fetching event guests:', error)
@@ -75,7 +104,6 @@ export async function POST(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
-    const supabase = await createClient()
     const { slug } = await params
     const body = await request.json()
     const { name, nights_count = 1, check_in_date, check_out_date } = body
@@ -83,6 +111,13 @@ export async function POST(
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
       return NextResponse.json(
         { error: 'Name is required' },
+        { status: 400 }
+      )
+    }
+
+    if (!check_in_date || !check_out_date) {
+      return NextResponse.json(
+        { error: 'Check-in and check-out dates are required' },
         { status: 400 }
       )
     }
@@ -96,46 +131,35 @@ export async function POST(
     }
 
     // Get the session
-    const { data: session, error: sessionError } = await supabase
-      .from('sessions')
-      .select('id')
-      .eq('slug', slug)
-
-    if (sessionError) {
-      console.error('Session fetch error:', sessionError)
-      throw sessionError
-    }
-
-    if (!session || session.length === 0) {
+    const session = await getSessionBySlug(slug)
+    if (!session) {
       return NextResponse.json(
         { error: 'Event not found' },
         { status: 404 }
       )
     }
 
-    const sessionId = session[0].id
+    const db = getFirebaseAdminDb()
+    const { Timestamp } = await import('firebase-admin/firestore')
 
     // Create guest
-    const { data: guest, error: guestError } = await supabase
-      .from('guests')
-      .insert({
-        name: name.trim(),
-        session_id: sessionId,
-        nights_count: nightsNum,
-        check_in_date: check_in_date ? new Date(check_in_date).toISOString() : null,
-        check_out_date: check_out_date ? new Date(check_out_date).toISOString() : null,
-        is_active: true
-      })
-      .select()
-      .single()
+    const guestData = {
+      name: name.trim(),
+      session_id: session.id,
+      nights_count: nightsNum,
+      check_in_date: check_in_date ? Timestamp.fromDate(new Date(check_in_date)) : null,
+      check_out_date: check_out_date ? Timestamp.fromDate(new Date(check_out_date)) : null,
+      is_active: true,
+      created_at: Timestamp.now(),
+    }
 
-    if (guestError) {
-      console.error('Guest creation error:', guestError)
-      const errorMessage = guestError.message || JSON.stringify(guestError)
-      return NextResponse.json(
-        { error: `Failed to create guest: ${errorMessage}` },
-        { status: 500 }
-      )
+    const docRef = await db.collection('guests').add(guestData)
+    const guest: Guest = {
+      id: docRef.id,
+      ...guestData,
+      created_at: guestData.created_at.toDate().toISOString(),
+      check_in_date: guestData.check_in_date?.toDate().toISOString() || null,
+      check_out_date: guestData.check_out_date?.toDate().toISOString() || null,
     }
 
     return NextResponse.json({ guest }, { status: 201 })
