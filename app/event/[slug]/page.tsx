@@ -28,7 +28,7 @@ export default function EventPage() {
     try {
       setLoading(true)
       const response = await fetch(`/api/event/${slug}`)
-      
+
       if (response.status === 404) {
         setError('Event nebyl nalezen')
         return
@@ -108,13 +108,7 @@ export default function EventPage() {
       <EventGuestHeader session_slug={slug} />
       <div className="max-w-2xl mx-auto">
         {/* Back Button */}
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-8 font-medium transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          Zpět na seznam eventů
-        </Link>
+
 
         {/* Event Header */}
         <div className="text-center mb-12">
@@ -124,16 +118,23 @@ export default function EventPage() {
           <div className="inline-flex flex-col items-center gap-3 bg-white rounded-xl shadow-lg p-4">
             <div className="flex items-center gap-3">
               <Calendar className="w-6 h-6 text-purple-600" />
-              <p className="text-lg text-gray-700">
-                {formatDate(session.start_date)}
-                {session.end_date && ` - ${formatDate(session.end_date)}`}
-              </p>
+              <div className="text-center">
+                <p className="text-lg font-semibold text-gray-900">
+                  {new Intl.DateTimeFormat('cs-CZ', { dateStyle: 'medium' }).format(new Date(session.start_date))}
+                  {session.end_date && new Date(session.start_date).toDateString() !== new Date(session.end_date).toDateString() &&
+                    ` - ${new Intl.DateTimeFormat('cs-CZ', { dateStyle: 'medium' }).format(new Date(session.end_date))}`
+                  }
+                </p>
+                <p className="text-base text-gray-600">
+                  {new Intl.DateTimeFormat('cs-CZ', { timeStyle: 'short' }).format(new Date(session.start_date))}
+                  {session.end_date &&
+                    ` - ${new Intl.DateTimeFormat('cs-CZ', { timeStyle: 'short' }).format(new Date(session.end_date))}`
+                  }
+                </p>
+              </div>
             </div>
-            <span className={`${getStatusColor(session.status)} text-white px-4 py-1 rounded-full text-sm font-semibold`}>
-              {getStatusLabel(session.status)}
-            </span>
           </div>
-          
+
           {session.description && (
             <p className="mt-4 text-lg text-gray-700 max-w-lg mx-auto">
               {session.description}
@@ -150,7 +151,9 @@ export default function EventPage() {
             <Users className="w-16 h-16" />
             <div className="text-center">
               <h2 className="text-2xl font-bold mb-1">Registrovaní lidé</h2>
-              <p className="text-blue-100 text-sm">{guestCount} uživatelů</p>
+              <p className="text-blue-100 text-sm">
+                {guestCount} {guestCount === 1 ? 'uživatel' : guestCount >= 2 && guestCount <= 4 ? 'uživatelé' : 'uživatelů'}
+              </p>
             </div>
           </Link>
 
@@ -161,7 +164,7 @@ export default function EventPage() {
             <Pizza className="w-16 h-16" />
             <div className="text-center">
               <h2 className="text-2xl font-bold mb-1">Občerstvení</h2>
-              <p className="text-green-100 text-sm">Přidej si, co jsi snědl</p>
+              <p className="text-green-100 text-sm">Přidej si, co jsi snědl a vypil</p>
             </div>
           </Link>
 
@@ -194,7 +197,7 @@ export default function EventPage() {
             <Users className="w-12 h-12" />
             <div className="text-left">
               <h2 className="text-xl font-bold mb-1">Registrace</h2>
-              <p className="text-purple-100 text-sm">Zaregistruj se na event</p>
+              <p className="text-purple-100 text-sm">Zaregistruj se na akci</p>
             </div>
           </Link>
         </div>

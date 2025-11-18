@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Calendar, Shield, ArrowRight, MapPin, Users } from 'lucide-react'
 import { Session } from '@/types/database.types'
 import { formatDate } from '@/lib/utils'
@@ -9,10 +10,26 @@ import { formatDate } from '@/lib/utils'
 export default function HomePage() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [loading, setLoading] = useState(true)
+  const [mounted, setMounted] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+
+  const router = useRouter()
 
   useEffect(() => {
+    console.log('[HomePage] Component mounted')
+    setMounted(true)
+    const token = localStorage.getItem('admin_token')
+    console.log('[HomePage] Token from localStorage:', token ? 'EXISTS' : 'NULL')
+    if (!token) {
+      console.log('[HomePage] No token found, setting isAuthenticated to false')
+      setIsAuthenticated(false)
+      setLoading(false)
+      return
+    }
+    console.log('[HomePage] Token found, setting isAuthenticated to true')
+    setIsAuthenticated(true)
     fetchUpcomingEvents()
-  }, [])
+  }, [router])
 
   const fetchUpcomingEvents = async () => {
     try {
@@ -54,7 +71,13 @@ export default function HomePage() {
     }
   }
 
+  if (!mounted) {
+    console.log('[HomePage] Rendering: Not mounted yet')
+    return null
+  }
+
   if (loading) {
+    console.log('[HomePage] Rendering: Loading state')
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
@@ -65,6 +88,37 @@ export default function HomePage() {
     )
   }
 
+  if (!isAuthenticated) {
+    console.log('[HomePage] Rendering: Not authenticated - showing admin-only message')
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-700 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-8 text-center">
+          <div className="bg-blue-100 p-4 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+            <Shield className="w-12 h-12 text-blue-600" />
+          </div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">
+            🪺 The Nest
+          </h1>
+          <h2 className="text-xl font-semibold text-gray-800 mb-3">
+            Přístup pouze pro administrátory
+          </h2>
+          <p className="text-gray-600 mb-6">
+            Tato stránka je určena pouze pro správu eventů. Pokud jsi účastník, admin ti pošle přímý odkaz na tvůj event.
+          </p>
+          <Link
+            href="/admin/login"
+            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-colors"
+          >
+            <Shield className="w-5 h-5" />
+            Admin přihlášení
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  console.log('[HomePage] Rendering: Authenticated - showing events list')
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 py-12 px-4">
       <div className="max-w-5xl mx-auto">
@@ -73,9 +127,7 @@ export default function HomePage() {
           <h1 className="text-7xl md:text-8xl font-bold text-gray-900 mb-6">
             🪺 The Nest
           </h1>
-          <p className="text-2xl md:text-3xl text-gray-700 font-medium mb-4">
-            Systém pro sledování spotřeby na LAN parties
-          </p>
+
           <p className="text-lg text-gray-600">
             Vyber akci a začni rezervovat
           </p>
@@ -116,51 +168,50 @@ export default function HomePage() {
               {sessions.map((session) => {
                 const eventStatus = getEventStatus(session)
                 return (
-                <Link
-                  key={session.id}
-                  href={`/event/${session.slug}`}
-                  className="block group"
-                >
-                  <div className={`p-6 rounded-xl border-2 transition-all hover:shadow-lg ${
-                    eventStatus.status === 'active'
+                  <Link
+                    key={session.id}
+                    href={`/event/${session.slug}`}
+                    className="block group"
+                  >
+                    <div className={`p-6 rounded-xl border-2 transition-all hover:shadow-lg ${eventStatus.status === 'active'
                       ? 'border-green-400 bg-green-50 hover:border-green-500'
                       : 'border-gray-200 hover:border-purple-400 bg-white'
-                  }`}>
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-xl font-bold text-gray-900">
-                            {session.name}
-                          </h3>
-                          <span className={`${getStatusColor(eventStatus.status)} text-white px-3 py-1 rounded-full text-sm font-semibold`}>
-                            {eventStatus.label}
-                          </span>
-                        </div>
-                        
-                        <div className="flex flex-wrap gap-4 text-gray-600 mb-2">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="w-4 h-4" />
-                            <span>
-                              {formatDate(session.start_date)}
-                              {session.end_date && ` - ${formatDate(session.end_date)}`}
+                      }`}>
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h3 className="text-xl font-bold text-gray-900">
+                              {session.name}
+                            </h3>
+                            <span className={`${getStatusColor(eventStatus.status)} text-white px-3 py-1 rounded-full text-sm font-semibold`}>
+                              {eventStatus.label}
                             </span>
                           </div>
+
+                          <div className="flex flex-wrap gap-4 text-gray-600 mb-2">
+                            <div className="flex items-center gap-2">
+                              <Calendar className="w-4 h-4" />
+                              <span>
+                                {formatDate(session.start_date)}
+                                {session.end_date && ` - ${formatDate(session.end_date)}`}
+                              </span>
+                            </div>
+                          </div>
+
+                          {session.description && (
+                            <p className="text-gray-600 mt-2">
+                              {session.description}
+                            </p>
+                          )}
                         </div>
 
-                        {session.description && (
-                          <p className="text-gray-600 mt-2">
-                            {session.description}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2 text-purple-600 group-hover:text-purple-700 font-semibold">
-                        <span className="hidden sm:inline">Přejít na event</span>
-                        <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                        <div className="flex items-center gap-2 text-purple-600 group-hover:text-purple-700 font-semibold">
+                          <span className="hidden sm:inline">Přejít na event</span>
+                          <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </Link>
+                  </Link>
                 )
               })}
             </div>

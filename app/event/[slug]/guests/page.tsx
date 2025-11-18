@@ -91,25 +91,30 @@ export default function GuestsPage() {
         </Link>
 
         <div className="bg-white rounded-2xl shadow-xl p-8">
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-3">
-              <Users className="w-8 h-8 text-purple-600" />
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Registrovaní uživatelé</h1>
-                {session && (
-                  <p className="text-gray-600 text-sm mt-1">
-                    {session.name} • {formatDate(session.start_date)}
-                  </p>
-                )}
+          {/* Header */}
+          <div className="mb-8">
+            <div className="flex items-start justify-between gap-4 mb-4">
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <Users className="w-8 h-8 text-purple-600 flex-shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <h1 className="text-3xl font-bold text-gray-900">Registrovaní uživatelé</h1>
+                  {session && (
+                    <div className="text-gray-600 text-sm mt-1 break-words">
+                      <div>{session.name}</div>
+                      <div>{formatDate(session.start_date)}</div>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-            <div className="bg-purple-50 px-6 py-3 rounded-xl border-2 border-purple-200">
-              <p className="text-sm text-purple-600 font-medium">
-                Celkem: <span className="text-3xl font-bold text-purple-700">{guests.length}</span>
-              </p>
-              <p className="text-xs text-purple-500 text-center mt-1">
-                {guests.length === 1 ? 'host' : guests.length >= 2 && guests.length <= 4 ? 'hosté' : 'hostů'}
-              </p>
+              <div className="bg-purple-50 px-4 py-2 rounded-xl border-2 border-purple-200 flex-shrink-0 text-center min-w-[100px]">
+                <p className="text-sm text-purple-600 font-medium">
+                  Celkem
+                </p>
+                <p className="text-3xl font-bold text-purple-700">{guests.length}</p>
+                <p className="text-xs text-purple-500">
+                  {guests.length === 1 ? 'host' : guests.length >= 2 && guests.length <= 4 ? 'hosté' : 'hostů'}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -124,85 +129,154 @@ export default function GuestsPage() {
               </Link>
             </div>
           ) : (
-            <div className="space-y-3">
-              {guests.map((guest) => {
-                const isCurrentGuest = currentGuest === guest.id
-                return (
-                  <button
-                    key={guest.id}
-                    onClick={() => handleGuestSelect(guest)}
-                    className={`w-full text-left px-6 py-5 rounded-xl border-2 transition-all ${
-                      isCurrentGuest
-                        ? 'border-purple-500 bg-purple-50 shadow-md'
-                        : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-3">
-                          <p className="font-bold text-lg text-gray-900">{guest.name}</p>
-                          {isCurrentGuest && (
-                            <div className="flex items-center gap-1 bg-green-100 px-2 py-1 rounded-full">
-                              <UserCheck className="w-4 h-4 text-green-600" />
-                              <span className="text-xs text-green-700 font-medium">Přihlášen/a</span>
-                            </div>
-                          )}
-                        </div>
+            <>
+              {/* Compact Table View */}
+              <div className="mb-8">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">Rychlý přehled</h2>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="bg-purple-50 border-b-2 border-purple-200">
+                        <th className="text-left py-3 px-4 font-semibold text-gray-900">Jméno</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-900">Počet nocí</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-900">Rozsah dní</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {guests.map((guest, index) => {
+                        const isCurrentGuest = currentGuest === guest.id
+                        let dayRange = '-'
+                        if (guest.check_in_date && guest.check_out_date && session?.start_date) {
+                          const sessionStart = new Date(session.start_date)
+                          sessionStart.setHours(0, 0, 0, 0)
 
-                        <div className="space-y-2">
-                          {/* Počet nocí */}
-                          <div className="flex items-center gap-2 text-sm">
-                            <Moon className="w-4 h-4 text-indigo-500" />
-                            <span className="text-gray-600">
-                              <span className="font-semibold text-gray-900">{guest.nights_count}</span>{' '}
-                              {guest.nights_count === 1 ? 'noc' : guest.nights_count >= 2 && guest.nights_count <= 4 ? 'noci' : 'nocí'}
-                            </span>
+                          const checkIn = new Date(guest.check_in_date)
+                          checkIn.setHours(0, 0, 0, 0)
+
+                          const checkOut = new Date(guest.check_out_date)
+                          checkOut.setHours(0, 0, 0, 0)
+
+                          const startDay = Math.floor((checkIn.getTime() - sessionStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
+                          const endDay = Math.floor((checkOut.getTime() - sessionStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
+
+                          if (startDay === endDay) {
+                            dayRange = `${startDay}`
+                          } else {
+                            dayRange = `${startDay}-${endDay}`
+                          }
+                        }
+
+                        return (
+                          <tr
+                            key={guest.id}
+                            className={`border-b border-gray-200 hover:bg-purple-50 transition-colors ${isCurrentGuest ? 'bg-purple-100' : index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                              }`}
+                          >
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-gray-900">{guest.name}</span>
+                                {isCurrentGuest && (
+                                  <UserCheck className="w-4 h-4 text-green-600" />
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 text-center text-gray-700">
+                              {guest.nights_count}
+                            </td>
+                            <td className="py-3 px-4 text-center text-gray-700 font-medium">
+                              {dayRange}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Detailed Cards View */}
+              <div className="mb-4">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">Detailní přehled</h2>
+              </div>
+              <div className="space-y-3">
+                {guests.map((guest) => {
+                  const isCurrentGuest = currentGuest === guest.id
+                  return (
+                    <button
+                      key={guest.id}
+                      onClick={() => handleGuestSelect(guest)}
+                      className={`w-full text-left px-6 py-5 rounded-xl border-2 transition-all ${isCurrentGuest
+                          ? 'border-purple-500 bg-purple-50 shadow-md'
+                          : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50'
+                        }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-3">
+                            <p className="font-bold text-lg text-gray-900">{guest.name}</p>
+                            {isCurrentGuest && (
+                              <div className="flex items-center gap-1 bg-green-100 px-2 py-1 rounded-full">
+                                <UserCheck className="w-4 h-4 text-green-600" />
+                                <span className="text-xs text-green-700 font-medium">Přihlášen/a</span>
+                              </div>
+                            )}
                           </div>
 
-                          {/* Datum příjezdu a odjezdu */}
-                          {guest.check_in_date && guest.check_out_date ? (
-                            <div className="flex items-start gap-2 text-sm">
-                              <Calendar className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                              <div className="text-gray-600">
-                                <div>
-                                  <span className="text-xs text-gray-500">Příjezd:</span>{' '}
-                                  <span className="font-medium text-gray-900">
-                                    {new Date(guest.check_in_date).toLocaleDateString('cs-CZ', {
-                                      day: 'numeric',
-                                      month: 'short',
-                                      year: 'numeric',
-                                      hour: '2-digit',
-                                      minute: '2-digit'
-                                    })}
-                                  </span>
-                                </div>
-                                <div>
-                                  <span className="text-xs text-gray-500">Odjezd:</span>{' '}
-                                  <span className="font-medium text-gray-900">
-                                    {new Date(guest.check_out_date).toLocaleDateString('cs-CZ', {
-                                      day: 'numeric',
-                                      month: 'short',
-                                      year: 'numeric',
-                                      hour: '2-digit',
-                                      minute: '2-digit'
-                                    })}
-                                  </span>
+                          <div className="space-y-2">
+                            {/* Počet nocí */}
+                            <div className="flex items-center gap-2 text-sm">
+                              <Moon className="w-4 h-4 text-indigo-500" />
+                              <span className="text-gray-600">
+                                <span className="font-semibold text-gray-900">{guest.nights_count}</span>{' '}
+                                {guest.nights_count === 1 ? 'noc' : guest.nights_count >= 2 && guest.nights_count <= 4 ? 'noci' : 'nocí'}
+                              </span>
+                            </div>
+
+                            {/* Datum příjezdu a odjezdu */}
+                            {guest.check_in_date && guest.check_out_date ? (
+                              <div className="flex items-start gap-2 text-sm">
+                                <Calendar className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                                <div className="text-gray-600">
+                                  <div>
+                                    <span className="text-xs text-gray-500">Příjezd:</span>{' '}
+                                    <span className="font-medium text-gray-900">
+                                      {new Date(guest.check_in_date).toLocaleDateString('cs-CZ', {
+                                        day: 'numeric',
+                                        month: 'short',
+                                        year: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                      })}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="text-xs text-gray-500">Odjezd:</span>{' '}
+                                    <span className="font-medium text-gray-900">
+                                      {new Date(guest.check_out_date).toLocaleDateString('cs-CZ', {
+                                        day: 'numeric',
+                                        month: 'short',
+                                        year: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                      })}
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2 text-sm">
-                              <Calendar className="w-4 h-4 text-gray-400" />
-                              <span className="text-gray-400 italic text-xs">Datum příjezdu/odjezdu neuvedeno</span>
-                            </div>
-                          )}
+                            ) : (
+                              <div className="flex items-center gap-2 text-sm">
+                                <Calendar className="w-4 h-4 text-gray-400" />
+                                <span className="text-gray-400 italic text-xs">Datum příjezdu/odjezdu neuvedeno</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </>
           )}
 
           <div className="mt-8 pt-8 border-t border-gray-200">
