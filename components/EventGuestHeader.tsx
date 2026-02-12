@@ -16,6 +16,17 @@ export default function EventGuestHeader({ session_slug }: EventGuestHeaderProps
     setMounted(true)
     const guest = guestStorage.getCurrentGuest(session_slug)
     setCurrentGuest(guest)
+
+    // Poll for guest changes (e.g. when user selects a guest on another part of the page)
+    const interval = setInterval(() => {
+      const g = guestStorage.getCurrentGuest(session_slug)
+      setCurrentGuest(prev => {
+        if (g?.id !== prev?.id) return g
+        return prev
+      })
+    }, 1000)
+
+    return () => clearInterval(interval)
   }, [session_slug])
 
   const handleLogout = () => {

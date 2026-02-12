@@ -75,6 +75,7 @@ export default function EventHardwarePage() {
   const [selectedGameInstalls, setSelectedGameInstalls] = useState<Set<string>>(new Set())
   const [savingGameInstalls, setSavingGameInstalls] = useState(false)
   const [existingGameInstalls, setExistingGameInstalls] = useState<string[]>([])
+  const [editingGuestHwId, setEditingGuestHwId] = useState<string | null>(null)
 
   useEffect(() => {
     setMounted(true)
@@ -430,6 +431,10 @@ export default function EventHardwarePage() {
         {/* My Reservations Section */}
         {selectedGuest && (() => {
           const myReservations = reservations.filter(r => r.guest_id === selectedGuest.id && r.status !== 'cancelled')
+            .sort((a, b) => {
+              const typeOrder = (t?: string) => t === 'pc' ? 0 : t === 'monitor' ? 1 : 2
+              return typeOrder(a.hardware_items?.type) - typeOrder(b.hardware_items?.type)
+            })
           if (myReservations.length === 0) return null
 
           return (
@@ -443,8 +448,8 @@ export default function EventHardwarePage() {
                     key={reservation.id}
                     className="p-4 bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg border-2 border-purple-200"
                   >
-                    <div className="flex items-start gap-3 mb-3">
-                      <div className="flex-shrink-0">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 pt-0.5">
                         {reservation.hardware_items?.type === 'pc' ? (
                           <Cpu className="w-6 h-6 text-blue-600" />
                         ) : reservation.hardware_items?.type === 'monitor' ? (
@@ -463,66 +468,22 @@ export default function EventHardwarePage() {
                           </p>
                         )}
                       </div>
+                      <button
+                        onClick={() => handleDeleteReservation(reservation.id)}
+                        className="flex-shrink-0 inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white px-2.5 py-1 rounded-lg text-xs font-medium transition-colors"
+                      >
+                        <Trash2 className="w-3 h-3" /> Zrušit
+                      </button>
                     </div>
 
-                    <div className="border-t border-purple-200 pt-3 mt-3">
-                      {editingReservationId === reservation.id ? (
-                        <div className="space-y-3">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Počet nocí</label>
-                            <input
-                              type="number"
-                              min="1"
-                              value={editNightsCount}
-                              onChange={(e) => setEditNightsCount(parseInt(e.target.value) || 1)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                            />
-                          </div>
-                          <div className="text-sm text-gray-600">
-                            Cena: {(reservation.hardware_items?.price_per_night || 0) * (reservation.quantity || 1) * editNightsCount} Kč
-                          </div>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleSaveEdit(reservation.id)}
-                              className="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg font-semibold text-sm"
-                            >
-                              <Save className="w-4 h-4" /> Uložit
-                            </button>
-                            <button
-                              onClick={() => setEditingReservationId(null)}
-                              className="flex-1 flex items-center justify-center gap-2 bg-gray-300 hover:bg-gray-400 text-gray-800 px-3 py-2 rounded-lg font-semibold text-sm"
-                            >
-                              <X className="w-4 h-4" /> Zrušit
-                            </button>
-                          </div>
+                    {reservation.total_price > 0 && (
+                      <div className="border-t border-purple-200 pt-2 mt-3">
+                        <div className="flex items-center gap-1 text-sm">
+                          <span className="text-gray-500">Cena:</span>
+                          <span className="font-bold text-purple-600">{reservation.total_price} Kč</span>
                         </div>
-                      ) : (
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600">Počet nocí:</span>
-                            <span className="font-semibold text-gray-900">{reservation.nights_count}×</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600">Celková cena:</span>
-                            <span className="font-bold text-purple-600">{reservation.total_price} Kč</span>
-                          </div>
-                          <div className="flex gap-2 mt-3">
-                            <button
-                              onClick={() => handleEditReservation(reservation.id, reservation.nights_count)}
-                              className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg font-semibold text-sm"
-                            >
-                              <Edit2 className="w-4 h-4" /> Upravit
-                            </button>
-                            <button
-                              onClick={() => handleDeleteReservation(reservation.id)}
-                              className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg font-semibold text-sm"
-                            >
-                              <Trash2 className="w-4 h-4" /> Smazat
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -754,23 +715,25 @@ export default function EventHardwarePage() {
           </div>
         )}
 
-        {/* All Reservations - grouped by item */}
+        {/* All Reservations - grouped by guest */}
         {reservations.filter(r => r.status !== 'cancelled').length > 0 && (() => {
           const activeReservations = reservations.filter(r => r.status !== 'cancelled')
-          // Group by hardware item
-          const grouped: Record<string, { item: any; people: { name: string; qty: number; nights: number }[] }> = {}
+          // Group by guest
+          const guestMap: Record<string, { guestId: string; name: string; items: { id: string; name: string; qty: number; nights: number; price: number }[] }> = {}
           activeReservations.forEach(r => {
-            const itemId = r.hardware_item_id
-            if (!grouped[itemId]) {
-              grouped[itemId] = { item: r.hardware_items || { name: 'Neznámé', type: 'accessory' }, people: [] }
+            const gid = r.guest_id
+            if (!guestMap[gid]) {
+              guestMap[gid] = { guestId: gid, name: r.guests?.name || 'Neznámý host', items: [] }
             }
-            grouped[itemId].people.push({
-              name: r.guests?.name || 'Neznámý host',
+            guestMap[gid].items.push({
+              id: r.id,
+              name: r.hardware_items?.name || 'Neznámý HW',
               qty: r.quantity || 1,
               nights: r.nights_count || 1,
+              price: r.total_price || 0,
             })
           })
-          const sortedItems = Object.values(grouped).sort((a, b) => b.people.length - a.people.length)
+          const sortedGuests = Object.values(guestMap).sort((a, b) => a.name.localeCompare(b.name))
 
           return (
             <div className="bg-white rounded-2xl shadow-xl p-6 mt-6">
@@ -778,41 +741,55 @@ export default function EventHardwarePage() {
                 Kdo si co zarezervoval
               </h2>
               <p className="text-sm text-gray-500 mb-4">
-                {activeReservations.length} rezervací od {new Set(activeReservations.map(r => r.guest_id)).size} hostů
+                {activeReservations.length} rezervací od {sortedGuests.length} hostů
               </p>
 
-              <div className="space-y-3">
-                {sortedItems.map(({ item, people }, idx) => (
-                  <div key={idx} className="border border-gray-200 rounded-xl overflow-hidden">
-                    {/* Item header */}
-                    <div className="flex items-center gap-3 px-4 py-3 bg-gray-50">
-                      <span className="flex-shrink-0 text-lg">
-                        {item.type === 'monitor' ? '📺' : item.type === 'pc' ? '💻' : '🎮'}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-gray-900 text-sm">{item.name}</h3>
-                        {formatSpecs(item.specs) && (
-                          <p className="text-xs text-gray-500">{formatSpecs(item.specs)}</p>
-                        )}
+              <div className="divide-y divide-gray-100">
+                {sortedGuests.map((guest, idx) => {
+                  const isMe = selectedGuest?.id === guest.guestId
+                  const isEditing = editingGuestHwId === guest.guestId
+                  return (
+                    <div key={idx} className={`py-3 ${isMe ? 'bg-purple-50 -mx-2 px-2 rounded-lg' : ''}`}>
+                      <div className="flex items-start gap-4">
+                        <div className="flex items-center gap-2 w-40 flex-shrink-0 pt-0.5">
+                          <span className={`font-semibold ${isMe ? 'text-purple-700' : 'text-gray-900'}`}>
+                            {guest.name}
+                            {isMe && <span className="text-xs text-purple-500 ml-1">(ty)</span>}
+                          </span>
+                          <button
+                            onClick={() => setEditingGuestHwId(isEditing ? null : guest.guestId)}
+                            className={`p-1 rounded transition-colors ${isEditing ? 'text-blue-600 bg-blue-100' : 'text-gray-400 hover:text-blue-600'}`}
+                            title={isEditing ? 'Zrušit editaci' : 'Upravit rezervace'}
+                          >
+                            {isEditing ? <X className="w-3.5 h-3.5" /> : <Edit2 className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                        <div className="flex-1 flex flex-wrap gap-2">
+                          {guest.items.map((item, i) => (
+                            <div key={item.id} className="inline-flex items-center gap-1">
+                              <span className="text-sm text-gray-700">
+                                {item.qty > 1 ? `${item.qty}× ` : ''}{item.name}
+                              </span>
+                              {isEditing && (
+                                <button
+                                  onClick={() => handleDeleteReservation(item.id)}
+                                  className="text-red-400 hover:text-red-600 transition-colors p-0.5"
+                                  title="Smazat rezervaci"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {i < guest.items.length - 1 && !isEditing && <span className="text-gray-300 ml-0.5">,</span>}
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      <span className="flex-shrink-0 text-xs font-semibold bg-orange-100 text-orange-700 px-2 py-1 rounded-full">
-                        {people.reduce((s, p) => s + p.qty, 0)}× rezervováno
-                      </span>
+                      {isEditing && selectedGuest && (
+                        <p className="text-xs text-gray-400 mt-1 ml-1">Edituje: {selectedGuest.name}</p>
+                      )}
                     </div>
-                    {/* People list */}
-                    <div className="px-4 py-2 flex flex-wrap gap-1.5">
-                      {people.map((person, i) => (
-                        <span
-                          key={i}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200"
-                        >
-                          {person.name}
-                          {person.qty > 1 && <span className="font-bold">({person.qty}×)</span>}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           )

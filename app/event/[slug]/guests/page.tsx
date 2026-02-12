@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
-import { ArrowLeft, Users, UserCheck, Calendar, Moon } from 'lucide-react'
+import { useParams, useRouter } from 'next/navigation'
+import { ArrowLeft, Users, UserCheck, Calendar, Moon, Armchair, LogOut } from 'lucide-react'
 import { Session, Guest } from '@/types/database.types'
 import { formatDate } from '@/lib/utils'
 import { guestStorage } from '@/lib/guest-storage'
@@ -11,6 +11,7 @@ import EventGuestHeader from '@/components/EventGuestHeader'
 
 export default function GuestsPage() {
   const params = useParams()
+  const router = useRouter()
   const slug = params?.slug as string
 
   const [session, setSession] = useState<Session | null>(null)
@@ -18,6 +19,8 @@ export default function GuestsPage() {
   const [loading, setLoading] = useState(true)
   const [currentGuest, setCurrentGuest] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
+  const [seatReservations, setSeatReservations] = useState<{ id: string, seat_id: string, guest_id: string, guest_name: string }[]>([])
+  const [unregistering, setUnregistering] = useState(false)
 
   useEffect(() => {
     setMounted(true)
@@ -41,8 +44,9 @@ export default function GuestsPage() {
       setLoading(true)
 
       const sessionRes = await fetch(`/api/event/${slug}`)
+      let sessionData: any = null
       if (sessionRes.ok) {
-        const sessionData = await sessionRes.json()
+        sessionData = await sessionRes.json()
         setSession(sessionData.session)
       }
 
@@ -50,6 +54,15 @@ export default function GuestsPage() {
       if (guestsRes.ok) {
         const guestsData = await guestsRes.json()
         setGuests(guestsData.guests || [])
+      }
+
+      // Fetch seat reservations
+      if (sessionData?.session?.id) {
+        const seatsRes = await fetch(`/api/seats/reservations?session_id=${sessionData.session.id}`)
+        if (seatsRes.ok) {
+          const seatsData = await seatsRes.json()
+          setSeatReservations(seatsData.reservations || [])
+        }
       }
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -138,6 +151,7 @@ export default function GuestsPage() {
                     <thead>
                       <tr className="bg-purple-50 border-b-2 border-purple-200">
                         <th className="text-left py-3 px-4 font-semibold text-gray-900">Jméno</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-900">Místo</th>
                         <th className="text-center py-3 px-4 font-semibold text-gray-900">Počet nocí</th>
                         <th className="text-center py-3 px-4 font-semibold text-gray-900">Rozsah dní</th>
                       </tr>
@@ -180,6 +194,18 @@ export default function GuestsPage() {
                                 )}
                               </div>
                             </td>
+                            <td className="py-3 px-4 text-center">
+                              {(() => {
+                                const seats = seatReservations.filter(r => r.guest_id === guest.id).map(r => r.seat_id)
+                                return seats.length > 0 ? (
+                                  <span className="text-xs px-2 py-0.5 rounded bg-green-50 text-green-700 border border-green-200 font-semibold">
+                                    🪑 {seats.join(', ')}
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-gray-400">—</span>
+                                )
+                              })()}
+                            </td>
                             <td className="py-3 px-4 text-center text-gray-700">
                               {guest.nights_count}
                             </td>
@@ -206,8 +232,8 @@ export default function GuestsPage() {
                       key={guest.id}
                       onClick={() => handleGuestSelect(guest)}
                       className={`w-full text-left px-6 py-5 rounded-xl border-2 transition-all ${isCurrentGuest
-                          ? 'border-purple-500 bg-purple-50 shadow-md'
-                          : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50'
+                        ? 'border-purple-500 bg-purple-50 shadow-md'
+                        : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50'
                         }`}
                     >
                       <div className="flex items-start justify-between">
@@ -231,6 +257,24 @@ export default function GuestsPage() {
                                 {guest.nights_count === 1 ? 'noc' : guest.nights_count >= 2 && guest.nights_count <= 4 ? 'noci' : 'nocí'}
                               </span>
                             </div>
+
+                            {/* Místo */}
+                            {(() => {
+                              const seats = seatReservations.filter(r => r.guest_id === guest.id).map(r => r.seat_id)
+                              return seats.length > 0 ? (
+                                <div className="flex items-center gap-2 text-sm">
+                                  <Armchair className="w-4 h-4 text-green-500" />
+                                  <span className="text-gray-600">
+                                    Místo: <span className="font-semibold text-green-700">{seats.join(', ')}</span>
+                                  </span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2 text-sm">
+                                  <Armchair className="w-4 h-4 text-gray-400" />
+                                  <span className="text-gray-400 italic text-xs">Bez místa</span>
+                                </div>
+                              )
+                            })()}
 
                             {/* Datum příjezdu a odjezdu */}
                             {guest.check_in_date && guest.check_out_date ? (
@@ -270,6 +314,40 @@ export default function GuestsPage() {
                               </div>
                             )}
                           </div>
+
+                          {/* Unregister button - only for current guest before event start */}
+                          {isCurrentGuest && session && new Date(session.start_date) > new Date() && (
+                            <div className="mt-3 pt-3 border-t border-gray-200">
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation()
+                                  if (!confirm('Opravdu se chceš odhlásit z akce?\n\nBudou zrušeny všechny tvoje rezervace (HW, místo, hry).')) return
+                                  setUnregistering(true)
+                                  try {
+                                    const res = await fetch(`/api/event/${slug}/guests/${guest.id}`, { method: 'DELETE' })
+                                    if (res.ok) {
+                                      guestStorage.clearCurrentGuest()
+                                      setCurrentGuest(null)
+                                      alert('Byl/a jsi odhlášen/a z akce. Všechny rezervace byly zrušeny.')
+                                      fetchData()
+                                    } else {
+                                      const data = await res.json()
+                                      alert(`Chyba: ${data.error || 'Nepodařilo se odhlásit'}`)
+                                    }
+                                  } catch (err) {
+                                    alert('Chyba při odhlašování z akce')
+                                  } finally {
+                                    setUnregistering(false)
+                                  }
+                                }}
+                                disabled={unregistering}
+                                className="inline-flex items-center gap-2 text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium"
+                              >
+                                <LogOut className="w-4 h-4" />
+                                {unregistering ? 'Odhlašuji...' : 'Odhlásit se z akce'}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </button>

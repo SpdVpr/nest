@@ -67,6 +67,7 @@ export default function EventDetailPage() {
   const [addingGame, setAddingGame] = useState(false)
   const [libraryGames, setLibraryGames] = useState<GameLibraryItem[]>([])
   const [gameInstallRequests, setGameInstallRequests] = useState<any[]>([])
+  const [seatReservations, setSeatReservations] = useState<{ id: string, seat_id: string, guest_id: string, guest_name: string }[]>([])
 
   useEffect(() => {
     const token = localStorage.getItem('admin_token')
@@ -241,6 +242,13 @@ export default function EventDetailPage() {
       if (installRes.ok) {
         const installData = await installRes.json()
         setGameInstallRequests(installData.requests || [])
+      }
+
+      // Fetch seat reservations for this session
+      const seatsRes = await fetch(`/api/seats/reservations?session_id=${sessionId}`)
+      if (seatsRes.ok) {
+        const seatsData = await seatsRes.json()
+        setSeatReservations(seatsData.reservations || [])
       }
     } catch (error) {
       console.error('Error fetching event data:', error)
@@ -670,6 +678,7 @@ export default function EventDetailPage() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Jméno</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Místo</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Noci</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Příjezd / Odjezd</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">HW</th>
@@ -688,6 +697,22 @@ export default function EventDetailPage() {
                     return (
                       <tr key={guest.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">{guest.name}</td>
+                        <td className="px-4 py-3">
+                          {(() => {
+                            const seats = seatReservations.filter(r => r.guest_id === guest.id).map(r => r.seat_id)
+                            return seats.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {seats.map(s => (
+                                  <span key={s} className="text-[11px] px-1.5 py-0.5 rounded bg-green-50 text-green-700 border border-green-200 font-semibold whitespace-nowrap">
+                                    🪑 {s}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-xs text-gray-400">—</span>
+                            )
+                          })()}
+                        </td>
                         <td className="px-4 py-3 text-sm">
                           <span className="bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full font-semibold text-xs">
                             {guest.nights_count}
@@ -717,7 +742,7 @@ export default function EventDetailPage() {
                   })
                 ) : (
                   <tr>
-                    <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                    <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
                       Zatím žádní hosté
                     </td>
                   </tr>
