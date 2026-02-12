@@ -131,9 +131,10 @@ export interface ConsumptionInput {
 export interface HardwareItem {
   id: string
   name: string
-  type: 'monitor' | 'pc'
+  type: 'monitor' | 'pc' | 'accessory'
   category: string
   price_per_night: number
+  quantity: number
   specs?: {
     resolution?: string
     diagonal?: string
@@ -149,9 +150,10 @@ export interface HardwareItem {
 
 export interface HardwareItemInput {
   name: string
-  type: 'monitor' | 'pc'
+  type: 'monitor' | 'pc' | 'accessory'
   category: string
   price_per_night: number
+  quantity?: number
   specs?: {
     resolution?: string
     diagonal?: string
