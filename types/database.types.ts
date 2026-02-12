@@ -259,13 +259,39 @@ export interface GuestMealSelection {
 }
 
 // =============================================
-// GAMES TYPES
+// GAME LIBRARY TYPES (global database of games)
+// =============================================
+
+export interface GameLibraryItem {
+  id: string
+  name: string
+  category?: string              // e.g. 'FPS', 'RTS', 'Racing', 'Sport', 'Party'
+  max_players?: number | null
+  image_url?: string | null
+  notes?: string | null          // install size, requirements etc.
+  is_available: boolean          // still offered for install?
+  created_at: string
+  updated_at: string
+}
+
+export interface GameLibraryItemInput {
+  name: string
+  category?: string
+  max_players?: number | null
+  image_url?: string | null
+  notes?: string | null
+  is_available?: boolean
+}
+
+// =============================================
+// PER-EVENT GAMES TYPES
 // =============================================
 
 export interface Game {
   id: string
   session_id: string
   name: string
+  library_game_id?: string       // optional link to GameLibraryItem
   suggested_by?: string          // guest_id if user-suggested, undefined if admin
   is_admin_pick: boolean         // true if added by admin
   votes: number                  // cached vote count

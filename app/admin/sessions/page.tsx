@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Plus, Loader2, PlayCircle, StopCircle, Edit, Eye, Trash2, UtensilsCrossed, X, Gamepad2 } from 'lucide-react'
+import { ArrowLeft, Plus, Loader2, PlayCircle, StopCircle, Edit, Eye, Trash2, UtensilsCrossed, X } from 'lucide-react'
 import { Session, MealType } from '@/types/database.types'
 import { formatDate, formatDateOnly } from '@/lib/utils'
 
@@ -852,14 +852,6 @@ export default function AdminSessionsPage() {
                         <Edit className="w-4 h-4 mr-1" />
                         Upravit
                       </button>
-                      <Link
-                        href={`/admin/sessions/${session.id}#games`}
-                        className="flex items-center text-violet-600 hover:text-violet-700"
-                        title="Správa her"
-                      >
-                        <Gamepad2 className="w-4 h-4 mr-1" />
-                        Hry
-                      </Link>
                       <button
                         onClick={() => toggleSessionActive(session.id, session.is_active)}
                         className={`flex items-center ${session.is_active

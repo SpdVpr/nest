@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Users, Monitor, Utensils, TrendingUp, Loader2, Edit2, Check, X, Edit, UtensilsCrossed } from 'lucide-react'
-import { Session, Guest, MenuItem, MealType, Game } from '@/types/database.types'
+import { Session, Guest, MenuItem, MealType, Game, GameLibraryItem } from '@/types/database.types'
 import { HardwareItem } from '@/types/hardware.types'
 import { formatDate, formatDateOnly } from '@/lib/utils'
 
@@ -65,6 +65,8 @@ export default function EventDetailPage() {
   const [games, setGames] = useState<Game[]>([])
   const [newGameName, setNewGameName] = useState('')
   const [addingGame, setAddingGame] = useState(false)
+  const [libraryGames, setLibraryGames] = useState<GameLibraryItem[]>([])
+  const [gameInstallRequests, setGameInstallRequests] = useState<any[]>([])
 
   useEffect(() => {
     const token = localStorage.getItem('admin_token')
@@ -223,6 +225,22 @@ export default function EventDetailPage() {
         const data = await menuRes.json()
         setMenuItems(data.items || [])
         setMenuEnabled(data.enabled || false)
+      }
+
+      // Fetch global game library
+      const libraryRes = await fetch('/api/admin/games', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      if (libraryRes.ok) {
+        const data = await libraryRes.json()
+        setLibraryGames((data.games || []).filter((g: GameLibraryItem) => g.is_available))
+      }
+
+      // Fetch game install requests
+      const installRes = await fetch(`/api/game-installs?session_id=${sessionId}`)
+      if (installRes.ok) {
+        const installData = await installRes.json()
+        setGameInstallRequests(installData.requests || [])
       }
     } catch (error) {
       console.error('Error fetching event data:', error)
@@ -770,59 +788,72 @@ export default function EventDetailPage() {
           )
         })()}
 
-        {/* Games */}
-        <div id="games" className="bg-white rounded-xl shadow mb-8 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-            <h2 className="text-xl font-bold text-gray-900">🎮 Hry ({games.length})</h2>
-          </div>
-          <div className="p-6">
-            {/* Add game form */}
-            <div className="flex gap-2 mb-4">
-              <input
-                type="text"
-                value={newGameName}
-                onChange={(e) => setNewGameName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && addGame()}
-                placeholder="Název hry (např. Counter-Strike 2)"
-                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              />
-              <button
-                onClick={addGame}
-                disabled={!newGameName.trim() || addingGame}
-                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all"
-              >
-                {addingGame ? '...' : '+ Přidat'}
-              </button>
-            </div>
 
-            {games.length > 0 ? (
-              <div className="divide-y divide-gray-100">
-                {games.map(game => (
-                  <div key={game.id} className="py-2.5 flex items-center gap-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${game.is_admin_pick
-                      ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                      : 'bg-purple-100 text-purple-800 border border-purple-200'
-                      }`}>
-                      {game.is_admin_pick ? '⭐ Admin' : '👤 Návrh'}
-                    </span>
-                    <span className="font-medium text-gray-900 flex-1">{game.name}</span>
-                    <span className="text-sm text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                      👍 {game.votes || 0}
-                    </span>
-                    <button
-                      onClick={() => deleteGame(game.id)}
-                      className="text-red-400 hover:text-red-600 text-xs px-2 py-1 rounded hover:bg-red-50 transition-all"
-                    >
-                      ✕
-                    </button>
+
+        {/* Game Install Requests for Admin Overview */}
+        {gameInstallRequests.length > 0 && (
+          <div className="bg-white rounded-xl shadow mb-8 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-900">💿 Hry k instalaci na PC</h2>
+              <p className="text-sm text-gray-500 mt-1">Přehled her, které si hosté přejí nainstalovat na svůj PC</p>
+            </div>
+            <div className="divide-y divide-gray-100">
+              {gameInstallRequests.map((req: any) => {
+                const guestName = getGuestName(req.guest_id)
+                // Find which PCs this guest has reserved
+                const guestPcReservations = reservations.filter(
+                  (r: any) => r.guest_id === req.guest_id && hardwareItems.find(h => h.id === r.hardware_item_id)?.type === 'pc'
+                )
+                const pcNames = guestPcReservations.map((r: any) => {
+                  const hw = hardwareItems.find(h => h.id === r.hardware_item_id)
+                  return hw?.name || 'PC'
+                })
+
+                return (
+                  <div key={req.id} className="px-6 py-4 hover:bg-gray-50">
+                    <div className="flex items-start gap-4">
+                      {/* Guest info */}
+                      <div className="flex-shrink-0">
+                        <span className="font-semibold text-gray-900">{guestName}</span>
+                        {pcNames.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {pcNames.map((name: string, i: number) => (
+                              <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                                💻 {name}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      {/* Games */}
+                      <div className="flex-1 flex flex-wrap gap-1.5">
+                        {(req.game_names || []).map((gameName: string, i: number) => (
+                          <span
+                            key={i}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-violet-50 text-violet-700 border border-violet-200"
+                          >
+                            🎮 {gameName}
+                          </span>
+                        ))}
+                      </div>
+                      {/* Game count */}
+                      <span className="flex-shrink-0 text-xs font-semibold bg-violet-100 text-violet-700 px-2 py-1 rounded-full">
+                        {(req.game_names || []).length} her
+                      </span>
+                    </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-500 text-center py-4">Zatím žádné hry. Přidejte první!</p>
-            )}
+                )
+              })}
+            </div>
+            {/* Summary footer */}
+            <div className="px-6 py-3 bg-gray-50 border-t border-gray-200">
+              <p className="text-xs text-gray-500">
+                📊 Celkem {gameInstallRequests.length} hostů si vyžádalo instalaci her •{' '}
+                {[...new Set(gameInstallRequests.flatMap((r: any) => r.game_names || []))].length} unikátních her
+              </p>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Meal Attendance per Day */}
         {(() => {

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Monitor, Cpu, Check, Gamepad2, Keyboard, Mouse, Headphones, Cable, Edit2, Trash2, X, Save, Plus, Minus } from 'lucide-react'
-import { Session, Guest } from '@/types/database.types'
+import { Session, Guest, GameLibraryItem } from '@/types/database.types'
 import { HardwareItem } from '@/types/hardware.types'
 import { formatDate } from '@/lib/utils'
 import { guestStorage } from '@/lib/guest-storage'
@@ -69,6 +69,12 @@ export default function EventHardwarePage() {
   const [showGuestSelection, setShowGuestSelection] = useState(false)
   const [editingReservationId, setEditingReservationId] = useState<string | null>(null)
   const [editNightsCount, setEditNightsCount] = useState<number>(1)
+  // Game install selection
+  const [libraryGames, setLibraryGames] = useState<GameLibraryItem[]>([])
+  const [showGameInstallPicker, setShowGameInstallPicker] = useState(false)
+  const [selectedGameInstalls, setSelectedGameInstalls] = useState<Set<string>>(new Set())
+  const [savingGameInstalls, setSavingGameInstalls] = useState(false)
+  const [existingGameInstalls, setExistingGameInstalls] = useState<string[]>([])
 
   useEffect(() => {
     setMounted(true)
@@ -121,6 +127,31 @@ export default function EventHardwarePage() {
       if (hardwareRes.ok) {
         const hardwareData = await hardwareRes.json()
         setHardwareItems(hardwareData.items)
+      }
+
+      // Fetch game library
+      const gameLibRes = await fetch('/api/game-library')
+      if (gameLibRes.ok) {
+        const gameLibData = await gameLibRes.json()
+        setLibraryGames(gameLibData.games || [])
+      }
+
+      // Fetch existing game install requests
+      if (sessionRes.ok) {
+        const sessionData = await (await fetch(`/api/event/${slug}`)).json()
+        const installRes = await fetch(`/api/game-installs?session_id=${sessionData.session.id}`)
+        if (installRes.ok) {
+          const installData = await installRes.json()
+          // Find this guest's installs
+          const currentGuest = guestStorage.getCurrentGuest(slug)
+          if (currentGuest) {
+            const myInstalls = (installData.requests || []).find((r: any) => r.guest_id === currentGuest.id)
+            if (myInstalls) {
+              setExistingGameInstalls(myInstalls.game_names || [])
+              setSelectedGameInstalls(new Set(myInstalls.game_names || []))
+            }
+          }
+        }
       }
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -185,11 +216,26 @@ export default function EventHardwarePage() {
       })
 
       if (response.ok) {
+        const result = await response.json()
         setSelectedQuantities({})
         setShowConfirm(false)
         setNightsCount(1)
-        fetchData()
-        alert('Rezervace byla úspěšně vytvořena!')
+
+        // Check if any PC was reserved — if yes, show game install picker
+        const hasPc = Object.entries(selectedQuantities)
+          .filter(([, q]) => q > 0)
+          .some(([itemId]) => {
+            const item = hardwareItems.find(i => i.id === itemId)
+            return item?.type === 'pc'
+          })
+
+        await fetchData()
+
+        if (hasPc && libraryGames.length > 0) {
+          setShowGameInstallPicker(true)
+        } else {
+          alert('Rezervace byla úspěšně vytvořena!')
+        }
       } else {
         const errorData = await response.json()
         alert(`Chyba: ${errorData.error || 'Neznámá chyba'}`)
@@ -270,6 +316,54 @@ export default function EventHardwarePage() {
   const filteredItems = availableItems.filter(item => item.category === selectedCategory)
   const totalPrice = getTotalPrice()
   const totalSelected = getTotalSelectedCount()
+
+  // Has any PC type selected?
+  const hasPcSelected = Object.entries(selectedQuantities)
+    .filter(([, q]) => q > 0)
+    .some(([itemId]) => hardwareItems.find(i => i.id === itemId)?.type === 'pc')
+
+  // Toggle game install selection
+  const toggleGameInstall = (gameName: string) => {
+    setSelectedGameInstalls(prev => {
+      const next = new Set(prev)
+      if (next.has(gameName)) {
+        next.delete(gameName)
+      } else {
+        next.add(gameName)
+      }
+      return next
+    })
+  }
+
+  const handleSaveGameInstalls = async () => {
+    if (!selectedGuest || !session) return
+    setSavingGameInstalls(true)
+    try {
+      const pcReservationIds = reservations
+        .filter(r => r.guest_id === selectedGuest.id && r.hardware_items?.type === 'pc' && r.status !== 'cancelled')
+        .map(r => r.id)
+
+      await fetch('/api/game-installs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          guest_id: selectedGuest.id,
+          session_id: session.id,
+          reservation_ids: pcReservationIds,
+          game_names: Array.from(selectedGameInstalls),
+        }),
+      })
+
+      setExistingGameInstalls(Array.from(selectedGameInstalls))
+      setShowGameInstallPicker(false)
+      alert('Rezervace proběhla a hry byly vybrány! 🎮')
+    } catch (error) {
+      console.error('Error saving game installs:', error)
+      alert('Chyba při ukládání her')
+    } finally {
+      setSavingGameInstalls(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -763,6 +857,14 @@ export default function EventHardwarePage() {
               <p className="text-2xl font-bold text-orange-600">{totalPrice} Kč</p>
             </div>
 
+            {hasPcSelected && libraryGames.length > 0 && (
+              <div className="bg-violet-50 border border-violet-200 rounded-lg p-3 mb-4">
+                <p className="text-sm text-violet-800">
+                  🎮 Po potvrzení si budeš moci vybrat hry k instalaci na PC!
+                </p>
+              </div>
+            )}
+
             <div className="flex gap-3">
               <button
                 onClick={() => setShowConfirm(false)}
@@ -778,6 +880,117 @@ export default function EventHardwarePage() {
               >
                 {submitting ? 'Rezervuji...' : 'Potvrdit'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Game Install Picker Modal */}
+      {showGameInstallPicker && selectedGuest && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-lg w-full max-h-[85vh] flex flex-col">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 rounded-xl bg-violet-100 flex items-center justify-center text-2xl">🎮</div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Výběr her k instalaci</h2>
+                <p className="text-sm text-gray-500">Které hry chceš mít nainstalované na tvém PC?</p>
+              </div>
+            </div>
+
+            <div className="bg-violet-50 border border-violet-200 rounded-lg p-3 mb-4">
+              <p className="text-xs text-violet-800">
+                Vyber hry, které chceš mít připravené na svém PC při příjezdu. Admin je nainstaluje předem.
+              </p>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-2 mb-4">
+              {libraryGames.map(game => {
+                const isSelected = selectedGameInstalls.has(game.name)
+                return (
+                  <button
+                    key={game.id}
+                    onClick={() => toggleGameInstall(game.name)}
+                    className={`w-full text-left p-3 rounded-xl border-2 transition-all flex items-center gap-3 ${isSelected
+                      ? 'border-violet-500 bg-violet-50 shadow-md'
+                      : 'border-gray-200 hover:border-violet-300 hover:bg-gray-50'
+                      }`}
+                  >
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm flex-shrink-0 ${isSelected
+                      ? 'bg-violet-500 text-white'
+                      : 'bg-gray-100 text-gray-400'
+                      }`}>
+                      {isSelected ? '✓' : '+'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`font-semibold ${isSelected ? 'text-violet-900' : 'text-gray-900'}`}>
+                        {game.name}
+                      </p>
+                      <div className="flex gap-2 mt-0.5">
+                        {game.category && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+                            {game.category}
+                          </span>
+                        )}
+                        {game.max_players && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+                            👥 max {game.max_players}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+
+            <div className="border-t border-gray-200 pt-4 flex items-center justify-between">
+              <p className="text-sm text-gray-600">
+                Vybráno: <span className="font-bold text-violet-600">{selectedGameInstalls.size}</span> her
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setShowGameInstallPicker(false)
+                    alert('Rezervace byla vytvořena! Hry můžeš vybrat později.')
+                  }}
+                  className="px-4 py-2.5 text-gray-600 hover:text-gray-800 font-medium text-sm"
+                >
+                  Přeskočit
+                </button>
+                <button
+                  onClick={handleSaveGameInstalls}
+                  disabled={savingGameInstalls}
+                  className="px-6 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:bg-gray-300 text-white rounded-xl font-semibold text-sm transition-colors"
+                >
+                  {savingGameInstalls ? 'Ukládám...' : `Potvrdit výběr (${selectedGameInstalls.size})`}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Existing game install info */}
+      {selectedGuest && existingGameInstalls.length > 0 && (
+        <div className="max-w-5xl mx-auto px-4 mb-4">
+          <div className="bg-violet-50 border border-violet-200 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold text-violet-900 text-sm flex items-center gap-2">
+                🎮 Tvoje vybrané hry k instalaci
+              </h3>
+              <button
+                onClick={() => setShowGameInstallPicker(true)}
+                className="text-xs text-violet-600 hover:text-violet-700 font-medium underline"
+              >
+                Upravit
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {existingGameInstalls.map((name, i) => (
+                <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-violet-100 text-violet-700 font-medium border border-violet-200">
+                  {name}
+                </span>
+              ))}
             </div>
           </div>
         </div>

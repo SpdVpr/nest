@@ -15,7 +15,8 @@ import {
   MonitorSmartphone,
   Edit,
   Trash2,
-  UtensilsCrossed
+  UtensilsCrossed,
+  Gamepad2
 } from 'lucide-react'
 import { Session } from '@/types/database.types'
 import { formatDate } from '@/lib/utils'
@@ -574,6 +575,17 @@ export default function AdminDashboard() {
             </div>
             <h3 className="font-semibold text-gray-900 mb-2">💻 Správa Hardware</h3>
             <p className="text-sm text-gray-600">Centrální seznam HW pro všechny LAN</p>
+          </Link>
+
+          <Link
+            href="/admin/games"
+            className="bg-white rounded-xl shadow hover:shadow-lg transition-shadow p-6 flex flex-col items-center text-center"
+          >
+            <div className="bg-violet-100 p-4 rounded-full mb-4">
+              <Gamepad2 className="w-8 h-8 text-violet-600" />
+            </div>
+            <h3 className="font-semibold text-gray-900 mb-2">🎮 Správa her</h3>
+            <p className="text-sm text-gray-600">Databáze her k instalaci na PC</p>
           </Link>
 
           <Link

@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { ArrowLeft, Gamepad2, Plus, ThumbsUp, Loader2, Trophy, Sparkles } from 'lucide-react'
-import { Session, Game, GameVote } from '@/types/database.types'
+import { ArrowLeft, Gamepad2, Plus, ThumbsUp, Loader2, Trophy, Sparkles, Library } from 'lucide-react'
+import { Session, Game, GameVote, GameLibraryItem } from '@/types/database.types'
 import { guestStorage } from '@/lib/guest-storage'
 import EventGuestHeader from '@/components/EventGuestHeader'
 
@@ -15,6 +15,7 @@ export default function EventGamesPage() {
     const [session, setSession] = useState<Session | null>(null)
     const [games, setGames] = useState<Game[]>([])
     const [votes, setVotes] = useState<GameVote[]>([])
+    const [libraryGames, setLibraryGames] = useState<GameLibraryItem[]>([])
     const [loading, setLoading] = useState(true)
     const [newGameName, setNewGameName] = useState('')
     const [submitting, setSubmitting] = useState(false)
@@ -37,12 +38,19 @@ export default function EventGamesPage() {
                 setSession(data.session)
             }
 
-            // Fetch games
+            // Fetch games for this event
             const gamesRes = await fetch(`/api/event/${slug}/games`)
             if (gamesRes.ok) {
                 const data = await gamesRes.json()
                 setGames(data.games || [])
                 setVotes(data.votes || [])
+            }
+
+            // Fetch global game library
+            const libRes = await fetch('/api/game-library')
+            if (libRes.ok) {
+                const libData = await libRes.json()
+                setLibraryGames(libData.games || [])
             }
         } catch (error) {
             console.error('Error fetching data:', error)
@@ -135,6 +143,11 @@ export default function EventGamesPage() {
     const adminPicks = games.filter(g => g.is_admin_pick)
     const communityPicks = games.filter(g => !g.is_admin_pick)
 
+    // Library games that are NOT yet added to this event (available to quick-suggest)
+    const unaddedLibraryGames = libraryGames.filter(
+        lg => !games.some(g => g.name.toLowerCase() === lg.name.toLowerCase())
+    )
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-violet-50 via-purple-50 to-indigo-100 p-4 pb-32">
             <EventGuestHeader session_slug={slug} />
@@ -192,8 +205,8 @@ export default function EventGamesPage() {
                                             onClick={() => handleVote(game.id)}
                                             disabled={!currentGuest || votingId === game.id}
                                             className={`p-2.5 rounded-xl transition-all ${hasVoted(game.id)
-                                                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-200 scale-110'
-                                                    : 'bg-white text-gray-400 hover:text-purple-600 hover:bg-purple-50 border border-gray-200'
+                                                ? 'bg-purple-600 text-white shadow-lg shadow-purple-200 scale-110'
+                                                : 'bg-white text-gray-400 hover:text-purple-600 hover:bg-purple-50 border border-gray-200'
                                                 } ${!currentGuest ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                                         >
                                             {votingId === game.id ? (
@@ -204,6 +217,56 @@ export default function EventGamesPage() {
                                         </button>
                                     </div>
                                 </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Library games to suggest — quick pick buttons */}
+                {unaddedLibraryGames.length > 0 && currentGuest && (
+                    <div className="mb-6">
+                        <h2 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
+                            <Library className="w-5 h-5 text-violet-500" />
+                            Dostupné hry k instalaci
+                        </h2>
+                        <p className="text-sm text-gray-500 mb-3">
+                            Klikni na hru pro navržení na event — ostatní pro ni mohou hlasovat:
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                            {unaddedLibraryGames.map(lg => (
+                                <button
+                                    key={lg.id}
+                                    onClick={async () => {
+                                        if (!currentGuest || submitting) return
+                                        try {
+                                            setSubmitting(true)
+                                            const res = await fetch(`/api/event/${slug}/games`, {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({
+                                                    action: 'suggest',
+                                                    guest_id: currentGuest.id,
+                                                    name: lg.name,
+                                                }),
+                                            })
+                                            if (res.ok) {
+                                                await fetchData()
+                                            }
+                                        } catch (error) {
+                                            console.error('Error suggesting library game:', error)
+                                        } finally {
+                                            setSubmitting(false)
+                                        }
+                                    }}
+                                    disabled={submitting}
+                                    className="group relative px-3 py-2 rounded-xl bg-violet-50 hover:bg-violet-100 border border-violet-200 hover:border-violet-400 transition-all text-left disabled:opacity-50"
+                                >
+                                    <span className="font-medium text-violet-800 text-sm">{lg.name}</span>
+                                    {lg.category && (
+                                        <span className="ml-1.5 text-[10px] text-violet-400">({lg.category})</span>
+                                    )}
+                                    <span className="ml-1.5 text-xs text-violet-400 group-hover:text-violet-600">+ navrhnout</span>
+                                </button>
                             ))}
                         </div>
                     </div>
@@ -232,8 +295,8 @@ export default function EventGamesPage() {
                                             onClick={() => handleVote(game.id)}
                                             disabled={!currentGuest || votingId === game.id}
                                             className={`p-2.5 rounded-xl transition-all ${hasVoted(game.id)
-                                                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-200 scale-110'
-                                                    : 'bg-white text-gray-400 hover:text-purple-600 hover:bg-purple-50 border border-gray-200'
+                                                ? 'bg-purple-600 text-white shadow-lg shadow-purple-200 scale-110'
+                                                : 'bg-white text-gray-400 hover:text-purple-600 hover:bg-purple-50 border border-gray-200'
                                                 } ${!currentGuest ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                                         >
                                             {votingId === game.id ? (
