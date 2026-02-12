@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Calendar, Pizza, MonitorSmartphone, Users, AlertCircle, Armchair, UtensilsCrossed } from 'lucide-react'
+import { ArrowLeft, Calendar, Pizza, MonitorSmartphone, Users, AlertCircle, Armchair, UtensilsCrossed, Gamepad2 } from 'lucide-react'
 import { Session } from '@/types/database.types'
 import { formatEventRange } from '@/lib/utils'
 import EventGuestHeader from '@/components/EventGuestHeader'
@@ -193,6 +193,17 @@ export default function EventPage() {
               </div>
             </Link>
           )}
+
+          <Link
+            href={`/event/${slug}/games`}
+            className="group bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-8 flex flex-col items-center space-y-4 hover:scale-105"
+          >
+            <Gamepad2 className="w-16 h-16" />
+            <div className="text-center">
+              <h2 className="text-2xl font-bold mb-1">Hry</h2>
+              <p className="text-violet-100 text-sm">Hlasuj co budeme hrát na LAN</p>
+            </div>
+          </Link>
 
           <Link
             href={`/event/${slug}/register`}

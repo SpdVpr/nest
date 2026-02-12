@@ -660,47 +660,69 @@ export default function EventHardwarePage() {
           </div>
         )}
 
-        {/* All Reservations List */}
-        {reservations.filter(r => r.status !== 'cancelled').length > 0 && (
-          <div className="bg-white rounded-2xl shadow-xl p-6 mt-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">
-              Všechny rezervace ({reservations.filter(r => r.status !== 'cancelled').length})
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {reservations.filter(r => r.status !== 'cancelled').map((reservation) => (
-                <div
-                  key={reservation.id}
-                  className="p-4 bg-gray-50 rounded-lg border border-gray-200"
-                >
-                  <div className="flex items-start gap-3 mb-3">
-                    <div className="flex-shrink-0">
-                      {reservation.hardware_items?.type === 'pc' ? (
-                        <Cpu className="w-5 h-5 text-blue-600" />
-                      ) : reservation.hardware_items?.type === 'monitor' ? (
-                        <Monitor className="w-5 h-5 text-orange-600" />
-                      ) : (
-                        <Gamepad2 className="w-5 h-5 text-purple-600" />
-                      )}
+        {/* All Reservations - grouped by item */}
+        {reservations.filter(r => r.status !== 'cancelled').length > 0 && (() => {
+          const activeReservations = reservations.filter(r => r.status !== 'cancelled')
+          // Group by hardware item
+          const grouped: Record<string, { item: any; people: { name: string; qty: number; nights: number }[] }> = {}
+          activeReservations.forEach(r => {
+            const itemId = r.hardware_item_id
+            if (!grouped[itemId]) {
+              grouped[itemId] = { item: r.hardware_items || { name: 'Neznámé', type: 'accessory' }, people: [] }
+            }
+            grouped[itemId].people.push({
+              name: r.guests?.name || 'Neznámý host',
+              qty: r.quantity || 1,
+              nights: r.nights_count || 1,
+            })
+          })
+          const sortedItems = Object.values(grouped).sort((a, b) => b.people.length - a.people.length)
+
+          return (
+            <div className="bg-white rounded-2xl shadow-xl p-6 mt-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-1">
+                Kdo si co zarezervoval
+              </h2>
+              <p className="text-sm text-gray-500 mb-4">
+                {activeReservations.length} rezervací od {new Set(activeReservations.map(r => r.guest_id)).size} hostů
+              </p>
+
+              <div className="space-y-3">
+                {sortedItems.map(({ item, people }, idx) => (
+                  <div key={idx} className="border border-gray-200 rounded-xl overflow-hidden">
+                    {/* Item header */}
+                    <div className="flex items-center gap-3 px-4 py-3 bg-gray-50">
+                      <span className="flex-shrink-0 text-lg">
+                        {item.type === 'monitor' ? '📺' : item.type === 'pc' ? '💻' : '🎮'}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-gray-900 text-sm">{item.name}</h3>
+                        {formatSpecs(item.specs) && (
+                          <p className="text-xs text-gray-500">{formatSpecs(item.specs)}</p>
+                        )}
+                      </div>
+                      <span className="flex-shrink-0 text-xs font-semibold bg-orange-100 text-orange-700 px-2 py-1 rounded-full">
+                        {people.reduce((s, p) => s + p.qty, 0)}× rezervováno
+                      </span>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-gray-900 text-sm truncate">
-                        {reservation.quantity > 1 ? `${reservation.quantity}× ` : ''}{reservation.hardware_items?.name || 'Neznámé zařízení'}
-                      </h3>
+                    {/* People list */}
+                    <div className="px-4 py-2 flex flex-wrap gap-1.5">
+                      {people.map((person, i) => (
+                        <span
+                          key={i}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200"
+                        >
+                          {person.name}
+                          {person.qty > 1 && <span className="font-bold">({person.qty}×)</span>}
+                        </span>
+                      ))}
                     </div>
                   </div>
-                  <div className="border-t border-gray-200 pt-2">
-                    <p className="font-semibold text-gray-900 text-sm">
-                      {reservation.guests?.name || 'Neznámý host'}
-                    </p>
-                    <p className="text-xs text-gray-600">
-                      {reservation.nights_count}× noc • {reservation.total_price} Kč
-                    </p>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
       </div>
 
 

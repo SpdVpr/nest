@@ -257,3 +257,25 @@ export interface GuestMealSelection {
   created_at: string
   updated_at: string
 }
+
+// =============================================
+// GAMES TYPES
+// =============================================
+
+export interface Game {
+  id: string
+  session_id: string
+  name: string
+  suggested_by?: string          // guest_id if user-suggested, undefined if admin
+  is_admin_pick: boolean         // true if added by admin
+  votes: number                  // cached vote count
+  created_at: string
+}
+
+export interface GameVote {
+  id: string
+  game_id: string
+  guest_id: string
+  session_id: string
+  created_at: string
+}

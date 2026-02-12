@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Users, Monitor, Utensils, TrendingUp, Loader2, Edit2, Check, X, Edit, UtensilsCrossed } from 'lucide-react'
-import { Session, Guest, MenuItem, MealType } from '@/types/database.types'
+import { Session, Guest, MenuItem, MealType, Game } from '@/types/database.types'
 import { HardwareItem } from '@/types/hardware.types'
 import { formatDate, formatDateOnly } from '@/lib/utils'
 
@@ -62,6 +62,9 @@ export default function EventDetailPage() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
   const [menuEnabled, setMenuEnabled] = useState(false)
   const [guestSelections, setGuestSelections] = useState<Record<string, any>>({})
+  const [games, setGames] = useState<Game[]>([])
+  const [newGameName, setNewGameName] = useState('')
+  const [addingGame, setAddingGame] = useState(false)
 
   useEffect(() => {
     const token = localStorage.getItem('admin_token')
@@ -201,6 +204,15 @@ export default function EventDetailPage() {
       if (consumRes.ok) {
         const data = await consumRes.json()
         setConsumption(data.consumption || [])
+      }
+
+      // Fetch games for this session
+      const gamesRes = await fetch(`/api/admin/sessions/${sessionId}/games`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      if (gamesRes.ok) {
+        const data = await gamesRes.json()
+        setGames(data.games || [])
       }
 
       // Fetch menu items for this session
@@ -356,6 +368,41 @@ export default function EventDetailPage() {
     return guests.filter(g =>
       (g.dietary_restrictions && g.dietary_restrictions.length > 0) || g.dietary_note
     )
+  }
+
+  const addGame = async () => {
+    if (!newGameName.trim()) return
+    try {
+      setAddingGame(true)
+      const token = localStorage.getItem('admin_token')
+      const res = await fetch(`/api/admin/sessions/${sessionId}/games`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ name: newGameName.trim() }),
+      })
+      if (res.ok) {
+        setNewGameName('')
+        await fetchEventData()
+      }
+    } catch (error) {
+      console.error('Error adding game:', error)
+    } finally {
+      setAddingGame(false)
+    }
+  }
+
+  const deleteGame = async (gameId: string) => {
+    if (!confirm('Smazat tuto hru?')) return
+    try {
+      const token = localStorage.getItem('admin_token')
+      await fetch(`/api/admin/sessions/${sessionId}/games?gameId=${gameId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
+      await fetchEventData()
+    } catch (error) {
+      console.error('Error deleting game:', error)
+    }
   }
 
   if (!isAuthenticated || loading) {
@@ -604,12 +651,13 @@ export default function EventDetailPage() {
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Jméno</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Noci</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">HW (Kč)</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Jídlo (Kč)</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase text-red-600">CENA CELKEM (Kč)</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Registrace</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Jméno</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Noci</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Příjezd / Odjezd</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">HW</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">HW (Kč)</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Jídlo (Kč)</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase text-red-600 font-bold">Celkem</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -618,24 +666,40 @@ export default function EventDetailPage() {
                     const hwPrice = getTotalHardwareByGuest(guest.id)
                     const foodPrice = getTotalConsumptionByGuest(guest.id)
                     const totalPrice = getTotalPriceByGuest(guest.id)
+                    const guestHw = getGuestHardware(guest.id)
                     return (
                       <tr key={guest.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 font-medium text-gray-900">{guest.name}</td>
-                        <td className="px-6 py-4 text-sm bg-blue-50">
-                          <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-semibold">
+                        <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">{guest.name}</td>
+                        <td className="px-4 py-3 text-sm">
+                          <span className="bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full font-semibold text-xs">
                             {guest.nights_count}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{hwPrice} Kč</td>
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{foodPrice} Kč</td>
-                        <td className="px-6 py-4 font-bold text-red-600 text-lg">{totalPrice} Kč</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{formatDate(guest.created_at)}</td>
+                        <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+                          {guest.check_in_date ? formatDateOnly(new Date(guest.check_in_date)) : '—'}
+                          {' → '}
+                          {guest.check_out_date ? formatDateOnly(new Date(guest.check_out_date)) : '—'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap gap-1 max-w-xs">
+                            {guestHw.length > 0 ? guestHw.map((hw, i) => (
+                              <span key={i} className="text-[11px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap">
+                                {hw.quantity > 1 ? `${hw.quantity}× ` : ''}{hw.name}
+                              </span>
+                            )) : (
+                              <span className="text-xs text-gray-400">—</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">{hwPrice} Kč</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">{foodPrice} Kč</td>
+                        <td className="px-4 py-3 font-bold text-red-600">{totalPrice} Kč</td>
                       </tr>
                     )
                   })
                 ) : (
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                    <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
                       Zatím žádní hosté
                     </td>
                   </tr>
@@ -645,164 +709,295 @@ export default function EventDetailPage() {
           </div>
         </div>
 
-        {/* Hardware Reservations Detail */}
-        {reservations.length > 0 && (
-          <div className="bg-white rounded-xl shadow mb-8 overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">💻 HW Rezervace</h2>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Host</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Položka</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ks</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Noci</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cena (Kč)</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vytvořeno</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {reservations.map((res) => (
-                    <tr key={res.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 font-medium text-gray-900">{getGuestName(res.guest_id)}</td>
-                      <td className="px-6 py-4 text-sm">
-                        <span className="block bg-blue-50 px-2 py-1 rounded text-blue-700 text-xs font-medium">
-                          {getHardwareName(res.hardware_item_id)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm font-semibold text-gray-900">{res.quantity || 1}×</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{res.nights_count}</td>
-                      <td className="px-6 py-4 font-semibold text-gray-900">{res.total_price} Kč</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{formatDate(res.created_at)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+        {/* Hardware Reservations - grouped by guest */}
+        {reservations.length > 0 && (() => {
+          // Group reservations by guest
+          const guestHwMap: Record<string, { name: string; items: { name: string; type: string; qty: number; nights: number; price: number }[] }> = {}
+          reservations.forEach(r => {
+            const gid = r.guest_id
+            if (!guestHwMap[gid]) {
+              guestHwMap[gid] = { name: getGuestName(gid), items: [] }
+            }
+            const hw = hardwareItems.find(h => h.id === r.hardware_item_id)
+            guestHwMap[gid].items.push({
+              name: hw?.name || 'Neznámý HW',
+              type: hw?.type || 'accessory',
+              qty: r.quantity || 1,
+              nights: r.nights_count || 1,
+              price: r.total_price || 0,
+            })
+          })
+          const typeOrder: Record<string, number> = { pc: 0, monitor: 1, accessory: 2 }
+          // Sort items within each guest: PC → Monitor → Accessory
+          Object.values(guestHwMap).forEach(g => {
+            g.items.sort((a, b) => (typeOrder[a.type] ?? 9) - (typeOrder[b.type] ?? 9))
+          })
+          const sortedGuests = Object.values(guestHwMap).sort((a, b) => a.name.localeCompare(b.name))
 
-        {/* Menu Overview */}
-        {menuEnabled && menuItems.length > 0 && (
-          <div className="bg-white rounded-xl shadow mb-8 overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-900">🍽️ Jídelníček ({menuItems.length} jídel)</h2>
-              <Link
-                href={`/admin/sessions/${sessionId}/menu`}
-                className="text-sm text-orange-600 hover:text-orange-700 font-medium"
-              >
-                Upravit jídelníček →
-              </Link>
-            </div>
-            <div className="p-6">
-              {/* Menu by days - compact grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                {getMenuDays().map(day => {
-                  const dayMeals = getMealsForDay(day.dayIndex)
-                  if (dayMeals.length === 0) return null
+          return (
+            <div className="bg-white rounded-xl shadow mb-8 overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h2 className="text-xl font-bold text-gray-900">💻 HW Rezervace ({reservations.length})</h2>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {sortedGuests.map((guest, idx) => {
+                  const guestTotal = guest.items.reduce((s, i) => s + i.price, 0)
                   return (
-                    <div key={day.dayIndex} className="border border-gray-200 rounded-lg overflow-hidden">
-                      <div className="px-4 py-2 bg-gray-800 text-white">
-                        <span className="font-semibold text-sm">📅 {day.label}</span>
-                      </div>
-                      <div className="p-3 space-y-1.5">
-                        {dayMeals.map((meal, i) => (
-                          <div key={i} className="flex items-center gap-2 text-sm">
-                            <span className="text-gray-400 w-12 text-xs flex-shrink-0">{meal.time}</span>
-                            <span className="font-medium text-gray-700 flex-shrink-0">
-                              {getMealTypeLabel(meal.meal_type).split(' ')[0]}
-                            </span>
-                            <span className="text-gray-900 truncate">
-                              {meal.description || <span className="text-gray-400 italic">—</span>}
-                            </span>
-                          </div>
+                    <div key={idx} className="px-6 py-3 flex items-center gap-4 hover:bg-gray-50">
+                      <span className="font-semibold text-gray-900 w-36 flex-shrink-0 truncate">{guest.name}</span>
+                      <div className="flex-1 flex flex-wrap gap-1.5">
+                        {guest.items.map((item, i) => (
+                          <span
+                            key={i}
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${item.type === 'monitor'
+                              ? 'bg-orange-50 text-orange-700 border-orange-200'
+                              : item.type === 'pc'
+                                ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                : 'bg-purple-50 text-purple-700 border-purple-200'
+                              }`}
+                          >
+                            {item.type === 'monitor' ? '📺' : item.type === 'pc' ? '💻' : '🎮'}
+                            {item.qty > 1 ? `${item.qty}× ` : ''}{item.name}
+                          </span>
                         ))}
                       </div>
+                      <span className="flex-shrink-0 font-bold text-gray-900 text-sm">{guestTotal} Kč</span>
                     </div>
                   )
                 })}
               </div>
+            </div>
+          )
+        })()}
 
-              {/* Guest dietary restrictions */}
-              {getGuestsDietaryInfo().length > 0 && (
-                <div className="border-t border-gray-200 pt-4">
-                  <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                    ⚠️ Stravovací omezení hostů
-                    <span className="text-sm font-normal text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
-                      {getGuestsDietaryInfo().length} hostů
+        {/* Games */}
+        <div id="games" className="bg-white rounded-xl shadow mb-8 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+            <h2 className="text-xl font-bold text-gray-900">🎮 Hry ({games.length})</h2>
+          </div>
+          <div className="p-6">
+            {/* Add game form */}
+            <div className="flex gap-2 mb-4">
+              <input
+                type="text"
+                value={newGameName}
+                onChange={(e) => setNewGameName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && addGame()}
+                placeholder="Název hry (např. Counter-Strike 2)"
+                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              />
+              <button
+                onClick={addGame}
+                disabled={!newGameName.trim() || addingGame}
+                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all"
+              >
+                {addingGame ? '...' : '+ Přidat'}
+              </button>
+            </div>
+
+            {games.length > 0 ? (
+              <div className="divide-y divide-gray-100">
+                {games.map(game => (
+                  <div key={game.id} className="py-2.5 flex items-center gap-3">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${game.is_admin_pick
+                      ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                      : 'bg-purple-100 text-purple-800 border border-purple-200'
+                      }`}>
+                      {game.is_admin_pick ? '⭐ Admin' : '👤 Návrh'}
                     </span>
-                  </h3>
-                  <div className="space-y-2">
-                    {getGuestsDietaryInfo().map(guest => (
-                      <div key={guest.id} className="flex items-start gap-3 p-3 bg-red-50 border border-red-100 rounded-lg">
-                        <span className="font-semibold text-gray-900 w-32 flex-shrink-0">{guest.name}</span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {guest.dietary_restrictions?.map((r: string) => (
-                            <span key={r} className="text-xs px-2 py-1 bg-red-100 text-red-800 rounded-full font-medium">
-                              {r === 'vegan' ? '🌱 Vegan' : r === 'vegetarian' ? '🥬 Vegetarián' : r === 'gluten-free' ? '🌾 Bez lepku' : r === 'lactose-free' ? '🥛 Bez laktózy' : r}
-                            </span>
-                          ))}
-                          {guest.dietary_note && (
-                            <span className="text-xs px-2 py-1 bg-amber-100 text-amber-800 rounded-full">
-                              📝 {guest.dietary_note}
-                            </span>
-                          )}
+                    <span className="font-medium text-gray-900 flex-1">{game.name}</span>
+                    <span className="text-sm text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                      👍 {game.votes || 0}
+                    </span>
+                    <button
+                      onClick={() => deleteGame(game.id)}
+                      className="text-red-400 hover:text-red-600 text-xs px-2 py-1 rounded hover:bg-red-50 transition-all"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 text-center py-4">Zatím žádné hry. Přidejte první!</p>
+            )}
+          </div>
+        </div>
+
+        {/* Meal Attendance per Day */}
+        {(() => {
+          const days = getMenuDays()
+          if (days.length === 0 || guests.length === 0) return null
+
+          // Calculate which guests are present on a given day
+          const getGuestsOnDay = (dayDate: Date) => {
+            return guests.filter(g => {
+              if (g.check_in_date && g.check_out_date) {
+                const checkIn = new Date(g.check_in_date)
+                const checkOut = new Date(g.check_out_date)
+                checkIn.setHours(0, 0, 0, 0)
+                checkOut.setHours(23, 59, 59, 999)
+                const d = new Date(dayDate)
+                d.setHours(12, 0, 0, 0)
+                return d >= checkIn && d <= checkOut
+              }
+              // If no dates, assume present all days
+              return true
+            })
+          }
+
+          const mealTypes: MealType[] = ['lunch', 'dinner']
+
+          return (
+            <div className="bg-white rounded-xl shadow mb-8 overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-900">🍽️ Stravování – přehled po dnech</h2>
+                <Link
+                  href={`/admin/sessions/${sessionId}/menu`}
+                  className="text-sm text-orange-600 hover:text-orange-700 font-medium"
+                >
+                  Upravit jídelníček →
+                </Link>
+              </div>
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
+                  {days.map(day => {
+                    const presentGuests = getGuestsOnDay(day.date)
+                    const dayMeals = getMealsForDay(day.dayIndex)
+                    return (
+                      <div key={day.dayIndex} className="border border-gray-200 rounded-xl overflow-hidden">
+                        {/* Day header */}
+                        <div className="px-4 py-2.5 bg-gray-800 text-white flex items-center justify-between">
+                          <span className="font-semibold text-sm">📅 {day.label}</span>
+                          <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full font-medium">
+                            {presentGuests.length} hostů
+                          </span>
+                        </div>
+
+                        {/* Meals */}
+                        <div className="divide-y divide-gray-100">
+                          {mealTypes.map(mealType => {
+                            const mealInfo = dayMeals.find(m => m.meal_type === mealType)
+                            const label = getMealTypeLabel(mealType)
+                            return (
+                              <div key={mealType} className="px-4 py-2.5">
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-semibold text-gray-900">{label}</span>
+                                    {mealInfo?.time && (
+                                      <span className="text-xs text-gray-400">{mealInfo.time}</span>
+                                    )}
+                                  </div>
+                                  <span className="bg-green-100 text-green-800 text-xs font-bold px-2.5 py-0.5 rounded-full">
+                                    {presentGuests.length} porcí
+                                  </span>
+                                </div>
+                                {mealInfo?.description && (
+                                  <p className="text-xs text-gray-600 mb-1.5 italic">{mealInfo.description}</p>
+                                )}
+                                <div className="flex flex-wrap gap-1">
+                                  {presentGuests.map(g => (
+                                    <span key={g.id} className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                                      {g.name}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )
+                          })}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {getGuestsDietaryInfo().length === 0 && (
-                <div className="border-t border-gray-200 pt-4">
-                  <p className="text-sm text-gray-500">✅ Žádný host nemá stravovací omezení</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Consumption History */}
-        {consumption.length > 0 && (
-          <div className="bg-white rounded-xl shadow overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">🍕 Nákupy (Spotřeba)</h2>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Host</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produkt</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ks</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cena/Ks</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Celkem</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Čas</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {consumption.map((rec) => {
-                    const price = rec.products?.price || 0
-                    const subtotal = rec.quantity * price
-                    return (
-                      <tr key={rec.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 font-medium text-gray-900">{getGuestName(rec.guest_id)}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{rec.products?.name || 'Neznámý produkt'}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{rec.quantity}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{price} Kč</td>
-                        <td className="px-6 py-4 font-semibold text-gray-900">{subtotal} Kč</td>
-                        <td className="px-6 py-4 text-sm text-gray-500">{formatDate(rec.consumed_at)}</td>
-                      </tr>
                     )
                   })}
-                </tbody>
-              </table>
+                </div>
+
+                {/* Guest dietary restrictions */}
+                {getGuestsDietaryInfo().length > 0 && (
+                  <div className="border-t border-gray-200 pt-4">
+                    <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                      ⚠️ Stravovací omezení hostů
+                      <span className="text-sm font-normal text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
+                        {getGuestsDietaryInfo().length} hostů
+                      </span>
+                    </h3>
+                    <div className="space-y-2">
+                      {getGuestsDietaryInfo().map(guest => (
+                        <div key={guest.id} className="flex items-start gap-3 p-3 bg-red-50 border border-red-100 rounded-lg">
+                          <span className="font-semibold text-gray-900 w-32 flex-shrink-0">{guest.name}</span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {guest.dietary_restrictions?.map((r: string) => (
+                              <span key={r} className="text-xs px-2 py-1 bg-red-100 text-red-800 rounded-full font-medium">
+                                {r === 'vegan' ? '🌱 Vegan' : r === 'vegetarian' ? '🥬 Vegetarián' : r === 'gluten-free' ? '🌾 Bez lepku' : r === 'lactose-free' ? '🥛 Bez laktózy' : r}
+                              </span>
+                            ))}
+                            {guest.dietary_note && (
+                              <span className="text-xs px-2 py-1 bg-amber-100 text-amber-800 rounded-full">
+                                📝 {guest.dietary_note}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {getGuestsDietaryInfo().length === 0 && (
+                  <div className="border-t border-gray-200 pt-4">
+                    <p className="text-sm text-gray-500">✅ Žádný host nemá stravovací omezení</p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
+
+        {/* Consumption History - grouped by guest */}
+        {consumption.length > 0 && (() => {
+          const guestConsMap: Record<string, { name: string; items: Record<string, { qty: number; price: number }>; total: number }> = {}
+          consumption.forEach(rec => {
+            const gid = rec.guest_id
+            if (!guestConsMap[gid]) {
+              guestConsMap[gid] = { name: getGuestName(gid), items: {}, total: 0 }
+            }
+            const price = rec.products?.price || 0
+            const subtotal = rec.quantity * price
+            const productName = rec.products?.name || 'Neznámý'
+            if (!guestConsMap[gid].items[productName]) {
+              guestConsMap[gid].items[productName] = { qty: 0, price: 0 }
+            }
+            guestConsMap[gid].items[productName].qty += rec.quantity
+            guestConsMap[gid].items[productName].price += subtotal
+            guestConsMap[gid].total += subtotal
+          })
+          const sorted = Object.values(guestConsMap)
+            .map(g => ({ ...g, itemList: Object.entries(g.items).map(([product, v]) => ({ product, ...v })) }))
+            .sort((a, b) => a.name.localeCompare(b.name))
+
+          return (
+            <div className="bg-white rounded-xl shadow overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h2 className="text-xl font-bold text-gray-900">🍕 Nákupy – Spotřeba ({consumption.length})</h2>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {sorted.map((guest, idx) => (
+                  <div key={idx} className="px-6 py-3 flex items-center gap-4 hover:bg-gray-50">
+                    <span className="font-semibold text-gray-900 w-36 flex-shrink-0 truncate">{guest.name}</span>
+                    <div className="flex-1 flex flex-wrap gap-1.5">
+                      {guest.itemList.map((item, i) => (
+                        <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                          {item.qty > 1 ? `${item.qty}× ` : ''}{item.product}
+                          <span className="text-amber-500 font-normal">({item.price} Kč)</span>
+                        </span>
+                      ))}
+                    </div>
+                    <span className="flex-shrink-0 font-bold text-gray-900 text-sm">{guest.total} Kč</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        })()}
       </div>
     </div>
   )
