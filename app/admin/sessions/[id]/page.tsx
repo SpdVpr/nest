@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Users, Monitor, Utensils, TrendingUp, Loader2, Edit2, Check, X, Edit, UtensilsCrossed } from 'lucide-react'
+import { ArrowLeft, Users, Monitor, Utensils, TrendingUp, Loader2, Edit2, Check, X, Edit, UtensilsCrossed, Heart } from 'lucide-react'
 import { Session, Guest, MenuItem, MealType, Game, GameLibraryItem } from '@/types/database.types'
 import { HardwareItem } from '@/types/hardware.types'
 import { formatDate, formatDateOnly } from '@/lib/utils'
@@ -68,6 +68,7 @@ export default function EventDetailPage() {
   const [libraryGames, setLibraryGames] = useState<GameLibraryItem[]>([])
   const [gameInstallRequests, setGameInstallRequests] = useState<any[]>([])
   const [seatReservations, setSeatReservations] = useState<{ id: string, seat_id: string, guest_id: string, guest_name: string }[]>([])
+  const [tips, setTips] = useState<Record<string, { amount: number; percentage: number | null }>>({})
 
   useEffect(() => {
     const token = localStorage.getItem('admin_token')
@@ -250,6 +251,14 @@ export default function EventDetailPage() {
         const seatsData = await seatsRes.json()
         setSeatReservations(seatsData.reservations || [])
       }
+
+      // Fetch tips for this session (use session slug from state or just-fetched data)
+      const tipSlug = session?.slug || sessionId
+      const tipsRes = await fetch(`/api/event/${tipSlug}/tips`)
+      if (tipsRes.ok) {
+        const tipsData = await tipsRes.json()
+        setTips(tipsData.tips || {})
+      }
     } catch (error) {
       console.error('Error fetching event data:', error)
     } finally {
@@ -326,12 +335,17 @@ export default function EventDetailPage() {
       .reduce((sum, c) => sum + (c.quantity * (c.products?.price || 0)), 0)
   }
 
+  const getTipByGuest = (guestId: string) => {
+    return tips[guestId]?.amount || 0
+  }
+
   const getTotalPriceByGuest = (guestId: string) => {
     const nights = getGuestNights(guestId)
     const nightsPrice = nights * (session?.price_per_night || 0)
     const hardwarePrice = getTotalHardwareByGuest(guestId)
     const foodPrice = getTotalConsumptionByGuest(guestId)
-    return nightsPrice + hardwarePrice + foodPrice
+    const tip = getTipByGuest(guestId)
+    return nightsPrice + hardwarePrice + foodPrice + tip
   }
 
   const getTotalRevenue = () => {
@@ -342,7 +356,13 @@ export default function EventDetailPage() {
     total += reservations.reduce((sum, r) => sum + r.total_price, 0)
     // Add consumption revenue
     total += consumption.reduce((sum, c) => sum + (c.quantity * (c.products?.price || 0)), 0)
+    // Add tips
+    total += Object.values(tips).reduce((sum, t) => sum + (t.amount || 0), 0)
     return total
+  }
+
+  const getTotalTips = () => {
+    return Object.values(tips).reduce((sum, t) => sum + (t.amount || 0), 0)
   }
 
   const getHardwareStats = () => {
@@ -487,6 +507,12 @@ export default function EventDetailPage() {
               >
                 <Utensils className="w-5 h-5" />
                 Pochutiny
+              </Link>
+              <Link
+                href={`/admin/sessions/${sessionId}/settlement`}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium"
+              >
+                💳 Vyúčtování
               </Link>
               <Link
                 href={`/event/${session.slug}`}
@@ -684,6 +710,7 @@ export default function EventDetailPage() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">HW</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">HW (Kč)</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Jídlo (Kč)</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-pink-500 uppercase">💖 Dýško</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase text-red-600 font-bold">Celkem</th>
                 </tr>
               </thead>
@@ -736,13 +763,26 @@ export default function EventDetailPage() {
                         </td>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">{hwPrice} Kč</td>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">{foodPrice} Kč</td>
+                        <td className="px-4 py-3 text-sm font-medium">
+                          {getTipByGuest(guest.id) > 0 ? (
+                            <span className="inline-flex items-center gap-1 text-pink-600 font-semibold">
+                              <Heart className="w-3.5 h-3.5 fill-pink-500" />
+                              {getTipByGuest(guest.id)} Kč
+                              {tips[guest.id]?.percentage && (
+                                <span className="text-xs text-pink-400">({tips[guest.id].percentage}%)</span>
+                              )}
+                            </span>
+                          ) : (
+                            <span className="text-gray-300">—</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3 font-bold text-red-600">{totalPrice} Kč</td>
                       </tr>
                     )
                   })
                 ) : (
                   <tr>
-                    <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
+                    <td colSpan={9} className="px-6 py-8 text-center text-gray-500">
                       Zatím žádní hosté
                     </td>
                   </tr>

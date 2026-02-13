@@ -75,7 +75,6 @@ export default function EventHardwarePage() {
   const [selectedGameInstalls, setSelectedGameInstalls] = useState<Set<string>>(new Set())
   const [savingGameInstalls, setSavingGameInstalls] = useState(false)
   const [existingGameInstalls, setExistingGameInstalls] = useState<string[]>([])
-  const [editingGuestHwId, setEditingGuestHwId] = useState<string | null>(null)
 
   useEffect(() => {
     setMounted(true)
@@ -96,9 +95,8 @@ export default function EventHardwarePage() {
           setSelectedGuest(guestToSelect)
           setNightsCount(guestToSelect.nights_count || 1)
         }
-      } else {
-        setShowGuestSelection(true)
       }
+      // Don't force guest selection — let users browse freely
     }
   }, [guests, slug, mounted])
 
@@ -171,6 +169,11 @@ export default function EventHardwarePage() {
   }
 
   const changeQuantity = (itemId: string, delta: number, maxAvailable: number) => {
+    // If no guest selected, prompt them to pick one first
+    if (!selectedGuest) {
+      setShowGuestSelection(true)
+      return
+    }
     setSelectedQuantities(prev => {
       const current = prev[itemId] || 0
       const next = Math.max(0, Math.min(current + delta, maxAvailable))
@@ -379,7 +382,10 @@ export default function EventHardwarePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-purple-50 to-red-50 p-4 pb-32">
-      <EventGuestHeader session_slug={slug} />
+      <EventGuestHeader session_slug={slug} onLogout={() => {
+        setSelectedGuest(null)
+        setSelectedQuantities({})
+      }} />
 
       <GuestSelectionModal
         guests={guests}
@@ -491,22 +497,7 @@ export default function EventHardwarePage() {
           )
         })()}
 
-        {guests.length > 0 && !selectedGuest && (
-          <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Vyber hosta</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-              {guests.map((guest) => (
-                <button
-                  key={guest.id}
-                  onClick={() => setSelectedGuest(guest)}
-                  className="p-4 rounded-xl border-2 border-gray-200 hover:border-orange-500 hover:bg-orange-50 text-left transition-all text-center"
-                >
-                  <p className="font-semibold text-gray-900 text-sm">{guest.name}</p>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+
 
         {/* Category Selection */}
         <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
@@ -618,8 +609,8 @@ export default function EventHardwarePage() {
                       </span>
                     </div>
 
-                    {/* +/- Quantity controls */}
-                    {!soldOut && selectedGuest && (
+                    {/* +/- Quantity controls — always shown for available items */}
+                    {!soldOut && (
                       <div className="flex items-center justify-center gap-3 pt-3 border-t border-gray-200">
                         <button
                           onClick={() => changeQuantity(item.id, -1, available)}
@@ -639,8 +630,8 @@ export default function EventHardwarePage() {
 
                         <button
                           onClick={() => changeQuantity(item.id, 1, available)}
-                          disabled={qty >= available}
-                          className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors font-bold text-lg ${qty >= available
+                          disabled={qty >= available && !!selectedGuest}
+                          className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors font-bold text-lg ${qty >= available && !!selectedGuest
                             ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
                             : 'bg-green-100 text-green-600 hover:bg-green-200'
                             }`}
@@ -648,12 +639,6 @@ export default function EventHardwarePage() {
                           <Plus className="w-5 h-5" />
                         </button>
                       </div>
-                    )}
-
-                    {!selectedGuest && !soldOut && (
-                      <p className="text-xs text-gray-400 text-center pt-3 border-t border-gray-200">
-                        Pro výběr se nejdřív přihlaš
-                      </p>
                     )}
                   </div>
                 )
@@ -719,7 +704,8 @@ export default function EventHardwarePage() {
         {reservations.filter(r => r.status !== 'cancelled').length > 0 && (() => {
           const activeReservations = reservations.filter(r => r.status !== 'cancelled')
           // Group by guest
-          const guestMap: Record<string, { guestId: string; name: string; items: { id: string; name: string; qty: number; nights: number; price: number }[] }> = {}
+          const typeOrder = (t?: string) => t === 'pc' ? 0 : t === 'monitor' ? 1 : 2
+          const guestMap: Record<string, { guestId: string; name: string; items: { id: string; name: string; type: string; qty: number; nights: number; price: number }[] }> = {}
           activeReservations.forEach(r => {
             const gid = r.guest_id
             if (!guestMap[gid]) {
@@ -728,12 +714,30 @@ export default function EventHardwarePage() {
             guestMap[gid].items.push({
               id: r.id,
               name: r.hardware_items?.name || 'Neznámý HW',
+              type: r.hardware_items?.type || 'other',
               qty: r.quantity || 1,
               nights: r.nights_count || 1,
               price: r.total_price || 0,
             })
           })
+          // Sort items within each guest: PC → Monitor → Accessories
+          Object.values(guestMap).forEach(guest => {
+            guest.items.sort((a, b) => typeOrder(a.type) - typeOrder(b.type))
+          })
           const sortedGuests = Object.values(guestMap).sort((a, b) => a.name.localeCompare(b.name))
+
+          const handleSwitchToGuest = (guestId: string) => {
+            const guest = guests.find(g => g.id === guestId)
+            if (guest) {
+              setSelectedGuest(guest)
+              setNightsCount(guest.nights_count || 1)
+              guestStorage.setCurrentGuest({ id: guest.id, name: guest.name, session_slug: slug })
+              // Reset quantity selections when switching guests
+              setSelectedQuantities({})
+              // Scroll to top so they see My Reservations
+              window.scrollTo({ top: 0, behavior: 'smooth' })
+            }
+          }
 
           return (
             <div className="bg-white rounded-2xl shadow-xl p-6 mt-6">
@@ -741,52 +745,43 @@ export default function EventHardwarePage() {
                 Kdo si co zarezervoval
               </h2>
               <p className="text-sm text-gray-500 mb-4">
-                {activeReservations.length} rezervací od {sortedGuests.length} hostů
+                {activeReservations.length} rezervací od {sortedGuests.length} hostů • klikni na jméno pro editaci
               </p>
 
               <div className="divide-y divide-gray-100">
                 {sortedGuests.map((guest, idx) => {
                   const isMe = selectedGuest?.id === guest.guestId
-                  const isEditing = editingGuestHwId === guest.guestId
                   return (
                     <div key={idx} className={`py-3 ${isMe ? 'bg-purple-50 -mx-2 px-2 rounded-lg' : ''}`}>
                       <div className="flex items-start gap-4">
-                        <div className="flex items-center gap-2 w-40 flex-shrink-0 pt-0.5">
-                          <span className={`font-semibold ${isMe ? 'text-purple-700' : 'text-gray-900'}`}>
+                        <button
+                          onClick={() => handleSwitchToGuest(guest.guestId)}
+                          className={`flex items-center gap-2 w-40 flex-shrink-0 pt-0.5 text-left group transition-colors ${isMe
+                            ? 'cursor-default'
+                            : 'hover:text-purple-600'
+                            }`}
+                          title={isMe ? 'Aktuálně přihlášen/a' : `Přepnout na ${guest.name}`}
+                        >
+                          <span className={`font-semibold ${isMe ? 'text-purple-700' : 'text-gray-900 group-hover:text-purple-600'}`}>
                             {guest.name}
-                            {isMe && <span className="text-xs text-purple-500 ml-1">(ty)</span>}
                           </span>
-                          <button
-                            onClick={() => setEditingGuestHwId(isEditing ? null : guest.guestId)}
-                            className={`p-1 rounded transition-colors ${isEditing ? 'text-blue-600 bg-blue-100' : 'text-gray-400 hover:text-blue-600'}`}
-                            title={isEditing ? 'Zrušit editaci' : 'Upravit rezervace'}
-                          >
-                            {isEditing ? <X className="w-3.5 h-3.5" /> : <Edit2 className="w-3.5 h-3.5" />}
-                          </button>
-                        </div>
+                          {isMe ? (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-200 text-purple-700 font-medium">ty</span>
+                          ) : (
+                            <Edit2 className="w-3 h-3 text-gray-300 group-hover:text-purple-500 transition-colors" />
+                          )}
+                        </button>
                         <div className="flex-1 flex flex-wrap gap-2">
                           {guest.items.map((item, i) => (
                             <div key={item.id} className="inline-flex items-center gap-1">
                               <span className="text-sm text-gray-700">
                                 {item.qty > 1 ? `${item.qty}× ` : ''}{item.name}
                               </span>
-                              {isEditing && (
-                                <button
-                                  onClick={() => handleDeleteReservation(item.id)}
-                                  className="text-red-400 hover:text-red-600 transition-colors p-0.5"
-                                  title="Smazat rezervaci"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-                              {i < guest.items.length - 1 && !isEditing && <span className="text-gray-300 ml-0.5">,</span>}
+                              {i < guest.items.length - 1 && <span className="text-gray-300 ml-0.5">,</span>}
                             </div>
                           ))}
                         </div>
                       </div>
-                      {isEditing && selectedGuest && (
-                        <p className="text-xs text-gray-400 mt-1 ml-1">Edituje: {selectedGuest.name}</p>
-                      )}
                     </div>
                   )
                 })}

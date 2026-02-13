@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Calendar, Pizza, MonitorSmartphone, Users, AlertCircle, Armchair, UtensilsCrossed, Gamepad2 } from 'lucide-react'
+import { ArrowLeft, Calendar, Pizza, MonitorSmartphone, Users, AlertCircle, Armchair, UtensilsCrossed, Gamepad2, Wallet } from 'lucide-react'
 import { Session } from '@/types/database.types'
 import { formatEventRange } from '@/lib/utils'
 import EventGuestHeader from '@/components/EventGuestHeader'
@@ -167,6 +167,17 @@ export default function EventPage() {
             <div className="text-center">
               <h2 className="text-2xl font-bold mb-1">Rezervace HW</h2>
               <p className="text-orange-100 text-sm">Zapůjč si monitor nebo PC</p>
+            </div>
+          </Link>
+
+          <Link
+            href={`/event/${slug}/costs`}
+            className="group bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-8 flex flex-col items-center space-y-4 hover:scale-105"
+          >
+            <Wallet className="w-16 h-16" />
+            <div className="text-center">
+              <h2 className="text-2xl font-bold mb-1">Přehled nákladů</h2>
+              <p className="text-teal-100 text-sm">Kolik to celé stojí</p>
             </div>
           </Link>
 

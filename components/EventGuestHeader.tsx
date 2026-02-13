@@ -6,9 +6,10 @@ import { guestStorage, StoredGuest } from '@/lib/guest-storage'
 
 interface EventGuestHeaderProps {
   session_slug: string
+  onLogout?: () => void
 }
 
-export default function EventGuestHeader({ session_slug }: EventGuestHeaderProps) {
+export default function EventGuestHeader({ session_slug, onLogout }: EventGuestHeaderProps) {
   const [currentGuest, setCurrentGuest] = useState<StoredGuest | null>(null)
   const [mounted, setMounted] = useState(false)
 
@@ -32,6 +33,7 @@ export default function EventGuestHeader({ session_slug }: EventGuestHeaderProps
   const handleLogout = () => {
     guestStorage.clearCurrentGuest()
     setCurrentGuest(null)
+    onLogout?.()
   }
 
   if (!mounted) {

@@ -27,13 +27,13 @@ export default function SnacksPage() {
   const [newGuestName, setNewGuestName] = useState('')
 
   useEffect(() => {
-    fetchData()
+    fetchData(true)
   }, [])
 
-  const fetchData = async () => {
+  const fetchData = async (isInitial = false) => {
     try {
-      setLoading(true)
-      
+      if (isInitial) setLoading(true)
+
       // Fetch active session
       const sessionRes = await fetch('/api/sessions/active')
       if (sessionRes.ok) {
@@ -46,6 +46,12 @@ export default function SnacksPage() {
       if (guestsRes.ok) {
         const guestsData = await guestsRes.json()
         setGuests(guestsData.guests)
+        // Also update the selected guest with fresh data
+        setSelectedGuest(prev => {
+          if (!prev) return null
+          const updated = guestsData.guests.find((g: GuestWithConsumption) => g.id === prev.id)
+          return updated || null
+        })
       }
 
       // Fetch products
@@ -57,7 +63,7 @@ export default function SnacksPage() {
     } catch (error) {
       console.error('Error fetching data:', error)
     } finally {
-      setLoading(false)
+      if (isInitial) setLoading(false)
     }
   }
 
@@ -85,6 +91,42 @@ export default function SnacksPage() {
   const handleAddProduct = async (productId: string) => {
     if (!selectedGuest) return
 
+    // Find the product being added
+    const product = products.find(p => p.id === productId)
+    if (!product) return
+
+    // Optimistic update: immediately update local state
+    const tempId = `temp-${Date.now()}-${Math.random()}`
+    const newConsumptionItem = {
+      id: tempId,
+      quantity: 1,
+      products: product,
+    }
+
+    // Update the selected guest's consumption locally
+    setSelectedGuest(prev => {
+      if (!prev) return null
+      return {
+        ...prev,
+        consumption: [...prev.consumption, newConsumptionItem],
+        totalItems: prev.totalItems + 1,
+        totalBeers: product.category?.toLowerCase().includes('piv') ? prev.totalBeers + 1 : prev.totalBeers,
+        totalPrice: prev.totalPrice + product.price,
+      }
+    })
+
+    // Update the guests array too
+    setGuests(prev => prev.map(g => {
+      if (g.id !== selectedGuest.id) return g
+      return {
+        ...g,
+        consumption: [...g.consumption, newConsumptionItem],
+        totalItems: g.totalItems + 1,
+        totalBeers: product.category?.toLowerCase().includes('piv') ? g.totalBeers + 1 : g.totalBeers,
+        totalPrice: g.totalPrice + product.price,
+      }
+    }))
+
     try {
       const response = await fetch('/api/consumption', {
         method: 'POST',
@@ -97,14 +139,44 @@ export default function SnacksPage() {
       })
 
       if (response.ok) {
+        // Silently sync real data from server in background
         fetchData()
       }
     } catch (error) {
       console.error('Error adding product:', error)
+      // On error, re-fetch to restore correct state
+      fetchData()
     }
   }
 
   const handleDeleteProduct = async (consumptionId: string) => {
+    // Optimistic update: immediately remove from local state
+    const removedItem = selectedGuest?.consumption.find(c => c.id === consumptionId)
+
+    if (selectedGuest && removedItem) {
+      setSelectedGuest(prev => {
+        if (!prev) return null
+        return {
+          ...prev,
+          consumption: prev.consumption.filter(c => c.id !== consumptionId),
+          totalItems: prev.totalItems - removedItem.quantity,
+          totalBeers: removedItem.products.category?.toLowerCase().includes('piv') ? prev.totalBeers - removedItem.quantity : prev.totalBeers,
+          totalPrice: prev.totalPrice - (removedItem.products.price * removedItem.quantity),
+        }
+      })
+
+      setGuests(prev => prev.map(g => {
+        if (g.id !== selectedGuest.id) return g
+        return {
+          ...g,
+          consumption: g.consumption.filter(c => c.id !== consumptionId),
+          totalItems: g.totalItems - removedItem.quantity,
+          totalBeers: removedItem.products.category?.toLowerCase().includes('piv') ? g.totalBeers - removedItem.quantity : g.totalBeers,
+          totalPrice: g.totalPrice - (removedItem.products.price * removedItem.quantity),
+        }
+      }))
+    }
+
     try {
       const response = await fetch(`/api/consumption?id=${consumptionId}`, {
         method: 'DELETE',
@@ -112,10 +184,12 @@ export default function SnacksPage() {
       })
 
       if (response.ok) {
+        // Silently sync real data from server in background
         fetchData()
       }
     } catch (error) {
       console.error('Error deleting product:', error)
+      fetchData()
     }
   }
 
@@ -366,7 +440,7 @@ export default function SnacksPage() {
               Přidat položku pro {selectedGuest.name}
             </h2>
             <p className="text-gray-600 mb-6">Vyber, co si dal/a</p>
-            
+
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
               {products.map((product) => (
                 <button

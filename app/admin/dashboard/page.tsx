@@ -36,6 +36,7 @@ export default function AdminDashboard() {
   const [newSessionStartTime, setNewSessionStartTime] = useState('')
   const [newSessionEndTime, setNewSessionEndTime] = useState('')
   const [newSessionDescription, setNewSessionDescription] = useState('')
+  const [newPricePerNight, setNewPricePerNight] = useState('')
   const [savingSession, setSavingSession] = useState(false)
 
   useEffect(() => {
@@ -245,6 +246,9 @@ export default function AdminDashboard() {
         sessionData.end_time = newSessionEndTime
       }
 
+      const priceVal = parseFloat(newPricePerNight)
+      sessionData.price_per_night = !isNaN(priceVal) && priceVal >= 0 ? priceVal : 0
+
       const response = await fetch('/api/admin/sessions', {
         method: 'POST',
         headers: {
@@ -262,6 +266,7 @@ export default function AdminDashboard() {
       setNewSessionStartTime('')
       setNewSessionEndTime('')
       setNewSessionDescription('')
+      setNewPricePerNight('')
       setShowCreateForm(false)
       fetchDashboardData()
     } catch (error) {
@@ -280,6 +285,7 @@ export default function AdminDashboard() {
     setNewSessionStartTime('')
     setNewSessionEndTime('')
     setNewSessionDescription('')
+    setNewPricePerNight('')
   }
 
   if (!isAuthenticated) {
@@ -475,6 +481,20 @@ export default function AdminDashboard() {
                   placeholder="Popis eventu..."
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
                   rows={3}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Cena za noc (Kč)
+                </label>
+                <input
+                  type="number"
+                  value={newPricePerNight}
+                  onChange={(e) => setNewPricePerNight(e.target.value)}
+                  placeholder="např. 300"
+                  min="0"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
                 />
               </div>
 

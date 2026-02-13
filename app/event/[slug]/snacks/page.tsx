@@ -38,15 +38,15 @@ export default function EventSnacksPage() {
 
   useEffect(() => {
     if (slug) {
-      fetchData()
+      fetchData(true)
     }
   }, [slug])
 
 
 
-  const fetchData = async () => {
+  const fetchData = async (isInitial = false) => {
     try {
-      setLoading(true)
+      if (isInitial) setLoading(true)
 
       const sessionRes = await fetch(`/api/event/${slug}`)
       if (sessionRes.ok) {
@@ -58,6 +58,12 @@ export default function EventSnacksPage() {
       if (guestsRes.ok) {
         const guestsData = await guestsRes.json()
         setGuests(guestsData.guests)
+        // Also update the selected guest with fresh data
+        setSelectedGuest(prev => {
+          if (!prev) return null
+          const updated = guestsData.guests.find((g: GuestWithConsumption) => g.id === prev.id)
+          return updated || null
+        })
       }
 
       const productsRes = await fetch(`/api/event/${slug}/products`)
@@ -68,7 +74,7 @@ export default function EventSnacksPage() {
     } catch (error) {
       console.error('Error fetching data:', error)
     } finally {
-      setLoading(false)
+      if (isInitial) setLoading(false)
     }
   }
 
@@ -76,6 +82,46 @@ export default function EventSnacksPage() {
 
   const handleAddProduct = async (productId: string) => {
     if (!selectedGuest) return
+
+    // Find the product being added
+    const product = products.find(p => p.id === productId)
+    if (!product) return
+
+    // Optimistic update: immediately update local state
+    const tempId = `temp-${Date.now()}-${Math.random()}`
+    const newConsumptionItem = {
+      id: tempId,
+      quantity: 1,
+      products: product,
+    }
+
+    // Update the selected guest's consumption locally
+    setSelectedGuest(prev => {
+      if (!prev) return null
+      return {
+        ...prev,
+        consumption: [...prev.consumption, newConsumptionItem],
+        totalItems: prev.totalItems + 1,
+        totalBeers: product.category?.toLowerCase().includes('piv') ? prev.totalBeers + 1 : prev.totalBeers,
+        totalPrice: prev.totalPrice + product.price,
+      }
+    })
+
+    // Update the guests array too
+    setGuests(prev => prev.map(g => {
+      if (g.id !== selectedGuest.id) return g
+      return {
+        ...g,
+        consumption: [...g.consumption, newConsumptionItem],
+        totalItems: g.totalItems + 1,
+        totalBeers: product.category?.toLowerCase().includes('piv') ? g.totalBeers + 1 : g.totalBeers,
+        totalPrice: g.totalPrice + product.price,
+      }
+    }))
+
+    // Visual feedback
+    setJustAdded(productId)
+    setTimeout(() => setJustAdded(null), 600)
 
     try {
       const response = await fetch('/api/consumption', {
@@ -90,16 +136,44 @@ export default function EventSnacksPage() {
       })
 
       if (response.ok) {
-        setJustAdded(productId)
-        setTimeout(() => setJustAdded(null), 1000)
+        // Silently sync real data from server in background
         fetchData()
       }
     } catch (error) {
       console.error('Error adding product:', error)
+      // On error, re-fetch to restore correct state
+      fetchData()
     }
   }
 
   const handleDeleteProduct = async (consumptionId: string) => {
+    // Optimistic update: immediately remove from local state
+    const removedItem = selectedGuest?.consumption.find(c => c.id === consumptionId)
+
+    if (selectedGuest && removedItem) {
+      setSelectedGuest(prev => {
+        if (!prev) return null
+        return {
+          ...prev,
+          consumption: prev.consumption.filter(c => c.id !== consumptionId),
+          totalItems: prev.totalItems - removedItem.quantity,
+          totalBeers: removedItem.products.category?.toLowerCase().includes('piv') ? prev.totalBeers - removedItem.quantity : prev.totalBeers,
+          totalPrice: prev.totalPrice - (removedItem.products.price * removedItem.quantity),
+        }
+      })
+
+      setGuests(prev => prev.map(g => {
+        if (g.id !== selectedGuest.id) return g
+        return {
+          ...g,
+          consumption: g.consumption.filter(c => c.id !== consumptionId),
+          totalItems: g.totalItems - removedItem.quantity,
+          totalBeers: removedItem.products.category?.toLowerCase().includes('piv') ? g.totalBeers - removedItem.quantity : g.totalBeers,
+          totalPrice: g.totalPrice - (removedItem.products.price * removedItem.quantity),
+        }
+      }))
+    }
+
     try {
       const response = await fetch(`/api/consumption?id=${consumptionId}`, {
         method: 'DELETE',
@@ -107,10 +181,12 @@ export default function EventSnacksPage() {
       })
 
       if (response.ok) {
+        // Silently sync real data from server in background
         fetchData()
       }
     } catch (error) {
       console.error('Error deleting product:', error)
+      fetchData()
     }
   }
 

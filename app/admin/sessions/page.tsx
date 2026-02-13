@@ -35,6 +35,7 @@ export default function AdminSessionsPage() {
   const [newSessionStartTime, setNewSessionStartTime] = useState('')
   const [newSessionEndTime, setNewSessionEndTime] = useState('')
   const [newSessionDescription, setNewSessionDescription] = useState('')
+  const [newPricePerNight, setNewPricePerNight] = useState('')
 
   // Menu state
   const [menuEnabled, setMenuEnabled] = useState(false)
@@ -273,6 +274,9 @@ export default function AdminSessionsPage() {
 
       sessionData.menu_enabled = menuEnabled
 
+      const priceVal = parseFloat(newPricePerNight)
+      sessionData.price_per_night = !isNaN(priceVal) && priceVal >= 0 ? priceVal : 0
+
       const response = await fetch('/api/admin/sessions', {
         method: 'POST',
         headers: {
@@ -357,6 +361,9 @@ export default function AdminSessionsPage() {
         sessionData.end_time = newSessionEndTime
       }
 
+      const priceVal = parseFloat(newPricePerNight)
+      sessionData.price_per_night = !isNaN(priceVal) && priceVal >= 0 ? priceVal : 0
+
       const response = await fetch(`/api/admin/sessions/${editingSession.id}`, {
         method: 'PATCH',
         headers: {
@@ -387,6 +394,7 @@ export default function AdminSessionsPage() {
     setNewSessionStartTime(session.start_time || '')
     setNewSessionEndTime(session.end_time || '')
     setNewSessionDescription(session.description || '')
+    setNewPricePerNight((session as any).price_per_night?.toString() || '0')
     setShowCreateForm(false)
   }
 
@@ -404,6 +412,7 @@ export default function AdminSessionsPage() {
     setNewSessionStartTime('')
     setNewSessionEndTime('')
     setNewSessionDescription('')
+    setNewPricePerNight('')
     setMenuEnabled(false)
     setMenuItems([])
   }
@@ -509,6 +518,18 @@ export default function AdminSessionsPage() {
             placeholder="Popis eventu..."
             className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
             rows={3}
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Cena za noc (Kč)</label>
+          <input
+            type="number"
+            value={newPricePerNight}
+            onChange={(e) => setNewPricePerNight(e.target.value)}
+            placeholder="např. 300"
+            min="0"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
           />
         </div>
 
