@@ -227,7 +227,7 @@ export default function SnacksPage() {
         </Link>
 
         {/* Header with Event Info */}
-        <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
+        <div className="bg-[#efefef] rounded-2xl shadow-xl p-6 mb-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <Calendar className="w-8 h-8 text-orange-600" />
@@ -266,7 +266,7 @@ export default function SnacksPage() {
                 {topEaters.map((guest, index) => (
                   <div
                     key={guest.id}
-                    className="bg-white rounded-lg p-2 flex items-center justify-between text-sm"
+                    className="bg-[#efefef] rounded-lg p-2 flex items-center justify-between text-sm"
                   >
                     <div className="flex items-center gap-2">
                       <span className="text-xl">
@@ -293,7 +293,7 @@ export default function SnacksPage() {
                   topBeerDrinkers.map((guest, index) => (
                     <div
                       key={guest.id}
-                      className="bg-white rounded-lg p-2 flex items-center justify-between text-sm"
+                      className="bg-[#efefef] rounded-lg p-2 flex items-center justify-between text-sm"
                     >
                       <div className="flex items-center gap-2">
                         <span className="text-xl">
@@ -315,7 +315,7 @@ export default function SnacksPage() {
         )}
 
         {/* Guests List */}
-        <div className="bg-white rounded-2xl shadow-xl p-6">
+        <div className="bg-[#efefef] rounded-2xl shadow-xl p-6">
           <div className="flex items-center gap-3 mb-6">
             <TrendingUp className="w-6 h-6 text-gray-700" />
             <h2 className="text-2xl font-bold text-gray-900">Hosté a jejich spotřeba</h2>
@@ -397,7 +397,7 @@ export default function SnacksPage() {
       {/* Add Guest Modal */}
       {showAddGuest && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
+          <div className="bg-[#efefef] rounded-2xl shadow-2xl p-8 max-w-md w-full">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Přidat nového hosta</h2>
             <form onSubmit={handleAddGuest}>
               <input
@@ -435,7 +435,7 @@ export default function SnacksPage() {
       {/* Add Product Modal */}
       {selectedGuest && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+          <div className="bg-[#efefef] rounded-2xl shadow-2xl p-8 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
               Přidat položku pro {selectedGuest.name}
             </h2>

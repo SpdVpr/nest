@@ -158,7 +158,7 @@ export default function MealsPage() {
     return (
         <div className="min-h-screen bg-gray-50">
             {/* Header */}
-            <div className="bg-white shadow">
+            <div className="bg-[#efefef] shadow">
                 <div className="max-w-3xl mx-auto px-4 py-6">
                     <Link
                         href="/admin/dashboard"
@@ -179,7 +179,7 @@ export default function MealsPage() {
 
             <div className="max-w-3xl mx-auto px-4 py-8">
                 {/* Add new meal */}
-                <div className="bg-white rounded-xl shadow p-6 mb-6">
+                <div className="bg-[#efefef] rounded-xl shadow p-6 mb-6">
                     <h2 className="font-semibold text-gray-900 mb-4 text-lg">Přidat nové jídlo</h2>
                     <div className="flex gap-3 mb-3">
                         <input
@@ -229,7 +229,7 @@ export default function MealsPage() {
                 </div>
 
                 {/* Existing meals */}
-                <div className="bg-white rounded-xl shadow overflow-hidden">
+                <div className="bg-[#efefef] rounded-xl shadow overflow-hidden">
                     <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                         <h2 className="font-semibold text-gray-900 text-lg">
                             Jídla v databázi

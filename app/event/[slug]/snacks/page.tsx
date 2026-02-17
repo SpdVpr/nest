@@ -3,9 +3,11 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Calendar, Plus, Minus, Trophy, Beer } from 'lucide-react'
+import { Plus, Minus, Trophy, Beer } from 'lucide-react'
 import { Session, Guest, Product } from '@/types/database.types'
 import { formatDate } from '@/lib/utils'
+import NestPage from '@/components/NestPage'
+import NestLoading from '@/components/NestLoading'
 
 interface GuestWithConsumption extends Guest {
   consumption: Array<{
@@ -201,54 +203,22 @@ export default function EventSnacksPage() {
     .slice(0, 3)
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin text-6xl mb-4">🍕</div>
-          <p className="text-gray-600">Načítám...</p>
-        </div>
-      </div>
-    )
+    return <NestLoading message="Načítám občerstvení..." />
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex flex-col">
-
-
+    <NestPage sessionSlug={slug} backHref={`/event/${slug}`} title="Občerstvení" maxWidth="max-w-7xl">
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="bg-white border-b border-gray-200 px-4 md:px-6 py-4">
-          <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <Link
-                href={`/event/${slug}`}
-                className="inline-flex items-center text-gray-600 hover:text-gray-900"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </Link>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  {session?.name || 'Event'} - Pochutiny
-                </h1>
-                {session && (
-                  <p className="text-sm text-gray-600">
-                    {formatDate(session.start_date)}
-                    {session.end_date && ` - ${formatDate(session.end_date)}`}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
 
         <div className="flex-1 overflow-auto">
           <div className="max-w-7xl mx-auto w-full px-4 md:px-6 py-6">
             {guests.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-gray-600 text-lg mb-4">Zatím nejsou žádní hosté</p>
+                <p className="text-[var(--nest-white-60)] text-sm mb-4">Zatím nejsou žádní hosté</p>
                 <Link
                   href={`/event/${slug}/register`}
-                  className="text-green-600 hover:text-green-700 font-semibold"
+                  className="text-[var(--nest-yellow)] hover:underline font-semibold text-sm"
                 >
                   Zaregistruj se na akci
                 </Link>
@@ -260,50 +230,50 @@ export default function EventSnacksPage() {
                   {guests.length > 0 && (
                     <div className="grid grid-cols-2 gap-3 mb-6">
                       {/* Top Eaters */}
-                      <div className="bg-gradient-to-br from-yellow-100 to-orange-100 rounded-lg shadow p-3">
+                      <div className="nest-card p-3">
                         <div className="flex items-center gap-1 mb-2">
-                          <Trophy className="w-4 h-4 text-yellow-600" />
-                          <h3 className="text-sm font-bold text-gray-900">TOP Jedlíci</h3>
+                          <Trophy className="w-4 h-4 text-[var(--nest-yellow)]" />
+                          <h3 className="text-sm font-bold">TOP Jedlíci</h3>
                         </div>
                         <div className="space-y-1">
                           {topEaters.map((guest, index) => (
-                            <div key={guest.id} className="bg-white rounded p-1.5 flex items-center justify-between text-xs">
+                            <div key={guest.id} className="bg-[var(--nest-dark-3)] rounded p-1.5 flex items-center justify-between text-xs">
                               <div className="flex items-center gap-1">
                                 <span className="text-lg">{index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}</span>
-                                <span className="font-semibold text-gray-900 truncate text-xs">{guest.name}</span>
+                                <span className="font-semibold truncate text-xs">{guest.name}</span>
                               </div>
-                              <span className="font-bold text-orange-600 whitespace-nowrap ml-1">{guest.totalItems}×</span>
+                              <span className="font-bold text-[var(--nest-yellow)] whitespace-nowrap ml-1">{guest.totalItems}×</span>
                             </div>
                           ))}
                         </div>
                       </div>
 
                       {/* Top Beer Drinkers */}
-                      <div className="bg-gradient-to-br from-blue-100 to-indigo-100 rounded-lg shadow p-3">
+                      <div className="nest-card p-3">
                         <div className="flex items-center gap-1 mb-2">
-                          <Beer className="w-4 h-4 text-blue-600" />
-                          <h3 className="text-sm font-bold text-gray-900">TOP Pivaři</h3>
+                          <Beer className="w-4 h-4 text-[var(--nest-info)]" />
+                          <h3 className="text-sm font-bold">TOP Pivaři</h3>
                         </div>
                         <div className="space-y-1">
                           {topBeerDrinkers.length > 0 ? (
                             topBeerDrinkers.map((guest, index) => (
-                              <div key={guest.id} className="bg-white rounded p-1.5 flex items-center justify-between text-xs">
+                              <div key={guest.id} className="bg-[var(--nest-dark-3)] rounded p-1.5 flex items-center justify-between text-xs">
                                 <div className="flex items-center gap-1">
                                   <span className="text-lg">{index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}</span>
-                                  <span className="font-semibold text-gray-900 truncate text-xs">{guest.name}</span>
+                                  <span className="font-semibold truncate text-xs">{guest.name}</span>
                                 </div>
-                                <span className="font-bold text-blue-600 whitespace-nowrap ml-1">{guest.totalBeers}×</span>
+                                <span className="font-bold text-[var(--nest-info)] whitespace-nowrap ml-1">{guest.totalBeers}×</span>
                               </div>
                             ))
                           ) : (
-                            <p className="text-gray-600 text-center py-1 text-xs">Zatím nikdo 😢</p>
+                            <p className="text-[var(--nest-white-40)] text-center py-1 text-xs">Zatím nikdo 😢</p>
                           )}
                         </div>
                       </div>
                     </div>
                   )}
 
-                  <h2 className="text-xl font-bold text-gray-900 mb-4">Hosté</h2>
+                  <h2 className="text-base font-bold mb-3">Hosté</h2>
                   <div className="space-y-2">
                     {guests.map((guest) => (
                       <button
@@ -311,9 +281,9 @@ export default function EventSnacksPage() {
                         onClick={() => {
                           setSelectedGuest(guest)
                         }}
-                        className={`w-full text-left p-4 rounded-xl font-semibold transition-all ${selectedGuest?.id === guest.id
-                          ? 'bg-orange-600 text-white shadow-lg'
-                          : 'bg-white border-2 border-gray-200 text-gray-900 hover:border-orange-400'
+                        className={`w-full text-left p-3 rounded-xl font-semibold transition-all text-sm ${selectedGuest?.id === guest.id
+                          ? 'bg-[var(--nest-yellow)] text-[var(--nest-dark)] shadow-lg'
+                          : 'nest-card hover:border-[var(--nest-yellow)]/30'
                           }`}
                       >
                         <div className="flex items-center justify-between">
@@ -331,27 +301,27 @@ export default function EventSnacksPage() {
 
                 <div className="lg:col-span-2">
                   {!selectedGuest ? (
-                    <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
-                      <p className="text-lg text-gray-600">Vyber si hosta ze seznamu →</p>
+                    <div className="nest-card-elevated p-8 text-center">
+                      <p className="text-sm text-[var(--nest-white-60)]">Vyber si hosta ze seznamu →</p>
                     </div>
                   ) : (
                     <div>
-                      <div className="bg-orange-100 border-2 border-orange-300 rounded-xl p-4 mb-6">
-                        <p className="text-gray-700 text-sm mb-1">Vybíráš pro:</p>
+                      <div className="bg-[var(--nest-yellow)]/10 border border-[var(--nest-yellow)]/30 rounded-xl p-4 mb-6">
+                        <p className="text-[var(--nest-white-60)] text-xs mb-1">Vybíráš pro:</p>
                         <div className="flex items-center justify-between">
-                          <p className="text-2xl font-bold text-orange-900">{selectedGuest.name}</p>
+                          <p className="text-xl font-bold text-[var(--nest-yellow)]">{selectedGuest.name}</p>
                           <button
                             onClick={() => {
                               setSelectedGuest(null)
                             }}
-                            className="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-5 py-3 rounded-xl text-base font-bold transition-colors shadow-md"
+                            className="inline-flex items-center gap-2 bg-[var(--nest-yellow)] hover:bg-[var(--nest-yellow-dark)] text-[var(--nest-dark)] px-4 py-2 rounded-xl text-sm font-bold transition-colors"
                           >
                             Hotovo ✓
                           </button>
                         </div>
                         {selectedGuest.consumption.length > 0 && (
                           <div className="mt-3 pt-3 border-t border-orange-300">
-                            <p className="text-gray-700 text-sm mb-3 font-semibold">Zatím koupeno:</p>
+                            <p className="text-[var(--nest-white-60)] text-xs mb-3 font-semibold">Zatím koupeno:</p>
                             <div className="grid grid-cols-2 gap-2">
                               {Array.from(
                                 selectedGuest.consumption.reduce((acc, item) => {
@@ -367,22 +337,22 @@ export default function EventSnacksPage() {
                               )
                                 .sort((a, b) => (a.products.category || '').localeCompare(b.products.category || ''))
                                 .map((grouped) => (
-                                  <div key={grouped.products.id} className="flex items-center justify-between bg-white rounded-lg p-2">
+                                  <div key={grouped.products.id} className="flex items-center justify-between bg-[var(--nest-dark-3)] rounded-lg p-2">
                                     <div className="flex-1 min-w-0">
-                                      <p className="text-xs text-gray-500">{grouped.products.category}</p>
-                                      <p className="text-gray-700 font-medium text-sm">{grouped.products.name}</p>
+                                      <p className="text-[10px] text-[var(--nest-white-40)]">{grouped.products.category}</p>
+                                      <p className="font-medium text-xs">{grouped.products.name}</p>
                                     </div>
                                     <div className="flex items-center gap-1 flex-shrink-0">
                                       <button
                                         onClick={() => handleDeleteProduct(grouped.ids[grouped.ids.length - 1])}
-                                        className="w-7 h-7 flex items-center justify-center rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
+                                        className="w-7 h-7 flex items-center justify-center rounded-full bg-[var(--nest-error)]/15 text-[var(--nest-error)] hover:bg-[var(--nest-error)]/25 transition-colors"
                                       >
                                         <Minus className="w-4 h-4" />
                                       </button>
-                                      <span className="w-8 text-center font-bold text-gray-900">{grouped.totalQuantity}</span>
+                                      <span className="w-8 text-center font-bold">{grouped.totalQuantity}</span>
                                       <button
                                         onClick={() => handleAddProduct(grouped.products.id)}
-                                        className="w-7 h-7 flex items-center justify-center rounded-full bg-green-100 text-green-600 hover:bg-green-200 transition-colors"
+                                        className="w-7 h-7 flex items-center justify-center rounded-full bg-[var(--nest-success)]/15 text-[var(--nest-success)] hover:bg-[var(--nest-success)]/25 transition-colors"
                                       >
                                         <Plus className="w-4 h-4" />
                                       </button>
@@ -394,9 +364,9 @@ export default function EventSnacksPage() {
                         )}
                       </div>
 
-                      <h2 className="text-xl font-bold text-gray-900 mb-4">Pochutiny - Klikni a přidej!</h2>
+                      <h2 className="text-base font-bold mb-3">Pochutiny - Klikni a přidej!</h2>
                       {products.length === 0 ? (
-                        <p className="text-gray-600">Zatím žádné pochutiny nejsou k dispozici</p>
+                        <p className="text-[var(--nest-white-60)] text-sm">Zatím žádné pochutiny nejsou k dispozici</p>
                       ) : (() => {
                         // Get IDs of products the guest already consumed
                         const consumedProductIds = new Set(
@@ -408,9 +378,9 @@ export default function EventSnacksPage() {
                           <button
                             key={product.id}
                             onClick={() => handleAddProduct(product.id)}
-                            className={`relative rounded-xl p-5 text-center transition-all transform hover:scale-105 active:scale-95 shadow-md ${justAdded === product.id
-                              ? 'bg-green-500 text-white shadow-xl scale-105'
-                              : 'bg-white hover:shadow-xl border-2 border-gray-200 hover:border-orange-400 text-gray-900'
+                            className={`relative rounded-xl p-4 text-center transition-all transform hover:scale-105 active:scale-95 ${justAdded === product.id
+                              ? 'bg-[var(--nest-success)] text-[var(--nest-dark)] shadow-xl scale-105'
+                              : 'nest-card hover:border-[var(--nest-yellow)]/30'
                               }`}
                           >
                             {product.image_url ? (
@@ -422,12 +392,12 @@ export default function EventSnacksPage() {
                                 />
                               </div>
                             ) : (
-                              <div className="bg-gray-100 rounded-lg p-3 mb-3 h-32 flex items-center justify-center">
+                              <div className="bg-[var(--nest-dark-3)] rounded-lg p-3 mb-3 h-32 flex items-center justify-center">
                                 <span className="text-4xl">🍽️</span>
                               </div>
                             )}
-                            <p className="font-semibold text-base mb-2">{product.name}</p>
-                            <p className={`font-bold text-lg ${justAdded === product.id ? 'text-white' : 'text-orange-600'
+                            <p className="font-semibold text-sm mb-1">{product.name}</p>
+                            <p className={`font-bold text-sm ${justAdded === product.id ? 'text-[var(--nest-dark)]' : 'text-[var(--nest-yellow)]'
                               }`}>
                               {product.price} Kč
                             </p>
@@ -444,7 +414,7 @@ export default function EventSnacksPage() {
                             {/* Oblíbené - already consumed products */}
                             {favoriteProducts.length > 0 && (
                               <div>
-                                <h3 className="text-lg font-bold text-gray-800 mb-3 pb-2 border-b-2 border-yellow-400 flex items-center gap-2">
+                                <h3 className="text-sm font-bold mb-3 pb-2 border-b border-[var(--nest-yellow)]/30 flex items-center gap-2">
                                   ⭐ Oblíbené
                                 </h3>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
@@ -467,7 +437,7 @@ export default function EventSnacksPage() {
                               .sort(([catA], [catB]) => catA.localeCompare(catB))
                               .map(([category, categoryProducts]) => (
                                 <div key={category}>
-                                  <h3 className="text-lg font-bold text-gray-800 mb-3 pb-2 border-b-2 border-orange-300">
+                                  <h3 className="text-sm font-bold mb-3 pb-2 border-b border-[var(--nest-dark-4)]">
                                     {category}
                                   </h3>
                                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
@@ -488,6 +458,6 @@ export default function EventSnacksPage() {
       </div>
 
 
-    </div>
+    </NestPage>
   )
 }

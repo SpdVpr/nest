@@ -246,7 +246,7 @@ export default function AdminProductsPage() {
         {/* Editing Modal */}
         {editingProduct && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-            <div className="bg-white rounded-2xl shadow-xl p-8 max-w-2xl w-full my-8">
+            <div className="bg-[#efefef] rounded-2xl shadow-xl p-8 max-w-2xl w-full my-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-6">
                 {isCreating ? 'Nový produkt' : 'Upravit produkt'}
               </h2>
@@ -365,7 +365,7 @@ export default function AdminProductsPage() {
         {/* Products Grid */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {products.length === 0 ? (
-            <div className="col-span-full text-center py-12 bg-white rounded-xl">
+            <div className="col-span-full text-center py-12 bg-[#efefef] rounded-xl">
               <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-500">
                 Zatím žádné produkty. Klikni na &quot;Přidat produkt&quot; pro vytvoření prvního.
@@ -375,7 +375,7 @@ export default function AdminProductsPage() {
             products.map((product) => (
               <div
                 key={product.id}
-                className="bg-white rounded-xl shadow-sm p-4 hover:shadow-md transition-shadow"
+                className="bg-[#efefef] rounded-xl shadow-sm p-4 hover:shadow-md transition-shadow"
               >
                 {product.image_url && (
                   <div className="w-full bg-gray-50 rounded-lg mb-3 flex items-center justify-center p-2">

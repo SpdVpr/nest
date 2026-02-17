@@ -273,7 +273,7 @@ export default function AdminGamesPage() {
                 </div>
 
                 {/* Search + Categories */}
-                <div className="bg-white rounded-xl shadow-sm p-4 mb-6 space-y-3">
+                <div className="bg-[#efefef] rounded-xl shadow-sm p-4 mb-6 space-y-3">
                     {/* Search */}
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -315,7 +315,7 @@ export default function AdminGamesPage() {
                 {/* Editing / Create Modal */}
                 {editingGame && (
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full">
+                        <div className="bg-[#efefef] rounded-2xl shadow-xl p-8 max-w-md w-full">
                             <h2 className="text-2xl font-bold text-gray-900 mb-6">
                                 {isCreating ? '➕ Nová hra' : '✏️ Upravit hru'}
                             </h2>
@@ -406,7 +406,7 @@ export default function AdminGamesPage() {
 
                 {/* Games List */}
                 {filteredGames.length === 0 ? (
-                    <div className="bg-white rounded-xl shadow-sm p-8 text-center">
+                    <div className="bg-[#efefef] rounded-xl shadow-sm p-8 text-center">
                         {games.length === 0 ? (
                             <div>
                                 <Gamepad2 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
@@ -425,7 +425,7 @@ export default function AdminGamesPage() {
                         )}
                     </div>
                 ) : (
-                    <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                    <div className="bg-[#efefef] rounded-xl shadow-sm overflow-hidden">
                         <div className="bg-gradient-to-r from-violet-500 to-purple-500 px-6 py-3 flex items-center justify-between">
                             <h2 className="text-xl font-bold text-white">
                                 🎮 Hry ({filteredGames.length})

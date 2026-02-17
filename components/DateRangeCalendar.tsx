@@ -160,7 +160,7 @@ export default function DateRangeCalendar({
                 ${isCheckIn ? 'bg-green-500 text-white font-bold' : ''}
                 ${isCheckOut ? 'bg-red-500 text-white font-bold' : ''}
                 ${isSelected && !isCheckIn && !isCheckOut ? 'bg-blue-200 text-gray-900' : ''}
-                ${isInRange && !isSelected && !isCheckIn && !isCheckOut ? 'bg-white border border-gray-300 hover:bg-gray-100 text-gray-900' : ''}
+                ${isInRange && !isSelected && !isCheckIn && !isCheckOut ? 'bg-[#efefef] border border-gray-300 hover:bg-gray-100 text-gray-900' : ''}
               `}
             >
               {date && date.getDate()}

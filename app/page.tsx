@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Calendar, Shield, ArrowRight, MapPin, Users } from 'lucide-react'
+import { Calendar, Shield, ArrowRight } from 'lucide-react'
 import { Session } from '@/types/database.types'
 import { formatEventRange } from '@/lib/utils'
+import NestLoading from '@/components/NestLoading'
 
 export default function HomePage() {
   const [sessions, setSessions] = useState<Session[]>([])
@@ -16,17 +17,13 @@ export default function HomePage() {
   const router = useRouter()
 
   useEffect(() => {
-    console.log('[HomePage] Component mounted')
     setMounted(true)
     const token = localStorage.getItem('admin_token')
-    console.log('[HomePage] Token from localStorage:', token ? 'EXISTS' : 'NULL')
     if (!token) {
-      console.log('[HomePage] No token found, setting isAuthenticated to false')
       setIsAuthenticated(false)
       setLoading(false)
       return
     }
-    console.log('[HomePage] Token found, setting isAuthenticated to true')
     setIsAuthenticated(true)
     fetchUpcomingEvents()
   }, [router])
@@ -62,54 +59,39 @@ export default function HomePage() {
     return { status: 'completed', label: 'Ukončeno' }
   }
 
-  const getStatusColor = (status: string) => {
+  const getStatusStyles = (status: string) => {
     switch (status) {
-      case 'active': return 'bg-green-500'
-      case 'upcoming': return 'bg-blue-500'
-      case 'completed': return 'bg-gray-400'
-      default: return 'bg-gray-300'
+      case 'active': return 'bg-[var(--nest-success)]/20 text-[var(--nest-success)] border-[var(--nest-success)]/30'
+      case 'upcoming': return 'bg-[var(--nest-yellow)]/15 text-[var(--nest-yellow)] border-[var(--nest-yellow)]/30'
+      case 'completed': return 'bg-[var(--nest-white-40)]/15 text-[var(--nest-white-40)] border-[var(--nest-white-40)]/30'
+      default: return 'bg-[var(--nest-white-40)]/15 text-[var(--nest-white-40)]'
     }
   }
 
-  if (!mounted) {
-    console.log('[HomePage] Rendering: Not mounted yet')
-    return null
-  }
+  if (!mounted) return null
 
   if (loading) {
-    console.log('[HomePage] Rendering: Loading state')
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin text-6xl mb-4">🪺</div>
-          <p className="text-gray-600">Načítám eventy...</p>
-        </div>
-      </div>
-    )
+    return <NestLoading message="Načítám eventy..." />
   }
 
+  // Not authenticated — show gate
   if (!isAuthenticated) {
-    console.log('[HomePage] Rendering: Not authenticated - showing admin-only message')
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-700 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-8 text-center">
-          <div className="bg-blue-100 p-4 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
-            <Shield className="w-12 h-12 text-blue-600" />
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">
-            🪺 The Nest
+      <div className="min-h-screen bg-[var(--nest-dark)] flex items-center justify-center p-4">
+        <div className="max-w-sm w-full text-center">
+          <div className="text-6xl mb-6">🎮</div>
+          <h1 className="text-3xl font-bold text-[var(--nest-white)] mb-2">
+            The Nest
           </h1>
-          <h2 className="text-xl font-semibold text-gray-800 mb-3">
-            Přístup pouze pro administrátory
-          </h2>
-          <p className="text-gray-600 mb-6">
-            Tato stránka je určena pouze pro správu eventů. Pokud jsi účastník, admin ti pošle přímý odkaz na tvůj event.
+          <p className="text-[var(--nest-white-60)] text-sm mb-8 leading-relaxed">
+            Tato stránka je určena pouze pro správu eventů.<br />
+            Pokud jsi účastník, admin ti pošle přímý odkaz.
           </p>
           <Link
             href="/admin/login"
-            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-colors"
+            className="inline-flex items-center gap-2 bg-[var(--nest-yellow)] hover:bg-[var(--nest-yellow-dark)] text-[var(--nest-dark)] px-6 py-3 rounded-xl font-semibold text-sm transition-colors"
           >
-            <Shield className="w-5 h-5" />
+            <Shield className="w-4 h-4" />
             Admin přihlášení
           </Link>
         </div>
@@ -117,54 +99,52 @@ export default function HomePage() {
     )
   }
 
-  console.log('[HomePage] Rendering: Authenticated - showing events list')
-
+  // Authenticated — events list
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 py-12 px-4">
-      <div className="max-w-5xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-7xl md:text-8xl font-bold text-gray-900 mb-6">
-            🪺 The Nest
-          </h1>
+    <div className="min-h-screen bg-[var(--nest-dark)] text-[var(--nest-white)]">
+      {/* Header */}
+      <div className="text-center pt-12 pb-8 px-4">
+        <h1 className="text-4xl md:text-5xl font-bold mb-2">
+          The Nest
+        </h1>
+        <p className="text-sm text-[var(--nest-white-60)]">
+          Vyber akci a začni rezervovat
+        </p>
+      </div>
 
-          <p className="text-lg text-gray-600">
-            Vyber akci a začni rezervovat
-          </p>
-        </div>
-
-        {/* Events List */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <Calendar className="w-8 h-8 text-purple-600" />
-              <h2 className="text-2xl font-bold text-gray-900">Dostupné akce</h2>
+      {/* Events container */}
+      <div className="max-w-2xl mx-auto px-4 pb-12">
+        <div className="nest-card-elevated p-6">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-[var(--nest-yellow)]" />
+              <h2 className="text-lg font-bold">Dostupné akce</h2>
             </div>
             <Link
               href="/admin/login"
-              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
+              className="flex items-center gap-1.5 text-[var(--nest-white-40)] hover:text-[var(--nest-yellow)] transition-colors text-xs font-medium"
             >
-              <Shield className="w-5 h-5" />
+              <Shield className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Administrace</span>
             </Link>
           </div>
 
           {sessions.length === 0 ? (
             <div className="text-center py-12">
-              <div className="text-6xl mb-4">📅</div>
-              <p className="text-gray-600 text-lg mb-6">
+              <div className="text-4xl mb-3">📅</div>
+              <p className="text-[var(--nest-white-60)] text-sm mb-5">
                 Zatím nejsou naplánované žádné akce
               </p>
               <Link
                 href="/admin/login"
-                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-colors"
+                className="inline-flex items-center gap-2 bg-[var(--nest-yellow)] hover:bg-[var(--nest-yellow-dark)] text-[var(--nest-dark)] px-5 py-2.5 rounded-xl font-semibold text-sm transition-colors"
               >
-                <Shield className="w-5 h-5" />
+                <Shield className="w-4 h-4" />
                 Přejít do administrace
               </Link>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {sessions.map((session) => {
                 const eventStatus = getEventStatus(session)
                 return (
@@ -173,41 +153,36 @@ export default function HomePage() {
                     href={`/event/${session.slug}`}
                     className="block group"
                   >
-                    <div className={`p-6 rounded-xl border-2 transition-all hover:shadow-lg ${eventStatus.status === 'active'
-                      ? 'border-green-400 bg-green-50 hover:border-green-500'
-                      : 'border-gray-200 hover:border-purple-400 bg-white'
+                    <div className={`p-4 rounded-xl border transition-all duration-200 hover:border-[var(--nest-yellow)]/40 ${eventStatus.status === 'active'
+                      ? 'border-[var(--nest-success)]/30 bg-[var(--nest-success)]/5'
+                      : 'border-[var(--nest-dark-4)] bg-[var(--nest-dark-3)] hover:bg-[var(--nest-dark-3)]'
                       }`}>
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="text-xl font-bold text-gray-900">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <h3 className="text-base font-bold truncate">
                               {session.name}
                             </h3>
-                            <span className={`${getStatusColor(eventStatus.status)} text-white px-3 py-1 rounded-full text-sm font-semibold`}>
+                            <span className={`${getStatusStyles(eventStatus.status)} px-2 py-0.5 rounded-full text-xs font-semibold border whitespace-nowrap`}>
                               {eventStatus.label}
                             </span>
                           </div>
 
-                          <div className="flex flex-wrap gap-4 text-gray-600 mb-2">
-                            <div className="flex items-center gap-2">
-                              <Calendar className="w-4 h-4" />
-                              <span>
-                                {formatEventRange(session.start_date, session.end_date, session.start_time, session.end_time)}
-                              </span>
-                            </div>
+                          <div className="flex items-center gap-1.5 text-[var(--nest-white-60)] text-xs">
+                            <Calendar className="w-3.5 h-3.5" />
+                            <span>
+                              {formatEventRange(session.start_date, session.end_date, session.start_time, session.end_time)}
+                            </span>
                           </div>
 
                           {session.description && (
-                            <p className="text-gray-600 mt-2 whitespace-pre-line">
+                            <p className="text-[var(--nest-white-40)] mt-1.5 text-xs line-clamp-2 whitespace-pre-line">
                               {session.description}
                             </p>
                           )}
                         </div>
 
-                        <div className="flex items-center gap-2 text-purple-600 group-hover:text-purple-700 font-semibold">
-                          <span className="hidden sm:inline">Přejít na event</span>
-                          <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                        </div>
+                        <ArrowRight className="w-4 h-4 text-[var(--nest-white-40)] group-hover:text-[var(--nest-yellow)] group-hover:translate-x-0.5 transition-all flex-shrink-0" />
                       </div>
                     </div>
                   </Link>
@@ -215,17 +190,6 @@ export default function HomePage() {
               })}
             </div>
           )}
-        </div>
-
-        {/* Admin Link */}
-        <div className="text-center">
-          <Link
-            href="/admin/login"
-            className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 font-medium transition-colors"
-          >
-            <Shield className="w-5 h-5" />
-            Administrace
-          </Link>
         </div>
       </div>
     </div>

@@ -42,7 +42,7 @@ export default function AdminLoginPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-700 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
-        <div className="bg-white rounded-2xl shadow-2xl p-8">
+        <div className="bg-[#efefef] rounded-2xl shadow-2xl p-8">
           <div className="flex items-center justify-center mb-6">
             <div className="bg-blue-100 p-4 rounded-full">
               <Shield className="w-12 h-12 text-blue-600" />

@@ -127,7 +127,7 @@ export default function HardwarePage() {
         </Link>
 
         {/* Header */}
-        <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
+        <div className="bg-[#efefef] rounded-2xl shadow-xl p-6 mb-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <Monitor className="w-8 h-8 text-orange-600" />
@@ -146,7 +146,7 @@ export default function HardwarePage() {
         </div>
 
         {/* Category Selector */}
-        <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
+        <div className="bg-[#efefef] rounded-2xl shadow-xl p-6 mb-6">
           <h2 className="text-xl font-bold text-gray-900 mb-4">Vyber kategorii</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <button
@@ -197,7 +197,7 @@ export default function HardwarePage() {
         </div>
 
         {/* Hardware List */}
-        <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
+        <div className="bg-[#efefef] rounded-2xl shadow-xl p-6 mb-6">
           <h2 className="text-xl font-bold text-gray-900 mb-4">
             Dostupné {selectedCategory === '250' ? 'PC' : 'monitory'} ({filteredItems.length} ks)
           </h2>
@@ -262,7 +262,7 @@ export default function HardwarePage() {
                     min="1"
                     value={nightsCount}
                     onChange={(e) => setNightsCount(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="w-24 px-3 py-2 rounded-lg border-2 border-white bg-white text-gray-900 font-bold text-center"
+                    className="w-24 px-3 py-2 rounded-lg border-2 border-white bg-[#efefef] text-gray-900 font-bold text-center"
                   />
                 </div>
                 
@@ -273,7 +273,7 @@ export default function HardwarePage() {
                 
                 <button
                   onClick={() => setShowConfirm(true)}
-                  className="bg-white text-green-600 hover:bg-green-50 px-6 py-3 rounded-xl font-bold shadow-lg transition-colors"
+                  className="bg-[#efefef] text-green-600 hover:bg-green-50 px-6 py-3 rounded-xl font-bold shadow-lg transition-colors"
                 >
                   Rezervovat
                 </button>
@@ -286,7 +286,7 @@ export default function HardwarePage() {
       {/* Confirmation Modal */}
       {showConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
+          <div className="bg-[#efefef] rounded-2xl shadow-2xl p-8 max-w-md w-full">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Rezervace hardware</h2>
             
             <div className="mb-6">
@@ -315,7 +315,7 @@ export default function HardwarePage() {
               <p className="text-sm text-gray-600 mb-3">Vybrané položky:</p>
               <div className="space-y-2 mb-4">
                 {selectedItemsDetails.map((item) => (
-                  <div key={item.id} className="bg-white p-2 rounded border border-gray-200">
+                  <div key={item.id} className="bg-[#efefef] p-2 rounded border border-gray-200">
                     <p className="font-semibold text-gray-900 text-sm">{item.name}</p>
                     <p className="text-xs text-gray-600">{item.price_per_night} Kč/noc</p>
                   </div>

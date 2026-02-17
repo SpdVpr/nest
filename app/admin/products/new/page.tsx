@@ -121,7 +121,7 @@ export default function NewProductPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white shadow">
+      <div className="bg-[#efefef] shadow">
         <div className="max-w-3xl mx-auto px-4 py-6">
           <Link
             href="/admin/products"
@@ -138,7 +138,7 @@ export default function NewProductPage() {
 
       {/* Form */}
       <div className="max-w-3xl mx-auto px-4 py-8">
-        <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="bg-[#efefef] rounded-xl shadow p-6 space-y-6">
           {/* Name */}
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">

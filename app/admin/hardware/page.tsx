@@ -270,7 +270,7 @@ export default function AdminHardwarePage() {
         </div>
 
         {/* Tabs */}
-        <div className="bg-white rounded-xl shadow-sm p-2 mb-6">
+        <div className="bg-[#efefef] rounded-xl shadow-sm p-2 mb-6">
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setActiveTab('all')}
@@ -299,7 +299,7 @@ export default function AdminHardwarePage() {
         {/* Editing Modal */}
         {editingItem && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full">
+            <div className="bg-[#efefef] rounded-2xl shadow-xl p-8 max-w-md w-full">
               <h2 className="text-2xl font-bold text-gray-900 mb-6">
                 {isCreating ? 'Nová HW položka' : 'Upravit HW položku'}
               </h2>
@@ -488,7 +488,7 @@ export default function AdminHardwarePage() {
 
         {/* Hardware List - Grouped by Category */}
         {items.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm p-8 text-center">
+          <div className="bg-[#efefef] rounded-xl shadow-sm p-8 text-center">
             <p className="text-gray-500">
               Zatím žádné HW položky. Klikni na &quot;Přidat HW&quot; pro vytvoření první.
             </p>
@@ -498,7 +498,7 @@ export default function AdminHardwarePage() {
             {filteredCategories.map((category) => {
               const categoryQty = itemsByCategory[category].reduce((sum, item) => sum + (item.quantity || 1), 0)
               return (
-                <div key={category} className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div key={category} className="bg-[#efefef] rounded-xl shadow-sm overflow-hidden">
                   <div className="bg-gradient-to-r from-orange-500 to-red-500 px-6 py-3 flex items-center justify-between">
                     <h2 className="text-xl font-bold text-white">
                       {category} ({itemsByCategory[category].length} modelů)

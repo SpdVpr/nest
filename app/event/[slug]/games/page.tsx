@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { ArrowLeft, Gamepad2, Plus, ThumbsUp, Loader2, Trophy, Sparkles, Library } from 'lucide-react'
+import NestPage from '@/components/NestPage'
 import { Session, Game, GameVote, GameLibraryItem } from '@/types/database.types'
 import { guestStorage } from '@/lib/guest-storage'
-import EventGuestHeader from '@/components/EventGuestHeader'
+import NestLoading from '@/components/NestLoading'
 
 export default function EventGamesPage() {
     const params = useParams()
@@ -116,23 +117,16 @@ export default function EventGamesPage() {
     }
 
     if (loading) {
-        return (
-            <div className="min-h-screen bg-gradient-to-br from-violet-50 via-purple-50 to-indigo-100 flex items-center justify-center">
-                <div className="text-center">
-                    <div className="animate-spin text-6xl mb-4">🎮</div>
-                    <p className="text-gray-600">Načítám hry...</p>
-                </div>
-            </div>
-        )
+        return <NestLoading message="Načítám hry..." />
     }
 
     if (!session) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-violet-50 via-purple-50 to-indigo-100 flex items-center justify-center p-4">
-                <div className="bg-white rounded-2xl shadow-xl p-8 text-center max-w-md">
+            <div className="min-h-screen bg-[var(--nest-dark)] text-[var(--nest-white)] flex items-center justify-center p-4">
+                <div className="nest-card-elevated p-8 text-center max-w-md">
                     <p className="text-6xl mb-4">😕</p>
-                    <h2 className="text-xl font-bold text-gray-900 mb-2">Event nenalezen</h2>
-                    <Link href="/" className="text-purple-600 hover:text-purple-700 font-medium">
+                    <h2 className="text-xl font-bold mb-2">Event nenalezen</h2>
+                    <Link href="/" className="text-[var(--nest-yellow)] hover:underline font-medium">
                         ← Zpět na hlavní stránku
                     </Link>
                 </div>
@@ -149,208 +143,189 @@ export default function EventGamesPage() {
     )
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-violet-50 via-purple-50 to-indigo-100 p-4 pb-32">
-            <EventGuestHeader session_slug={slug} />
+        <NestPage sessionSlug={slug} backHref={`/event/${slug}`} title="Hry na LAN" maxWidth="max-w-2xl">
 
-            <div className="max-w-2xl mx-auto">
-                {/* Header */}
-                <div className="flex items-center gap-3 mb-6">
-                    <Link
-                        href={`/event/${slug}`}
-                        className="p-2 bg-white rounded-full shadow hover:shadow-md transition-all"
-                    >
-                        <ArrowLeft className="w-5 h-5 text-gray-600" />
-                    </Link>
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                            🎮 Hry na LAN
-                        </h1>
-                        <p className="text-sm text-gray-500">{session.name}</p>
-                    </div>
+            {!currentGuest && (
+                <div className="bg-[var(--nest-warning)]/10 border border-[var(--nest-warning)]/30 rounded-xl p-4 mb-6 text-center">
+                    <p className="text-[var(--nest-warning)] font-medium text-sm">
+                        Pro hlasování a přidávání her se nejdřív{' '}
+                        <Link href={`/event/${slug}/register`} className="text-[var(--nest-yellow)] underline font-bold">
+                            zaregistruj
+                        </Link>
+                    </p>
                 </div>
+            )}
 
-                {!currentGuest && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 text-center">
-                        <p className="text-amber-800 font-medium">
-                            Pro hlasování a přidávání her se nejdřív{' '}
-                            <Link href={`/event/${slug}/register`} className="text-amber-900 underline font-bold">
-                                zaregistruj
-                            </Link>
-                        </p>
-                    </div>
-                )}
-
-                {/* Admin picks */}
-                {adminPicks.length > 0 && (
-                    <div className="mb-6">
-                        <h2 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
-                            <Trophy className="w-5 h-5 text-amber-500" />
-                            Hlavní program
-                        </h2>
-                        <div className="space-y-2">
-                            {adminPicks.map(game => (
-                                <div
-                                    key={game.id}
-                                    className="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl p-4 flex items-center gap-4"
-                                >
-                                    <div className="flex-1">
-                                        <span className="font-bold text-gray-900 text-lg">{game.name}</span>
-                                        <span className="ml-2 text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full">
-                                            ⭐ Vybraná hra
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm font-bold text-gray-700">{game.votes || 0}</span>
-                                        <button
-                                            onClick={() => handleVote(game.id)}
-                                            disabled={!currentGuest || votingId === game.id}
-                                            className={`p-2.5 rounded-xl transition-all ${hasVoted(game.id)
-                                                ? 'bg-purple-600 text-white shadow-lg shadow-purple-200 scale-110'
-                                                : 'bg-white text-gray-400 hover:text-purple-600 hover:bg-purple-50 border border-gray-200'
-                                                } ${!currentGuest ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                                        >
-                                            {votingId === game.id ? (
-                                                <Loader2 className="w-5 h-5 animate-spin" />
-                                            ) : (
-                                                <ThumbsUp className="w-5 h-5" />
-                                            )}
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {/* Library games to suggest — quick pick buttons */}
-                {unaddedLibraryGames.length > 0 && currentGuest && (
-                    <div className="mb-6">
-                        <h2 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
-                            <Library className="w-5 h-5 text-violet-500" />
-                            Dostupné hry k instalaci
-                        </h2>
-                        <p className="text-sm text-gray-500 mb-3">
-                            Klikni na hru pro navržení na event — ostatní pro ni mohou hlasovat:
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                            {unaddedLibraryGames.map(lg => (
-                                <button
-                                    key={lg.id}
-                                    onClick={async () => {
-                                        if (!currentGuest || submitting) return
-                                        try {
-                                            setSubmitting(true)
-                                            const res = await fetch(`/api/event/${slug}/games`, {
-                                                method: 'POST',
-                                                headers: { 'Content-Type': 'application/json' },
-                                                body: JSON.stringify({
-                                                    action: 'suggest',
-                                                    guest_id: currentGuest.id,
-                                                    name: lg.name,
-                                                }),
-                                            })
-                                            if (res.ok) {
-                                                await fetchData()
-                                            }
-                                        } catch (error) {
-                                            console.error('Error suggesting library game:', error)
-                                        } finally {
-                                            setSubmitting(false)
-                                        }
-                                    }}
-                                    disabled={submitting}
-                                    className="group relative px-3 py-2 rounded-xl bg-violet-50 hover:bg-violet-100 border border-violet-200 hover:border-violet-400 transition-all text-left disabled:opacity-50"
-                                >
-                                    <span className="font-medium text-violet-800 text-sm">{lg.name}</span>
-                                    {lg.category && (
-                                        <span className="ml-1.5 text-[10px] text-violet-400">({lg.category})</span>
-                                    )}
-                                    <span className="ml-1.5 text-xs text-violet-400 group-hover:text-violet-600">+ navrhnout</span>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {/* Community suggestions */}
+            {/* Admin picks */}
+            {adminPicks.length > 0 && (
                 <div className="mb-6">
-                    <h2 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
-                        <Sparkles className="w-5 h-5 text-purple-500" />
-                        Návrhy od hráčů
+                    <h2 className="text-lg font-bold text-[var(--nest-text-primary)] mb-3 flex items-center gap-2">
+                        <Trophy className="w-5 h-5 text-amber-500" />
+                        Hlavní program
                     </h2>
-
-                    {communityPicks.length > 0 ? (
-                        <div className="space-y-2">
-                            {communityPicks.map(game => (
-                                <div
-                                    key={game.id}
-                                    className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-4 hover:shadow-md transition-all"
-                                >
-                                    <div className="flex-1">
-                                        <span className="font-semibold text-gray-900">{game.name}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm font-bold text-gray-700">{game.votes || 0}</span>
-                                        <button
-                                            onClick={() => handleVote(game.id)}
-                                            disabled={!currentGuest || votingId === game.id}
-                                            className={`p-2.5 rounded-xl transition-all ${hasVoted(game.id)
-                                                ? 'bg-purple-600 text-white shadow-lg shadow-purple-200 scale-110'
-                                                : 'bg-white text-gray-400 hover:text-purple-600 hover:bg-purple-50 border border-gray-200'
-                                                } ${!currentGuest ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                                        >
-                                            {votingId === game.id ? (
-                                                <Loader2 className="w-5 h-5 animate-spin" />
-                                            ) : (
-                                                <ThumbsUp className="w-5 h-5" />
-                                            )}
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="bg-white border border-dashed border-gray-300 rounded-xl p-6 text-center">
-                            <Gamepad2 className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                            <p className="text-gray-500 text-sm">Zatím žádné návrhy. Buď první!</p>
-                        </div>
-                    )}
-                </div>
-
-                {/* Suggest new game */}
-                {currentGuest && (
-                    <div className="bg-white rounded-xl shadow-lg p-5 border border-gray-200">
-                        <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
-                            <Plus className="w-5 h-5 text-green-600" />
-                            Navrhnout hru
-                        </h3>
-                        <div className="flex gap-2">
-                            <input
-                                type="text"
-                                value={newGameName}
-                                onChange={(e) => setNewGameName(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleSuggestGame()}
-                                placeholder="Název hry (např. Counter-Strike 2)"
-                                className="flex-1 border border-gray-300 rounded-xl px-4 py-3 text-gray-900 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
-                            />
-                            <button
-                                onClick={handleSuggestGame}
-                                disabled={!newGameName.trim() || submitting}
-                                className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 text-white px-6 py-3 rounded-xl font-medium transition-all flex items-center gap-2"
+                    <div className="space-y-2">
+                        {adminPicks.map(game => (
+                            <div
+                                key={game.id}
+                                className="bg-gradient-to-r from-amber-900/20 to-yellow-900/15 border border-amber-700/30 rounded-xl p-4 flex items-center gap-4"
                             >
-                                {submitting ? (
-                                    <Loader2 className="w-5 h-5 animate-spin" />
-                                ) : (
-                                    <>
-                                        <Plus className="w-5 h-5" />
-                                        Přidat
-                                    </>
+                                <div className="flex-1">
+                                    <span className="font-bold text-[var(--nest-text-primary)] text-lg">{game.name}</span>
+                                    <span className="ml-2 text-xs bg-amber-800/30 text-amber-400 px-2 py-0.5 rounded-full">
+                                        ⭐ Vybraná hra
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-sm font-bold text-[var(--nest-text-secondary)]">{game.votes || 0}</span>
+                                    <button
+                                        onClick={() => handleVote(game.id)}
+                                        disabled={!currentGuest || votingId === game.id}
+                                        className={`p-2.5 rounded-xl transition-all ${hasVoted(game.id)
+                                            ? 'bg-[var(--nest-yellow)] text-[var(--nest-bg)] shadow-lg shadow-[var(--nest-yellow)]/20 scale-110'
+                                            : 'bg-[var(--nest-surface-alt)] text-[var(--nest-text-tertiary)] hover:text-[var(--nest-yellow)] hover:bg-[var(--nest-yellow)]/10 border border-[var(--nest-border)]'
+                                            } ${!currentGuest ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                                    >
+                                        {votingId === game.id ? (
+                                            <Loader2 className="w-5 h-5 animate-spin" />
+                                        ) : (
+                                            <ThumbsUp className="w-5 h-5" />
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Library games to suggest — quick pick buttons */}
+            {unaddedLibraryGames.length > 0 && currentGuest && (
+                <div className="mb-6">
+                    <h2 className="text-lg font-bold text-[var(--nest-text-primary)] mb-3 flex items-center gap-2">
+                        <Library className="w-5 h-5 text-[var(--nest-yellow)]" />
+                        Dostupné hry k instalaci
+                    </h2>
+                    <p className="text-sm text-[var(--nest-text-tertiary)] mb-3">
+                        Klikni na hru pro navržení na event — ostatní pro ni mohou hlasovat:
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                        {unaddedLibraryGames.map(lg => (
+                            <button
+                                key={lg.id}
+                                onClick={async () => {
+                                    if (!currentGuest || submitting) return
+                                    try {
+                                        setSubmitting(true)
+                                        const res = await fetch(`/api/event/${slug}/games`, {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                action: 'suggest',
+                                                guest_id: currentGuest.id,
+                                                name: lg.name,
+                                            }),
+                                        })
+                                        if (res.ok) {
+                                            await fetchData()
+                                        }
+                                    } catch (error) {
+                                        console.error('Error suggesting library game:', error)
+                                    } finally {
+                                        setSubmitting(false)
+                                    }
+                                }}
+                                disabled={submitting}
+                                className="group relative px-3 py-2 rounded-xl bg-[var(--nest-yellow)]/5 hover:bg-[var(--nest-yellow)]/10 border border-[var(--nest-yellow)]/20 hover:border-[var(--nest-yellow)]/40 transition-all text-left disabled:opacity-50"
+                            >
+                                <span className="font-medium text-[var(--nest-text-primary)] text-sm">{lg.name}</span>
+                                {lg.category && (
+                                    <span className="ml-1.5 text-[10px] text-[var(--nest-text-tertiary)]">({lg.category})</span>
                                 )}
+                                <span className="ml-1.5 text-xs text-[var(--nest-yellow)]/60 group-hover:text-[var(--nest-yellow)]">+ navrhnout</span>
                             </button>
-                        </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Community suggestions */}
+            <div className="mb-6">
+                <h2 className="text-lg font-bold text-[var(--nest-text-primary)] mb-3 flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-[var(--nest-yellow)]" />
+                    Návrhy od hráčů
+                </h2>
+
+                {communityPicks.length > 0 ? (
+                    <div className="space-y-2">
+                        {communityPicks.map(game => (
+                            <div
+                                key={game.id}
+                                className="bg-[var(--nest-surface)] border border-[var(--nest-border)] rounded-xl p-4 flex items-center gap-4 hover:border-[var(--nest-border-light)] transition-all"
+                            >
+                                <div className="flex-1">
+                                    <span className="font-semibold text-[var(--nest-text-primary)]">{game.name}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-sm font-bold text-[var(--nest-text-secondary)]">{game.votes || 0}</span>
+                                    <button
+                                        onClick={() => handleVote(game.id)}
+                                        disabled={!currentGuest || votingId === game.id}
+                                        className={`p-2.5 rounded-xl transition-all ${hasVoted(game.id)
+                                            ? 'bg-[var(--nest-yellow)] text-[var(--nest-bg)] shadow-lg shadow-[var(--nest-yellow)]/20 scale-110'
+                                            : 'bg-[var(--nest-surface-alt)] text-[var(--nest-text-tertiary)] hover:text-[var(--nest-yellow)] hover:bg-[var(--nest-yellow)]/10 border border-[var(--nest-border)]'
+                                            } ${!currentGuest ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                                    >
+                                        {votingId === game.id ? (
+                                            <Loader2 className="w-5 h-5 animate-spin" />
+                                        ) : (
+                                            <ThumbsUp className="w-5 h-5" />
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="bg-[var(--nest-surface)] border border-dashed border-[var(--nest-border)] rounded-xl p-6 text-center">
+                        <Gamepad2 className="w-10 h-10 text-[var(--nest-text-tertiary)] mx-auto mb-2" />
+                        <p className="text-[var(--nest-text-tertiary)] text-sm">Zatím žádné návrhy. Buď první!</p>
                     </div>
                 )}
             </div>
-        </div>
+
+            {/* Suggest new game */}
+            {currentGuest && (
+                <div className="bg-[var(--nest-surface)] rounded-xl shadow-lg p-5 border border-[var(--nest-border)]">
+                    <h3 className="font-bold text-[var(--nest-text-primary)] mb-3 flex items-center gap-2">
+                        <Plus className="w-5 h-5 text-[var(--nest-yellow)]" />
+                        Navrhnout hru
+                    </h3>
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            value={newGameName}
+                            onChange={(e) => setNewGameName(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSuggestGame()}
+                            placeholder="Název hry (např. Counter-Strike 2)"
+                            className="flex-1 bg-[var(--nest-bg)] border border-[var(--nest-border)] rounded-xl px-4 py-3 text-[var(--nest-text-primary)] placeholder:text-[var(--nest-text-tertiary)] focus:ring-2 focus:ring-[var(--nest-yellow)]/50 focus:border-[var(--nest-yellow)]/50 outline-none"
+                        />
+                        <button
+                            onClick={handleSuggestGame}
+                            disabled={!newGameName.trim() || submitting}
+                            className="bg-[var(--nest-yellow)] hover:bg-[var(--nest-yellow-dark)] disabled:bg-[var(--nest-border)] text-[var(--nest-bg)] px-6 py-3 rounded-xl font-medium transition-all flex items-center gap-2"
+                        >
+                            {submitting ? (
+                                <Loader2 className="w-5 h-5 animate-spin" />
+                            ) : (
+                                <>
+                                    <Plus className="w-5 h-5" />
+                                    Přidat
+                                </>
+                            )}
+                        </button>
+                    </div>
+                </div>
+            )}
+        </NestPage>
     )
 }

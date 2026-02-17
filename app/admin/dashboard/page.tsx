@@ -295,10 +295,10 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white shadow">
+      <div className="bg-[#efefef] shadow">
         <div className="max-w-7xl mx-auto px-4 py-6 flex items-center justify-between">
           <h1 className="text-3xl font-bold text-gray-900">
-            🪺 The Nest - Admin
+            The Nest - Admin
           </h1>
           <button
             onClick={handleLogout}
@@ -328,7 +328,7 @@ export default function AdminDashboard() {
           </div>
 
           {sessions.length > 0 ? (
-            <div className="bg-white rounded-xl shadow overflow-hidden">
+            <div className="bg-[#efefef] rounded-xl shadow overflow-hidden">
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
@@ -520,7 +520,7 @@ export default function AdminDashboard() {
 
         {/* Stats Cards - Placeholder */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow p-6">
+          <div className="bg-[#efefef] rounded-xl shadow p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Hosté</p>
@@ -530,7 +530,7 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow p-6">
+          <div className="bg-[#efefef] rounded-xl shadow p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Produkty</p>
@@ -540,7 +540,7 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow p-6">
+          <div className="bg-[#efefef] rounded-xl shadow p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Celkový obrat</p>
@@ -550,7 +550,7 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow p-6">
+          <div className="bg-[#efefef] rounded-xl shadow p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Spotřeba dnes</p>
@@ -566,7 +566,7 @@ export default function AdminDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <Link
             href="/admin/sessions"
-            className="bg-white rounded-xl shadow hover:shadow-lg transition-shadow p-6 flex flex-col items-center text-center"
+            className="bg-[#efefef] rounded-xl shadow hover:shadow-lg transition-shadow p-6 flex flex-col items-center text-center"
           >
             <div className="bg-blue-100 p-4 rounded-full mb-4">
               <Calendar className="w-8 h-8 text-blue-600" />
@@ -577,7 +577,7 @@ export default function AdminDashboard() {
 
           <Link
             href="/admin/products"
-            className="bg-white rounded-xl shadow hover:shadow-lg transition-shadow p-6 flex flex-col items-center text-center"
+            className="bg-[#efefef] rounded-xl shadow hover:shadow-lg transition-shadow p-6 flex flex-col items-center text-center"
           >
             <div className="bg-purple-100 p-4 rounded-full mb-4">
               <Package className="w-8 h-8 text-purple-600" />
@@ -588,7 +588,7 @@ export default function AdminDashboard() {
 
           <Link
             href="/admin/hardware"
-            className="bg-white rounded-xl shadow hover:shadow-lg transition-shadow p-6 flex flex-col items-center text-center"
+            className="bg-[#efefef] rounded-xl shadow hover:shadow-lg transition-shadow p-6 flex flex-col items-center text-center"
           >
             <div className="bg-orange-100 p-4 rounded-full mb-4">
               <MonitorSmartphone className="w-8 h-8 text-orange-600" />
@@ -599,7 +599,7 @@ export default function AdminDashboard() {
 
           <Link
             href="/admin/games"
-            className="bg-white rounded-xl shadow hover:shadow-lg transition-shadow p-6 flex flex-col items-center text-center"
+            className="bg-[#efefef] rounded-xl shadow hover:shadow-lg transition-shadow p-6 flex flex-col items-center text-center"
           >
             <div className="bg-violet-100 p-4 rounded-full mb-4">
               <Gamepad2 className="w-8 h-8 text-violet-600" />
@@ -610,7 +610,7 @@ export default function AdminDashboard() {
 
           <Link
             href="/admin/meals"
-            className="bg-white rounded-xl shadow hover:shadow-lg transition-shadow p-6 flex flex-col items-center text-center"
+            className="bg-[#efefef] rounded-xl shadow hover:shadow-lg transition-shadow p-6 flex flex-col items-center text-center"
           >
             <div className="bg-amber-100 p-4 rounded-full mb-4">
               <UtensilsCrossed className="w-8 h-8 text-amber-600" />
@@ -621,7 +621,7 @@ export default function AdminDashboard() {
 
           <Link
             href="/admin/guests"
-            className="bg-white rounded-xl shadow hover:shadow-lg transition-shadow p-6 flex flex-col items-center text-center"
+            className="bg-[#efefef] rounded-xl shadow hover:shadow-lg transition-shadow p-6 flex flex-col items-center text-center"
           >
             <div className="bg-green-100 p-4 rounded-full mb-4">
               <Users className="w-8 h-8 text-green-600" />
@@ -632,7 +632,7 @@ export default function AdminDashboard() {
 
           <Link
             href="/admin/consumption"
-            className="bg-white rounded-xl shadow hover:shadow-lg transition-shadow p-6 flex flex-col items-center text-center"
+            className="bg-[#efefef] rounded-xl shadow hover:shadow-lg transition-shadow p-6 flex flex-col items-center text-center"
           >
             <div className="bg-purple-100 p-4 rounded-full mb-4">
               <History className="w-8 h-8 text-purple-600" />

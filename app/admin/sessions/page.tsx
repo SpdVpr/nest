@@ -554,7 +554,7 @@ export default function AdminSessionsPage() {
                     className="sr-only"
                   />
                   <div className={`block w-12 h-7 rounded-full transition-colors ${menuEnabled ? 'bg-orange-500' : 'bg-gray-300'}`}></div>
-                  <div className={`absolute left-0.5 top-0.5 bg-white w-6 h-6 rounded-full transition-transform ${menuEnabled ? 'translate-x-5' : ''}`}></div>
+                  <div className={`absolute left-0.5 top-0.5 bg-[#efefef] w-6 h-6 rounded-full transition-transform ${menuEnabled ? 'translate-x-5' : ''}`}></div>
                 </div>
                 <div className="flex items-center gap-2">
                   <UtensilsCrossed className="w-5 h-5 text-orange-500" />
@@ -582,7 +582,7 @@ export default function AdminSessionsPage() {
 
                 <div className="flex flex-wrap gap-2 mb-3">
                   {mealTemplates.map(template => (
-                    <div key={template.id} className="flex items-center gap-1 bg-white border border-orange-200 rounded-full px-3 py-1">
+                    <div key={template.id} className="flex items-center gap-1 bg-[#efefef] border border-orange-200 rounded-full px-3 py-1">
                       <span className="text-sm text-gray-900">{template.name}</span>
                       <button
                         onClick={() => deleteMealTemplate(template.id)}
@@ -730,7 +730,7 @@ export default function AdminSessionsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-white shadow">
+      <div className="bg-[#efefef] shadow">
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
@@ -783,7 +783,7 @@ export default function AdminSessionsPage() {
 
         {/* Create form */}
         {showCreateForm && (
-          <div className="bg-white rounded-xl shadow p-6 mb-6">
+          <div className="bg-[#efefef] rounded-xl shadow p-6 mb-6">
             <h3 className="font-semibold text-gray-900 mb-4">Vytvořit nový event</h3>
             {renderFormFields()}
             <div className="flex gap-4 justify-end mt-4">
@@ -806,7 +806,7 @@ export default function AdminSessionsPage() {
           </div>
         )}
 
-        <div className="bg-white rounded-xl shadow overflow-hidden">
+        <div className="bg-[#efefef] rounded-xl shadow overflow-hidden">
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>

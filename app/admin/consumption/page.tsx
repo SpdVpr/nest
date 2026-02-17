@@ -28,7 +28,7 @@ export default function AdminConsumptionPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-white shadow">
+      <div className="bg-[#efefef] shadow">
         <div className="max-w-7xl mx-auto px-4 py-6">
           <Link
             href="/admin/dashboard"
@@ -42,7 +42,7 @@ export default function AdminConsumptionPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="bg-white rounded-xl shadow p-12 text-center">
+        <div className="bg-[#efefef] rounded-xl shadow p-12 text-center">
           <p className="text-gray-600">
             Historie spotřeby - připravuje se...
           </p>

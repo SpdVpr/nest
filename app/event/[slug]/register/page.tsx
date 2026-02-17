@@ -3,12 +3,13 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Users, Loader2 } from 'lucide-react'
+import { Users, Loader2 } from 'lucide-react'
 import { Session } from '@/types/database.types'
 import { formatEventRange } from '@/lib/utils'
 import DateRangeCalendar from '@/components/DateRangeCalendar'
 import { guestStorage } from '@/lib/guest-storage'
-import EventGuestHeader from '@/components/EventGuestHeader'
+import NestPage from '@/components/NestPage'
+import NestLoading from '@/components/NestLoading'
 
 export default function RegisterPage() {
   const params = useParams()
@@ -104,18 +105,15 @@ export default function RegisterPage() {
         throw new Error(errorMessage)
       }
 
-      // Get the created guest from response
       const data = await response.json()
       const guest = data.guest
 
-      // Save guest to localStorage
       guestStorage.setCurrentGuest({
         id: guest.id,
         name: guest.name,
         session_slug: slug
       })
 
-      // Redirect immediately using replace to prevent back button issues
       router.replace(`/event/${slug}/hardware`)
     } catch (error: any) {
       console.error('Error registering:', error)
@@ -126,139 +124,128 @@ export default function RegisterPage() {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin text-6xl mb-4">🪺</div>
-          <p className="text-gray-600">Načítám...</p>
-        </div>
-      </div>
-    )
+    return <NestLoading message="Načítám..." />
   }
 
   if (!session) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        <div className="text-center">
-          <p className="text-gray-600 mb-4">Event nenalezen</p>
-          <Link href="/" className="text-purple-600 hover:text-purple-700">
+      <NestPage title="Chyba">
+        <div className="text-center py-20">
+          <p className="text-[var(--nest-white-60)] mb-4">Event nenalezen</p>
+          <Link href="/" className="text-[var(--nest-yellow)] hover:underline text-sm">
             Zpět na homepage
           </Link>
         </div>
-      </div>
+      </NestPage>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 py-12 px-4">
-      <EventGuestHeader session_slug={slug} />
-      <div className="max-w-md mx-auto">
-        {/* Back Button */}
-        <Link
-          href={`/event/${slug}`}
-          className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-8 font-medium transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          Zpět na event
-        </Link>
+    <NestPage
+      sessionSlug={slug}
+      backHref={`/event/${slug}`}
+      title="Registrace"
+      maxWidth="max-w-md"
+    >
+      {/* Registration Card */}
+      <div className="nest-card-elevated p-6 mt-4">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-10 h-10 rounded-xl bg-[var(--nest-yellow)]/10 flex items-center justify-center">
+            <Users className="w-5 h-5 text-[var(--nest-yellow)]" />
+          </div>
+          <h1 className="text-xl font-bold">Registrace</h1>
+        </div>
 
-        {/* Registration Card */}
-        <div className="bg-white rounded-2xl shadow-xl p-8">
-          <div className="flex items-center gap-3 mb-6">
-            <Users className="w-8 h-8 text-purple-600" />
-            <h1 className="text-2xl font-bold text-gray-900">Registrace</h1>
+        {/* Event info */}
+        <div className="mb-5 p-3 bg-[var(--nest-dark-3)] rounded-xl border border-[var(--nest-dark-4)]">
+          <p className="text-xs text-[var(--nest-white-40)] mb-0.5">Akce:</p>
+          <p className="font-bold text-sm">{session.name}</p>
+          <p className="text-xs text-[var(--nest-white-60)]">
+            {formatEventRange(session.start_date, session.end_date, session.start_time, session.end_time)}
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="mb-5">
+            <label htmlFor="name" className="block text-xs font-medium text-[var(--nest-white-60)] mb-1.5">
+              Tvoje jméno <span className="text-[var(--nest-error)]">*</span>
+            </label>
+            <input
+              type="text"
+              id="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Zadej své jméno"
+              className="w-full px-4 py-2.5 bg-[var(--nest-dark-3)] border border-[var(--nest-dark-4)] rounded-xl focus:ring-2 focus:ring-[var(--nest-yellow)]/50 focus:border-[var(--nest-yellow)]/50 text-[var(--nest-white)] placeholder-[var(--nest-white-40)] text-sm outline-none transition-all"
+              disabled={submitting}
+              autoFocus
+            />
           </div>
 
-          <div className="mb-6 p-4 bg-purple-50 rounded-lg">
-            <p className="text-sm text-gray-600 mb-1">Akce:</p>
-            <p className="font-bold text-gray-900">{session.name}</p>
-            <p className="text-sm text-gray-600">
-              {formatEventRange(session.start_date, session.end_date, session.start_time, session.end_time)}
-            </p>
-          </div>
-
-          <form onSubmit={handleSubmit}>
-            <div className="mb-6">
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                Tvoje jméno <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Zadej své jméno"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900 placeholder-gray-500"
-                disabled={submitting}
-                autoFocus
-              />
-            </div>
-
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-3">
-                Kdy přijedeš a odjedeš? <span className="text-red-500">*</span>
-              </label>
-              <DateRangeCalendar
-                startDate={new Date(session.start_date)}
-                endDate={session.end_date ? new Date(session.end_date) : undefined}
-                onCheckIn={setCheckedInDate}
-                onCheckOut={setCheckedOutDate}
-                checkedInDate={checkedInDate}
-                checkedOutDate={checkedOutDate}
-                onReset={() => {
-                  setCheckedInDate(undefined)
-                  setCheckedOutDate(undefined)
-                }}
-              />
-              {(checkedInDate || checkedOutDate) && (
-                <div className="mt-3 p-3 bg-blue-50 rounded-lg text-sm">
-                  {checkedInDate && checkedOutDate ? (
-                    <p className="text-gray-800">
-                      <span className="font-semibold">Počet nocí:</span> {calculateNights()}
-                    </p>
-                  ) : (
-                    <p className="text-gray-600">
-                      {!checkedInDate ? 'Vyberte si příjezdový den' : 'Vyberte si odjezdový den'}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                {error}
+          <div className="mb-5">
+            <label className="block text-xs font-medium text-[var(--nest-white-60)] mb-2">
+              Kdy přijedeš a odjedeš? <span className="text-[var(--nest-error)]">*</span>
+            </label>
+            <DateRangeCalendar
+              startDate={new Date(session.start_date)}
+              endDate={session.end_date ? new Date(session.end_date) : undefined}
+              onCheckIn={setCheckedInDate}
+              onCheckOut={setCheckedOutDate}
+              checkedInDate={checkedInDate}
+              checkedOutDate={checkedOutDate}
+              onReset={() => {
+                setCheckedInDate(undefined)
+                setCheckedOutDate(undefined)
+              }}
+            />
+            {(checkedInDate || checkedOutDate) && (
+              <div className="mt-2 p-2.5 bg-[var(--nest-yellow)]/10 border border-[var(--nest-yellow)]/20 rounded-lg text-xs">
+                {checkedInDate && checkedOutDate ? (
+                  <p className="text-[var(--nest-yellow)]">
+                    <span className="font-semibold">Počet nocí:</span> {calculateNights()}
+                  </p>
+                ) : (
+                  <p className="text-[var(--nest-white-60)]">
+                    {!checkedInDate ? 'Vyberte si příjezdový den' : 'Vyberte si odjezdový den'}
+                  </p>
+                )}
               </div>
             )}
-
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={submitting || !name.trim() || !checkedInDate || !checkedOutDate}
-              className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
-            >
-              {submitting ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Registruji...
-                </>
-              ) : (
-                <>
-                  <Users className="w-5 h-5" />
-                  Zaregistrovat se
-                </>
-              )}
-            </button>
-          </form>
-
-          <div className="mt-6 pt-6 border-t border-gray-200 text-center text-sm text-gray-600">
-            Už jsi zaregistrovaný?{' '}
-            <Link href={`/event/${slug}/snacks`} className="text-purple-600 hover:text-purple-700 font-medium">
-              Přejdi rovnou na občerstvení
-            </Link>
           </div>
+
+          {error && (
+            <div className="mb-4 p-3 bg-[var(--nest-error)]/10 border border-[var(--nest-error)]/20 rounded-xl text-[var(--nest-error)] text-xs">
+              {error}
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={submitting || !name.trim() || !checkedInDate || !checkedOutDate}
+            className="w-full bg-[var(--nest-yellow)] hover:bg-[var(--nest-yellow-dark)] disabled:bg-[var(--nest-dark-4)] disabled:text-[var(--nest-white-40)] disabled:cursor-not-allowed text-[var(--nest-dark)] py-3 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2"
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Registruji...
+              </>
+            ) : (
+              <>
+                <Users className="w-4 h-4" />
+                Zaregistrovat se
+              </>
+            )}
+          </button>
+        </form>
+
+        <div className="mt-5 pt-5 border-t border-[var(--nest-dark-4)] text-center text-xs text-[var(--nest-white-40)]">
+          Už jsi zaregistrovaný?{' '}
+          <Link href={`/event/${slug}/snacks`} className="text-[var(--nest-yellow)] hover:underline font-medium">
+            Přejdi rovnou na občerstvení
+          </Link>
         </div>
       </div>
-    </div>
+    </NestPage>
   )
 }

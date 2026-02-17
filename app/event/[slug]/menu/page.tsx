@@ -7,7 +7,8 @@ import { ArrowLeft, UtensilsCrossed, Loader2, Check, AlertCircle, X } from 'luci
 import { Session, MenuItem, MealType } from '@/types/database.types'
 import { formatDateOnly } from '@/lib/utils'
 import { guestStorage } from '@/lib/guest-storage'
-// Header not used on menu page
+import NestLoading from '@/components/NestLoading'
+import NestPage from '@/components/NestPage'
 
 const MEAL_TYPE_LABELS: Record<MealType, string> = {
     breakfast: '🌅 Snídaně',
@@ -22,10 +23,10 @@ const MEAL_TYPE_ICONS: Record<MealType, string> = {
 }
 
 const DIETARY_OPTIONS = [
-    { value: 'vegan', label: '🌱 Vegan', color: 'bg-green-100 text-green-800 border-green-300' },
-    { value: 'vegetarian', label: '🥬 Vegetarián', color: 'bg-lime-100 text-lime-800 border-lime-300' },
-    { value: 'gluten-free', label: '🌾 Bez lepku', color: 'bg-amber-100 text-amber-800 border-amber-300' },
-    { value: 'lactose-free', label: '🥛 Bez laktózy', color: 'bg-blue-100 text-blue-800 border-blue-300' },
+    { value: 'vegan', label: '🌱 Vegan', color: 'bg-green-900/40 text-green-300 border-green-700/50' },
+    { value: 'vegetarian', label: '🥬 Vegetarián', color: 'bg-lime-900/40 text-lime-300 border-lime-700/50' },
+    { value: 'gluten-free', label: '🌾 Bez lepku', color: 'bg-amber-900/40 text-amber-300 border-amber-700/50' },
+    { value: 'lactose-free', label: '🥛 Bez laktózy', color: 'bg-blue-900/40 text-blue-300 border-blue-700/50' },
 ]
 
 export default function EventMenuPage() {
@@ -184,28 +185,21 @@ export default function EventMenuPage() {
     }
 
     if (loading) {
-        return (
-            <div className="min-h-screen bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50 flex items-center justify-center">
-                <div className="text-center">
-                    <div className="animate-spin text-6xl mb-4">🍽️</div>
-                    <p className="text-gray-600">Načítám jídelníček...</p>
-                </div>
-            </div>
-        )
+        return <NestLoading message="Načítám jídelníček..." />
     }
 
     if (!session || !menuEnabled) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50 flex items-center justify-center p-4">
-                <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
-                    <AlertCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Jídelníček není dostupný</h2>
-                    <p className="text-gray-600 mb-6">Organizátor zatím nezveřejnil jídelníček pro tuto akci.</p>
+            <div className="min-h-screen bg-[var(--nest-dark)] text-[var(--nest-white)] flex items-center justify-center p-4">
+                <div className="max-w-md w-full nest-card-elevated p-8 text-center">
+                    <AlertCircle className="w-12 h-12 text-[var(--nest-white-40)] mx-auto mb-4" />
+                    <h2 className="text-xl font-bold mb-2">Jídelníček není dostupný</h2>
+                    <p className="text-[var(--nest-white-60)] mb-6 text-sm">Organizátor zatím nezveřejnil jídelníček pro tuto akci.</p>
                     <Link
                         href={`/event/${slug}`}
-                        className="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-semibold transition-colors"
+                        className="inline-flex items-center gap-2 bg-[var(--nest-yellow)] hover:bg-[var(--nest-yellow-dark)] text-[var(--nest-dark)] px-5 py-2.5 rounded-xl font-semibold text-sm transition-colors"
                     >
-                        <ArrowLeft className="w-5 h-5" />
+                        <ArrowLeft className="w-4 h-4" />
                         Zpět na event
                     </Link>
                 </div>
@@ -216,218 +210,199 @@ export default function EventMenuPage() {
     const days = getEventDays()
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50 pb-28">
+        <NestPage sessionSlug={slug} backHref={`/event/${slug}`} title={`Jídelníček`} maxWidth="max-w-5xl">
 
-            {/* Header */}
-            <div className="bg-white border-b border-gray-200">
-                <div className="max-w-5xl mx-auto px-4 py-4">
-                    <Link
-                        href={`/event/${slug}`}
-                        className="inline-flex items-center gap-2 text-gray-500 hover:text-gray-900 mb-3 text-sm font-medium transition-colors"
-                    >
-                        <ArrowLeft className="w-4 h-4" />
-                        Zpět na event
-                    </Link>
-                    <div className="flex items-center justify-between">
-                        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-                            <UtensilsCrossed className="w-7 h-7 text-orange-500" />
-                            Jídelníček – {session.name}
-                        </h1>
-                        {guestId && (
-                            <div className="flex gap-3 text-sm">
-                                <span className="bg-green-100 text-green-800 px-3 py-1.5 rounded-full font-medium">
-                                    ✅ {getSelectedCount()}
-                                </span>
-                                <span className="bg-red-100 text-red-700 px-3 py-1.5 rounded-full font-medium">
-                                    ❌ {getSkippedCount()}
-                                </span>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            <div className="max-w-5xl mx-auto px-4 py-6">
-                {/* Instructions for registered guests */}
-                {guestId && (
-                    <div className="bg-white rounded-2xl shadow-md p-5 border border-orange-100">
-                        <p className="text-gray-700 text-sm">
-                            👋 <strong>Ahoj{guestName ? `, ${guestName}` : ''}!</strong> Klikni na každé jídlo a označ jestli ho <span className="text-green-600 font-semibold">budeš jíst</span> nebo <span className="text-red-500 font-semibold">ne</span>.
-                        </p>
-                    </div>
-                )}
-
-                {/* Day-by-day menu - 2 column grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                    {days.map((day) => {
-                        const dayMeals = getMealsForDay(day.dayIndex)
-                        if (dayMeals.length === 0) return null
-
-                        return (
-                            <div key={day.dayIndex} className="bg-white rounded-2xl shadow-md overflow-hidden border border-gray-100">
-                                {/* Day header */}
-                                <div className="px-5 py-4 bg-gradient-to-r from-gray-800 to-gray-700 text-white flex items-center justify-between">
-                                    <div>
-                                        <h2 className="text-lg font-bold">📅 {day.label}</h2>
-                                        <p className="text-gray-300 text-sm">{day.dateStr}</p>
-                                    </div>
-                                    {guestId && (
-                                        <span className="text-xs bg-white/15 px-3 py-1 rounded-full">
-                                            {dayMeals.filter(m => selections[m.id]).length}/{dayMeals.length} jídel
-                                        </span>
-                                    )}
-                                </div>
-
-                                {/* Meals */}
-                                <div className="divide-y divide-gray-100">
-                                    {dayMeals.map((meal) => {
-                                        const isSelected = selections[meal.id] ?? true
-                                        const canSelect = !!guestId
-
-                                        return (
-                                            <div
-                                                key={meal.id}
-                                                onClick={() => canSelect && toggleMealSelection(meal.id)}
-                                                className={`px-5 py-4 transition-all duration-200 ${canSelect ? 'cursor-pointer hover:shadow-inner' : ''} ${!canSelect
-                                                    ? 'bg-white'
-                                                    : isSelected
-                                                        ? 'bg-green-50 border-l-4 border-l-green-500'
-                                                        : 'bg-red-50 border-l-4 border-l-red-400 opacity-75'
-                                                    }`}
-                                            >
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center gap-4 flex-1">
-                                                        {/* Meal icon + type */}
-                                                        <div className="text-2xl flex-shrink-0">
-                                                            {MEAL_TYPE_ICONS[meal.meal_type]}
-                                                        </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex items-center gap-2 mb-0.5">
-                                                                <span className="font-semibold text-gray-900 text-base">
-                                                                    {MEAL_TYPE_LABELS[meal.meal_type].replace(/^[^\s]+\s/, '')}
-                                                                </span>
-                                                                <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                                                                    {meal.time}
-                                                                </span>
-                                                            </div>
-                                                            {meal.description && (
-                                                                <p className={`text-sm ${isSelected ? 'text-gray-600' : 'text-gray-400 line-through'}`}>
-                                                                    {meal.description}
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Selection indicator */}
-                                                    {canSelect && (
-                                                        <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-200 ${isSelected
-                                                            ? 'bg-green-500 text-white shadow-md shadow-green-200'
-                                                            : 'bg-red-400 text-white shadow-md shadow-red-200'
-                                                            }`}>
-                                                            {isSelected ? (
-                                                                <Check className="w-6 h-6" />
-                                                            ) : (
-                                                                <X className="w-6 h-6" />
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )
-                                    })}
-                                </div>
-                            </div>
-                        )
-                    })}
-                </div>
-
-                {/* Dietary Preferences */}
-                {guestId && (
-                    <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-100">
-                        <h2 className="font-bold text-gray-900 mb-1 text-lg">🥗 Stravovací omezení</h2>
-                        <p className="text-sm text-gray-500 mb-4">Označ, pokud máš nějaká dietní omezení</p>
-
-                        <div className="flex flex-wrap gap-2 mb-4">
-                            {DIETARY_OPTIONS.map(opt => (
-                                <button
-                                    key={opt.value}
-                                    onClick={() => toggleDietary(opt.value)}
-                                    className={`px-4 py-2 rounded-full text-sm font-medium border transition-all ${dietaryRestrictions.includes(opt.value)
-                                        ? `${opt.color} border-2 shadow-sm`
-                                        : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
-                                        }`}
-                                >
-                                    {opt.label}
-                                    {dietaryRestrictions.includes(opt.value) && <Check className="w-4 h-4 inline ml-1" />}
-                                </button>
-                            ))}
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Jiné alergie / poznámka</label>
-                            <input
-                                type="text"
-                                value={dietaryNote}
-                                onChange={(e) => setDietaryNote(e.target.value)}
-                                placeholder="Např. alergie na ořechy, mořské plody..."
-                                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-gray-900 text-sm"
-                            />
-                        </div>
-                    </div>
-                )}
-
-                {/* Not registered notice */}
-                {!guestId && (
-                    <div className="bg-white rounded-2xl shadow-md p-8 text-center border border-gray-100">
-                        <div className="text-5xl mb-4">👤</div>
-                        <p className="text-gray-700 font-medium mb-2 text-lg">
-                            Pro výběr jídel se nejprve zaregistruj
-                        </p>
-                        <p className="text-gray-500 text-sm mb-5">
-                            Po registraci si budeš moct vybrat, která jídla chceš a která ne
-                        </p>
-                        <Link
-                            href={`/event/${slug}/register`}
-                            className="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-semibold transition-colors"
-                        >
-                            Zaregistrovat se
-                        </Link>
-                    </div>
-                )}
-            </div>
-
-            {/* Floating save button */}
             {guestId && (
-                <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-white via-white to-transparent">
-                    <div className="max-w-2xl mx-auto">
-                        <button
-                            onClick={handleSave}
-                            disabled={saving}
-                            className={`w-full py-4 rounded-2xl font-bold text-lg shadow-xl flex items-center justify-center gap-3 transition-all ${saved
-                                ? 'bg-green-500 text-white shadow-green-200'
-                                : 'bg-orange-500 hover:bg-orange-600 text-white disabled:bg-gray-400 shadow-orange-200'
-                                }`}
-                        >
-                            {saving ? (
-                                <>
-                                    <Loader2 className="w-5 h-5 animate-spin" />
-                                    Ukládám...
-                                </>
-                            ) : saved ? (
-                                <>
-                                    <Check className="w-6 h-6" />
-                                    Uloženo! ✅
-                                </>
-                            ) : (
-                                <>
-                                    <UtensilsCrossed className="w-5 h-5" />
-                                    Uložit výběr ({getSelectedCount()} jídel)
-                                </>
-                            )}
-                        </button>
+                <div className="flex gap-2 text-xs mb-4 justify-end">
+                    <span className="bg-[var(--nest-success)]/10 text-[var(--nest-success)] px-2.5 py-1 rounded-full font-medium border border-[var(--nest-success)]/20">
+                        ✅ {getSelectedCount()}
+                    </span>
+                    <span className="bg-[var(--nest-error)]/10 text-[var(--nest-error)] px-2.5 py-1 rounded-full font-medium border border-[var(--nest-error)]/20">
+                        ❌ {getSkippedCount()}
+                    </span>
+                </div>
+            )}
+            {/* Instructions for registered guests */}
+            {guestId && (
+                <div className="bg-[var(--nest-surface)] rounded-2xl shadow-md p-5 border border-[var(--nest-yellow)]/20">
+                    <p className="text-[var(--nest-text-primary)] text-sm">
+                        👋 <strong>Ahoj{guestName ? `, ${guestName}` : ''}!</strong> Klikni na každé jídlo a označ jestli ho <span className="text-green-400 font-semibold">budeš jíst</span> nebo <span className="text-red-400 font-semibold">ne</span>.
+                    </p>
+                </div>
+            )}
+
+            {/* Day-by-day menu - 2 column grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                {days.map((day) => {
+                    const dayMeals = getMealsForDay(day.dayIndex)
+                    if (dayMeals.length === 0) return null
+
+                    return (
+                        <div key={day.dayIndex} className="bg-[var(--nest-surface)] rounded-2xl shadow-md overflow-hidden border border-[var(--nest-border)]">
+                            {/* Day header */}
+                            <div className="px-5 py-4 bg-gradient-to-r from-[var(--nest-bg)] to-[var(--nest-dark-3)] text-[var(--nest-text-primary)] flex items-center justify-between">
+                                <div>
+                                    <h2 className="text-lg font-bold">📅 {day.label}</h2>
+                                    <p className="text-[var(--nest-text-secondary)] text-sm">{day.dateStr}</p>
+                                </div>
+                                {guestId && (
+                                    <span className="text-xs bg-white/15 px-3 py-1 rounded-full">
+                                        {dayMeals.filter(m => selections[m.id]).length}/{dayMeals.length} jídel
+                                    </span>
+                                )}
+                            </div>
+
+                            {/* Meals */}
+                            <div className="divide-y divide-[var(--nest-border)]">
+                                {dayMeals.map((meal) => {
+                                    const isSelected = selections[meal.id] ?? true
+                                    const canSelect = !!guestId
+
+                                    return (
+                                        <div
+                                            key={meal.id}
+                                            onClick={() => canSelect && toggleMealSelection(meal.id)}
+                                            className={`px-5 py-4 transition-all duration-200 ${canSelect ? 'cursor-pointer hover:bg-[var(--nest-surface-alt)]' : ''} ${!canSelect
+                                                ? 'bg-[var(--nest-surface)]'
+                                                : isSelected
+                                                    ? 'bg-green-900/20 border-l-4 border-l-green-500'
+                                                    : 'bg-red-900/20 border-l-4 border-l-red-400 opacity-75'
+                                                }`}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-4 flex-1">
+                                                    {/* Meal icon + type */}
+                                                    <div className="text-2xl flex-shrink-0">
+                                                        {MEAL_TYPE_ICONS[meal.meal_type]}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2 mb-0.5">
+                                                            <span className="font-semibold text-[var(--nest-text-primary)] text-base">
+                                                                {MEAL_TYPE_LABELS[meal.meal_type].replace(/^[^\s]+\s/, '')}
+                                                            </span>
+                                                            <span className="text-xs text-[var(--nest-text-tertiary)] bg-[var(--nest-bg)] px-2 py-0.5 rounded-full">
+                                                                {meal.time}
+                                                            </span>
+                                                        </div>
+                                                        {meal.description && (
+                                                            <p className={`text-sm ${isSelected ? 'text-[var(--nest-text-secondary)]' : 'text-[var(--nest-text-tertiary)] line-through'}`}>
+                                                                {meal.description}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Selection indicator */}
+                                                {canSelect && (
+                                                    <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-200 ${isSelected
+                                                        ? 'bg-green-500 text-white shadow-md shadow-green-900/50'
+                                                        : 'bg-red-400 text-white shadow-md shadow-red-900/50'
+                                                        }`}>
+                                                        {isSelected ? (
+                                                            <Check className="w-6 h-6" />
+                                                        ) : (
+                                                            <X className="w-6 h-6" />
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    )
+                })}
+            </div>
+
+            {/* Dietary Preferences */}
+            {guestId && (
+                <div className="bg-[var(--nest-surface)] rounded-2xl shadow-md p-6 border border-[var(--nest-border)]">
+                    <h2 className="font-bold text-[var(--nest-text-primary)] mb-1 text-lg">🥗 Stravovací omezení</h2>
+                    <p className="text-sm text-[var(--nest-text-secondary)] mb-4">Označ, pokud máš nějaká dietní omezení</p>
+
+                    <div className="flex flex-wrap gap-2 mb-4">
+                        {DIETARY_OPTIONS.map(opt => (
+                            <button
+                                key={opt.value}
+                                onClick={() => toggleDietary(opt.value)}
+                                className={`px-4 py-2 rounded-full text-sm font-medium border transition-all ${dietaryRestrictions.includes(opt.value)
+                                    ? `${opt.color} border-2 shadow-sm`
+                                    : 'bg-[var(--nest-bg)] text-[var(--nest-text-secondary)] border-[var(--nest-border)] hover:bg-[var(--nest-surface-alt)]'
+                                    }`}
+                            >
+                                {opt.label}
+                                {dietaryRestrictions.includes(opt.value) && <Check className="w-4 h-4 inline ml-1" />}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-[var(--nest-text-secondary)] mb-1">Jiné alergie / poznámka</label>
+                        <input
+                            type="text"
+                            value={dietaryNote}
+                            onChange={(e) => setDietaryNote(e.target.value)}
+                            placeholder="Např. alergie na ořechy, mořské plody..."
+                            className="w-full px-4 py-2.5 border border-[var(--nest-border)] rounded-xl bg-[var(--nest-bg)] text-[var(--nest-text-primary)] placeholder:text-[var(--nest-text-tertiary)] text-sm focus:outline-none focus:border-[var(--nest-yellow)]/50"
+                        />
                     </div>
                 </div>
             )}
-        </div>
+
+            {/* Not registered notice */}
+            {!guestId && (
+                <div className="bg-[var(--nest-surface)] rounded-2xl shadow-md p-8 text-center border border-[var(--nest-border)]">
+                    <div className="text-5xl mb-4">👤</div>
+                    <p className="text-[var(--nest-text-primary)] font-medium mb-2 text-lg">
+                        Pro výběr jídel se nejprve zaregistruj
+                    </p>
+                    <p className="text-[var(--nest-text-secondary)] text-sm mb-5">
+                        Po registraci si budeš moct vybrat, která jídla chceš a která ne
+                    </p>
+                    <Link
+                        href={`/event/${slug}/register`}
+                        className="inline-flex items-center gap-2 bg-[var(--nest-yellow)] hover:bg-[var(--nest-yellow-dark)] text-[var(--nest-bg)] px-6 py-3 rounded-xl font-semibold transition-colors"
+                    >
+                        Zaregistrovat se
+                    </Link>
+                </div>
+            )}
+
+            {/* Floating save button */}
+            {
+                guestId && (
+                    <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[var(--nest-bg)] via-[var(--nest-bg)] to-transparent">
+                        <div className="max-w-2xl mx-auto">
+                            <button
+                                onClick={handleSave}
+                                disabled={saving}
+                                className={`w-full py-4 rounded-2xl font-bold text-lg shadow-xl flex items-center justify-center gap-3 transition-all ${saved
+                                    ? 'bg-green-500 text-white shadow-green-900/50'
+                                    : 'bg-[var(--nest-yellow)] hover:bg-[var(--nest-yellow-dark)] text-[var(--nest-bg)] disabled:bg-[var(--nest-border)] shadow-[var(--nest-yellow)]/20'
+                                    }`}
+                            >
+                                {saving ? (
+                                    <>
+                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                        Ukládám...
+                                    </>
+                                ) : saved ? (
+                                    <>
+                                        <Check className="w-6 h-6" />
+                                        Uloženo! ✅
+                                    </>
+                                ) : (
+                                    <>
+                                        <UtensilsCrossed className="w-5 h-5" />
+                                        Uložit výběr ({getSelectedCount()} jídel)
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                )
+            }
+        </NestPage >
     )
 }

@@ -1,8 +1,48 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* === THE NEST — 4-COLOR PALETTE === */
+  /* #222831 · #393E46 · #FFD369 · #EEEEEE */
+
+  --nest-bg: #222831;
+  --nest-surface: #393E46;
+  --nest-surface-alt: #42474f;
+  --nest-border: #4a4f58;
+  --nest-border-light: #555b65;
+  --nest-text-primary: #EEEEEE;
+  --nest-text-secondary: #b0b0b0;
+  --nest-text-tertiary: #7a7a7a;
+  --nest-overlay: rgba(34, 40, 49, 0.85);
+  --nest-color-scheme: dark;
+
+  /* Mapped aliases */
+  --nest-dark: var(--nest-bg);
+  --nest-dark-2: var(--nest-surface);
+  --nest-dark-3: var(--nest-border);
+  --nest-dark-4: var(--nest-border-light);
+  --nest-white: var(--nest-text-primary);
+  --nest-white-90: #d4d4d4;
+  --nest-white-80: #b8b8b8;
+  --nest-white-60: var(--nest-text-secondary);
+  --nest-white-40: var(--nest-text-tertiary);
+
+  /* Accent */
+  --nest-yellow: #FFD369;
+  --nest-yellow-light: #ffe08a;
+  --nest-yellow-dark: #e6b84d;
+  --nest-yellow-muted: #fff3d4;
+  --nest-yellow-subtle: #fffbeb;
+  --nest-yellow-glow: rgba(255, 211, 105, 0.15);
+
+  /* Functional */
+  --nest-success: #34d399;
+  --nest-error: #f87171;
+  --nest-info: #60a5fa;
+  --nest-warning: #fbbf24;
+
+  /* Global */
+  --background: var(--nest-bg);
+  --foreground: var(--nest-text-primary);
 }
 
 @theme inline {
@@ -10,17 +50,223 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --color-nest-dark: var(--nest-dark);
+  --color-nest-dark-2: var(--nest-dark-2);
+  --color-nest-dark-3: var(--nest-dark-3);
+  --color-nest-dark-4: var(--nest-dark-4);
+  --color-nest-white: var(--nest-white);
+  --color-nest-white-90: var(--nest-white-90);
+  --color-nest-white-80: var(--nest-white-80);
+  --color-nest-white-60: var(--nest-white-60);
+  --color-nest-white-40: var(--nest-white-40);
+  --color-nest-yellow: var(--nest-yellow);
+  --color-nest-yellow-light: var(--nest-yellow-light);
+  --color-nest-yellow-dark: var(--nest-yellow-dark);
+  --color-nest-yellow-muted: var(--nest-yellow-muted);
+  --color-nest-yellow-subtle: var(--nest-yellow-subtle);
+  --color-nest-success: var(--nest-success);
+  --color-nest-error: var(--nest-error);
+  --color-nest-info: var(--nest-info);
+  --color-nest-warning: var(--nest-warning);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* === BASE === */
+body {
+  background: var(--nest-bg);
+  color: var(--nest-text-primary);
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* === SCROLLBAR === */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--nest-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--nest-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--nest-yellow);
+}
+
+/* === SELECTION === */
+::selection {
+  background: var(--nest-yellow);
+  color: var(--nest-bg);
+}
+
+/* === FOCUS === */
+*:focus-visible {
+  outline: 2px solid var(--nest-yellow);
+  outline-offset: 2px;
+}
+
+/* === INPUTS === */
+input,
+textarea,
+select {
+  color-scheme: var(--nest-color-scheme);
+}
+
+/* === CARDS === */
+.nest-card {
+  background: var(--nest-surface);
+  border: 1px solid var(--nest-border);
+  border-radius: 16px;
+}
+
+.nest-card-elevated {
+  background: var(--nest-surface);
+  border: 1px solid var(--nest-border);
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* === GLOW === */
+.nest-glow {
+  box-shadow: 0 0 20px var(--nest-yellow-glow), 0 0 60px var(--nest-yellow-glow);
+}
+
+/* === SPINNER === */
+@keyframes nest-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+.nest-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--nest-border);
+  border-top-color: var(--nest-yellow);
+  border-radius: 50%;
+  animation: nest-spin 0.8s linear infinite;
+}
+
+/* === TRANSITION === */
+.nest-transition {
+  transition: all 0.2s ease;
+}
+
+/* =============================== */
+/* LEGACY COLOR OVERRIDES          */
+/* Auto-converts old Tailwind      */
+/* colors to the 4-color palette   */
+/* =============================== */
+
+/* White backgrounds → surface */
+.bg-white,
+.bg-\[\#efefef\] {
+  background-color: var(--nest-surface) !important;
+}
+
+/* Gray backgrounds */
+.bg-gray-50,
+.bg-gray-100 {
+  background-color: var(--nest-surface-alt) !important;
+}
+
+.bg-gray-200,
+.bg-gray-300 {
+  background-color: var(--nest-border) !important;
+}
+
+.bg-gray-700,
+.bg-gray-800,
+.bg-gray-900 {
+  background-color: var(--nest-bg) !important;
+}
+
+/* Text colors → palette */
+.text-gray-900,
+.text-gray-800,
+.text-gray-700 {
+  color: var(--nest-text-primary) !important;
+}
+
+.text-gray-600,
+.text-gray-500 {
+  color: var(--nest-text-secondary) !important;
+}
+
+.text-gray-400,
+.text-gray-300 {
+  color: var(--nest-text-tertiary) !important;
+}
+
+/* White text stays white on dark bg */
+.text-white {
+  color: var(--nest-text-primary) !important;
+}
+
+/* Borders */
+.border-gray-100,
+.border-gray-200,
+.border-gray-300,
+.border-gray-600 {
+  border-color: var(--nest-border) !important;
+}
+
+/* Shadows for dark theme */
+.shadow-xl,
+.shadow-2xl,
+.shadow-lg,
+.shadow-md {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Overlays */
+.bg-black\/50,
+.bg-black\/40,
+.bg-black\/60 {
+  background-color: var(--nest-overlay) !important;
+}
+
+/* Placeholder */
+::placeholder {
+  color: var(--nest-text-tertiary);
+}
+
+/* === INTERACTIVE STATES (dark highlight) === */
+/* Selection on buttons → dark bg so light text stays readable */
+button::selection,
+a::selection,
+[role="button"]::selection {
+  background: var(--nest-bg);
+  color: var(--nest-yellow);
+}
+
+/* Active/pressed → subtle darken only */
+button:active,
+a:active {
+  opacity: 0.85;
+}
+
+/* Prevent browser default light highlight on tap (mobile) */
+* {
+  -webkit-tap-highlight-color: rgba(255, 211, 105, 0.15);
+}
+
+/* Force accent color for native form controls (checkboxes, radio, range) */
+@supports (accent-color: auto) {
+
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="range"] {
+    accent-color: var(--nest-yellow);
+  }
+}
+
+/* Option/select hover in native dropdowns */
+option:checked,
+option:hover {
+  background: var(--nest-surface) !important;
+  color: var(--nest-text-primary) !important;
 }
