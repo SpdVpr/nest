@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Plus, Loader2, PlayCircle, StopCircle, Edit, Eye, Trash2, UtensilsCrossed, X, Monitor, Cpu, Gamepad2, ChevronDown, ChevronUp } from 'lucide-react'
@@ -32,7 +32,7 @@ interface AdminHardwareItem {
   is_available: boolean
 }
 
-export default function AdminSessionsPage() {
+function AdminSessionsPageInner() {
   const router = useRouter()
   const [sessions, setSessions] = useState<Session[]>([])
   const [loading, setLoading] = useState(true)
@@ -1177,5 +1177,13 @@ export default function AdminSessionsPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function AdminSessionsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>}>
+      <AdminSessionsPageInner />
+    </Suspense>
   )
 }
