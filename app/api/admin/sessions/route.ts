@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
 
     const db = getFirebaseAdminDb()
 
-    // Generate slug from name and date
+    // Generate slug from name and date with random 4-digit suffix for uniqueness
     const startDate = start_date || new Date().toISOString()
     const dateStr = new Date(startDate).toISOString().split('T')[0] // YYYY-MM-DD
     const slugBase = `${name}-${dateStr}`
@@ -63,19 +63,18 @@ export async function POST(request: NextRequest) {
       .replace(/^-+|-+$/g, '')
       .substring(0, 50)
 
-    // Check for unique slug
-    let slug = slugBase
-    let counter = 0
+    // Append random 4-digit number to make the URL hard to guess
+    let slug = ''
     while (true) {
+      const randomSuffix = Math.floor(1000 + Math.random() * 9000) // 1000-9999
+      slug = `${slugBase}-${randomSuffix}`
+
       const existingDoc = await db.collection('sessions')
         .where('slug', '==', slug)
         .limit(1)
         .get()
 
       if (existingDoc.empty) break // Slug is unique
-
-      counter++
-      slug = `${slugBase}-${counter}`
     }
 
     const now = Timestamp.now()

@@ -30,7 +30,9 @@ export default function DateRangeCalendar({
   }
 
   const firstDayOfMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth(), 1).getDay()
+    const day = new Date(date.getFullYear(), date.getMonth(), 1).getDay()
+    // Convert from Sunday-based (0=Sun,1=Mon,...,6=Sat) to Monday-based (0=Mon,...,6=Sun)
+    return day === 0 ? 6 : day - 1
   }
 
   const monthDays = useMemo(() => {
@@ -89,7 +91,7 @@ export default function DateRangeCalendar({
     if (!isDateInEventRange(date)) return
 
     const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-    const checkInOnly = checkedInDate 
+    const checkInOnly = checkedInDate
       ? new Date(checkedInDate.getFullYear(), checkedInDate.getMonth(), checkedInDate.getDate())
       : null
 
