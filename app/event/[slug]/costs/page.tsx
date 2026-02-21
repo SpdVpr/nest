@@ -67,6 +67,7 @@ export default function CostsPage() {
     const [bankSettings, setBankSettings] = useState<BankSettings | null>(null)
     const [isPreliminary, setIsPreliminary] = useState(true)
     const [copiedVS, setCopiedVS] = useState<string | null>(null)
+    const [hardwarePricingEnabled, setHardwarePricingEnabled] = useState(true)
 
     useEffect(() => {
         if (slug) {
@@ -86,6 +87,7 @@ export default function CostsPage() {
                 setPricePerNight(data.pricePerNight || 0)
                 setBankSettings(data.bankSettings || null)
                 setIsPreliminary(data.isPreliminary !== false)
+                setHardwarePricingEnabled(data.hardwarePricingEnabled !== false)
                 setLastRefresh(new Date())
             }
         } catch (error) {
@@ -330,7 +332,7 @@ export default function CostsPage() {
                                                     {guest.consumption.length > 0 && (
                                                         <span>🍕 {guest.snacksTotal.toLocaleString('cs-CZ')} Kč</span>
                                                     )}
-                                                    {guest.hwTotal > 0 && (
+                                                    {guest.hwTotal > 0 && hardwarePricingEnabled && (
                                                         <span>💻 {guest.hwTotal.toLocaleString('cs-CZ')} Kč</span>
                                                     )}
                                                     {guest.tip > 0 && (
@@ -400,7 +402,7 @@ export default function CostsPage() {
                                             )}
 
                                             {/* Hardware */}
-                                            {guest.hardware.length > 0 && (
+                                            {guest.hardware.length > 0 && hardwarePricingEnabled && (
                                                 <div className={guest.consumption.length > 0 ? 'mt-4 pt-4 border-t border-[var(--nest-border)]' : 'mt-4'}>
                                                     <h4 className="text-sm font-semibold text-[var(--nest-text-secondary)] uppercase tracking-wider mb-2">
                                                         💻 Hardware — {guest.hwTotal.toLocaleString('cs-CZ')} Kč

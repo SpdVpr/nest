@@ -160,9 +160,22 @@ export default function EventHardwarePage() {
     }
   }
 
+  // Check if hardware pricing is enabled for this session
+  const hardwarePricingEnabled = session?.hardware_pricing_enabled !== false
+  const hwOverrides = (session as any)?.hardware_overrides || {} as Record<string, { quantity: number }>
+
+  // Get effective quantity for an item (applying session overrides)
+  const getEffectiveQuantity = (item: HardwareItem): number => {
+    if (hwOverrides[item.id] !== undefined) {
+      return hwOverrides[item.id].quantity
+    }
+    return item.quantity || 1
+  }
+
   // Compute available quantity for an item
   const getAvailableQty = (item: HardwareItem): number => {
-    const totalStock = item.quantity || 1
+    const totalStock = getEffectiveQuantity(item)
+    if (totalStock === 0) return 0  // item disabled for this event
     const reservedQty = reservations
       .filter(r => r.hardware_item_id === item.id && r.status !== 'cancelled')
       .reduce((sum: number, r: any) => sum + (r.quantity || 1), 0)
@@ -297,8 +310,8 @@ export default function EventHardwarePage() {
     }
   }
 
-  // Filter available items by category
-  const availableItems = hardwareItems.filter(i => i.is_available)
+  // Filter available items by category — also exclude items overridden to 0
+  const availableItems = hardwareItems.filter(i => i.is_available && getEffectiveQuantity(i) > 0)
   const categories = Array.from(new Set(availableItems.map(item => item.category))).sort()
 
   // Set initial category only once
@@ -457,7 +470,7 @@ export default function EventHardwarePage() {
                     </button>
                   </div>
 
-                  {reservation.total_price > 0 && (
+                  {reservation.total_price > 0 && hardwarePricingEnabled && (
                     <div className="border-t border-[var(--nest-border)] pt-2 mt-3">
                       <div className="flex items-center gap-1 text-sm">
                         <span className="text-[var(--nest-text-secondary)]">Cena:</span>
@@ -481,7 +494,7 @@ export default function EventHardwarePage() {
           {categories.map((category) => {
             const catItems = availableItems.filter(i => i.category === category)
             const totalAvailable = catItems.reduce((sum, i) => sum + getAvailableQty(i), 0)
-            const totalStock = catItems.reduce((sum, i) => sum + (i.quantity || 1), 0)
+            const totalStock = catItems.reduce((sum, i) => sum + getEffectiveQuantity(i), 0)
             const firstItem = catItems[0]
 
             const prices = catItems.map(i => i.price_per_night)
@@ -510,9 +523,9 @@ export default function EventHardwarePage() {
                 )}
                 <h3 className="text-lg font-bold text-[var(--nest-text-primary)]">{category}</h3>
                 <p className="text-3xl font-bold text-[var(--nest-yellow)] my-2">
-                  {isFree ? 'Zdarma' : minPrice !== maxPrice ? `${minPrice}–${maxPrice} Kč` : `${minPrice} Kč`}
+                  {isFree || !hardwarePricingEnabled ? 'Zdarma' : minPrice !== maxPrice ? `${minPrice}–${maxPrice} Kč` : `${minPrice} Kč`}
                 </p>
-                {!isFree && (
+                {!isFree && hardwarePricingEnabled && (
                   <p className="text-sm text-[var(--nest-text-secondary)]">za noc</p>
                 )}
                 <p className={`text-xs mt-2 font-semibold ${totalAvailable > 0 ? 'text-emerald-500/80' : 'text-red-400'}`}>
@@ -570,7 +583,7 @@ export default function EventHardwarePage() {
 
                   {/* Price */}
                   <p className="text-lg font-bold text-[var(--nest-yellow)] mb-3">
-                    {item.price_per_night === 0 ? 'Zdarma' : `${item.price_per_night} Kč/noc`}
+                    {!hardwarePricingEnabled ? '' : item.price_per_night === 0 ? 'Zdarma' : `${item.price_per_night} Kč/noc`}
                   </p>
 
                   {/* Availability */}
@@ -580,7 +593,7 @@ export default function EventHardwarePage() {
                       {soldOut ? '❌ Vše obsazeno' : `✅ ${available} ks volných`}
                     </span>
                     <span className="text-xs text-[var(--nest-text-tertiary)]">
-                      z {item.quantity || 1} ks celkem
+                      z {getEffectiveQuantity(item)} ks celkem
                     </span>
                   </div>
 
@@ -645,7 +658,7 @@ export default function EventHardwarePage() {
                       <span className="text-sm font-medium truncate">{q}× {item.name}</span>
                     </div>
                     <span className="text-sm font-bold flex-shrink-0 ml-2">
-                      {itemTotal === 0 ? 'Zdarma' : `${itemTotal} Kč`}
+                      {!hardwarePricingEnabled ? '' : itemTotal === 0 ? 'Zdarma' : `${itemTotal} Kč`}
                     </span>
                   </div>
                 )
@@ -659,10 +672,12 @@ export default function EventHardwarePage() {
                 <p className="text-lg font-bold">{nightsCount}</p>
               </div>
 
-              <div>
-                <p className="text-xs text-emerald-300/70">Celkem:</p>
-                <p className="text-2xl font-bold">{totalPrice} Kč</p>
-              </div>
+              {hardwarePricingEnabled && (
+                <div>
+                  <p className="text-xs text-emerald-300/70">Celkem:</p>
+                  <p className="text-2xl font-bold">{totalPrice} Kč</p>
+                </div>
+              )}
             </div>
 
             <button
@@ -788,11 +803,15 @@ export default function EventHardwarePage() {
                         <div key={itemId} className="bg-[var(--nest-surface)] p-3 rounded border border-[var(--nest-border)] flex justify-between items-center">
                           <div>
                             <p className="font-semibold text-[var(--nest-text-primary)] text-sm">{q}× {item?.name}</p>
-                            <p className="text-xs text-[var(--nest-text-secondary)]">{item?.price_per_night || 0} Kč/noc</p>
+                            {hardwarePricingEnabled && (
+                              <p className="text-xs text-[var(--nest-text-secondary)]">{item?.price_per_night || 0} Kč/noc</p>
+                            )}
                           </div>
-                          <p className="font-bold text-[var(--nest-yellow)]">
-                            {(item?.price_per_night || 0) * q * nightsCount} Kč
-                          </p>
+                          {hardwarePricingEnabled && (
+                            <p className="font-bold text-[var(--nest-yellow)]">
+                              {(item?.price_per_night || 0) * q * nightsCount} Kč
+                            </p>
+                          )}
                         </div>
                       )
                     })}
@@ -800,7 +819,9 @@ export default function EventHardwarePage() {
                 <p className="font-semibold text-[var(--nest-text-primary)] mb-1">
                   {nightsCount}× noc
                 </p>
-                <p className="text-2xl font-bold text-[var(--nest-yellow)]">{totalPrice} Kč</p>
+                {hardwarePricingEnabled && (
+                  <p className="text-2xl font-bold text-[var(--nest-yellow)]">{totalPrice} Kč</p>
+                )}
               </div>
 
               {hasPcSelected && libraryGames.length > 0 && (

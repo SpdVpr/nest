@@ -135,9 +135,12 @@ export async function GET(
                     }
                 })
 
-                // Hardware costs
+                // Hardware costs — respect hardware_pricing_enabled
                 const hwItems = hwByGuest[guestId] || []
-                const hwTotal = hwItems.reduce((sum, item) => sum + item.totalPrice, 0)
+                const hardwarePricingEnabled = (session as any).hardware_pricing_enabled !== false
+                const hwTotal = hardwarePricingEnabled
+                    ? hwItems.reduce((sum, item) => sum + item.totalPrice, 0)
+                    : 0
 
                 // Tip
                 const tip = tipsMap[guestId] || { amount: 0, percentage: null }
@@ -217,6 +220,7 @@ export async function GET(
             guests: guestCosts,
             sessionName: session.name,
             pricePerNight: (session as any).price_per_night || 0,
+            hardwarePricingEnabled: (session as any).hardware_pricing_enabled !== false,
             isPreliminary: !hasAnySettlement,
             bankSettings: hasAnySettlement ? bankSettings : null,
         })

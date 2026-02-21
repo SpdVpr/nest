@@ -21,6 +21,7 @@ export interface HardwareItem {
   quantity: number           // how many physical units of this model
   specs?: HardwareSpecs
   is_available: boolean
+  sort_order?: number
   created_at?: string
   updated_at?: string
 }

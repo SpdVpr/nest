@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Plus, Loader2, PlayCircle, StopCircle, Edit, Eye, Trash2, UtensilsCrossed, X } from 'lucide-react'
-import { Session, MealType } from '@/types/database.types'
+import { ArrowLeft, Plus, Loader2, PlayCircle, StopCircle, Edit, Eye, Trash2, UtensilsCrossed, X, Monitor, Cpu, Gamepad2, ChevronDown, ChevronUp } from 'lucide-react'
+import { Session, MealType, HardwareOverride } from '@/types/database.types'
 import { formatDate, formatDateOnly } from '@/lib/utils'
 
 interface MealTemplate {
@@ -20,6 +20,16 @@ interface InlineMenuItem {
   time: string
   description: string
   order: number
+}
+
+interface AdminHardwareItem {
+  id: string
+  name: string
+  type: 'monitor' | 'pc' | 'accessory'
+  category: string
+  price_per_night: number
+  quantity: number
+  is_available: boolean
 }
 
 export default function AdminSessionsPage() {
@@ -44,6 +54,14 @@ export default function AdminSessionsPage() {
   const [showTemplateManager, setShowTemplateManager] = useState(false)
   const [newTemplateName, setNewTemplateName] = useState('')
 
+  // Hardware state
+  const [hardwarePricingEnabled, setHardwarePricingEnabled] = useState(true)
+  const [hardwareOverrides, setHardwareOverrides] = useState<Record<string, HardwareOverride>>({})
+  const [allHardwareItems, setAllHardwareItems] = useState<AdminHardwareItem[]>([])
+  const [showHardwareConfig, setShowHardwareConfig] = useState(false)
+
+  const searchParams = useSearchParams()
+
   useEffect(() => {
     const token = localStorage.getItem('admin_token')
     if (!token) {
@@ -52,8 +70,15 @@ export default function AdminSessionsPage() {
       setIsAuthenticated(true)
       fetchSessions()
       fetchMealTemplates()
+      fetchHardwareItems()
+
+      // Auto-open create form if redirected from dashboard
+      if (searchParams.get('create') === 'true') {
+        resetForm()
+        setShowCreateForm(true)
+      }
     }
-  }, [router])
+  }, [router, searchParams])
 
   const fetchSessions = async () => {
     try {
@@ -82,6 +107,21 @@ export default function AdminSessionsPage() {
       }
     } catch (error) {
       console.error('Error fetching meal templates:', error)
+    }
+  }
+
+  const fetchHardwareItems = async () => {
+    try {
+      const token = localStorage.getItem('admin_token')
+      const response = await fetch('/api/admin/hardware', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setAllHardwareItems(data.items || [])
+      }
+    } catch (error) {
+      console.error('Error fetching hardware items:', error)
     }
   }
 
@@ -273,6 +313,8 @@ export default function AdminSessionsPage() {
       }
 
       sessionData.menu_enabled = menuEnabled
+      sessionData.hardware_pricing_enabled = hardwarePricingEnabled
+      sessionData.hardware_overrides = hardwareOverrides
 
       const priceVal = parseFloat(newPricePerNight)
       sessionData.price_per_night = !isNaN(priceVal) && priceVal >= 0 ? priceVal : 0
@@ -364,6 +406,9 @@ export default function AdminSessionsPage() {
       const priceVal = parseFloat(newPricePerNight)
       sessionData.price_per_night = !isNaN(priceVal) && priceVal >= 0 ? priceVal : 0
 
+      sessionData.hardware_pricing_enabled = hardwarePricingEnabled
+      sessionData.hardware_overrides = hardwareOverrides
+
       const response = await fetch(`/api/admin/sessions/${editingSession.id}`, {
         method: 'PATCH',
         headers: {
@@ -395,6 +440,9 @@ export default function AdminSessionsPage() {
     setNewSessionEndTime(session.end_time || '')
     setNewSessionDescription(session.description || '')
     setNewPricePerNight((session as any).price_per_night?.toString() || '0')
+    setHardwarePricingEnabled((session as any).hardware_pricing_enabled !== false)
+    setHardwareOverrides((session as any).hardware_overrides || {})
+    setShowHardwareConfig(false)
     setShowCreateForm(false)
   }
 
@@ -415,6 +463,9 @@ export default function AdminSessionsPage() {
     setNewPricePerNight('')
     setMenuEnabled(false)
     setMenuItems([])
+    setHardwarePricingEnabled(true)
+    setHardwareOverrides({})
+    setShowHardwareConfig(false)
   }
 
   const cancelEdit = () => {
@@ -531,6 +582,225 @@ export default function AdminSessionsPage() {
             min="0"
             className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
           />
+        </div>
+
+        {/* Hardware Configuration Section */}
+        <hr style={{ borderColor: 'var(--nest-border)' }} />
+
+        <div className="space-y-4">
+          {/* Hardware pricing toggle */}
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  checked={hardwarePricingEnabled}
+                  onChange={(e) => setHardwarePricingEnabled(e.target.checked)}
+                  className="sr-only"
+                />
+                <div
+                  className="block w-12 h-7 rounded-full transition-colors"
+                  style={{ backgroundColor: hardwarePricingEnabled ? '#3b82f6' : 'var(--nest-border)' }}
+                ></div>
+                <div
+                  className={`absolute left-0.5 top-0.5 w-6 h-6 rounded-full transition-transform ${hardwarePricingEnabled ? 'translate-x-5' : ''}`}
+                  style={{ backgroundColor: 'var(--nest-text-primary)' }}
+                ></div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Monitor className="w-5 h-5" style={{ color: '#60a5fa' }} />
+                <span className="font-semibold" style={{ color: 'var(--nest-text-primary)' }}>Cena techniky</span>
+              </div>
+            </label>
+            {!hardwarePricingEnabled && (
+              <span
+                className="text-xs px-2 py-1 rounded-full font-medium"
+                style={{ color: '#fbbf24', backgroundColor: 'rgba(251, 191, 36, 0.15)' }}
+              >
+                🚫 Cena techniky nebude zobrazena hostům
+              </span>
+            )}
+          </div>
+
+          {!hardwarePricingEnabled && (
+            <div
+              className="rounded-lg p-3 text-sm"
+              style={{
+                backgroundColor: 'rgba(251, 191, 36, 0.1)',
+                border: '1px solid rgba(251, 191, 36, 0.25)',
+                color: '#fbbf24',
+              }}
+            >
+              💡 Hostům nebudou vidět ceny za hardware. Technika se jim nebude počítat do nákladů.
+              Využij na akce, kde je technika v ceně.
+            </div>
+          )}
+
+          {/* Hardware quantity overrides */}
+          <div>
+            <button
+              onClick={() => setShowHardwareConfig(!showHardwareConfig)}
+              className="flex items-center gap-2 font-medium text-sm transition-colors"
+              style={{ color: '#60a5fa' }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#93bbfd')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = '#60a5fa')}
+            >
+              <Cpu className="w-4 h-4" />
+              {showHardwareConfig ? 'Skrýt úpravy HW' : '🖥️ Upravit dostupnost HW pro tuto akci'}
+              {showHardwareConfig
+                ? <ChevronUp className="w-4 h-4" />
+                : <ChevronDown className="w-4 h-4" />
+              }
+              {Object.keys(hardwareOverrides).length > 0 && (
+                <span
+                  className="text-xs px-2 py-0.5 rounded-full font-bold"
+                  style={{ backgroundColor: 'rgba(96, 165, 250, 0.2)', color: '#93bbfd' }}
+                >
+                  {Object.keys(hardwareOverrides).length} změn
+                </span>
+              )}
+            </button>
+          </div>
+
+          {showHardwareConfig && (
+            <div
+              className="rounded-lg p-4 space-y-3"
+              style={{
+                backgroundColor: 'var(--nest-bg)',
+                border: '1px solid var(--nest-border)',
+              }}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-semibold flex items-center gap-2" style={{ color: 'var(--nest-text-primary)' }}>
+                  🖥️ Úpravy dostupnosti HW
+                  <span className="text-sm font-normal" style={{ color: 'var(--nest-text-secondary)' }}>
+                    (změň počet kusů pro tuto akci)
+                  </span>
+                </h4>
+                {Object.keys(hardwareOverrides).length > 0 && (
+                  <button
+                    onClick={() => setHardwareOverrides({})}
+                    className="text-xs font-medium underline transition-colors"
+                    style={{ color: '#f87171' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = '#fca5a5')}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = '#f87171')}
+                  >
+                    Resetovat vše
+                  </button>
+                )}
+              </div>
+
+              <p className="text-xs mb-3" style={{ color: 'var(--nest-text-secondary)' }}>
+                ⚠️ Zde můžeš omezit počet kusů pro tuto konkrétní akci.
+                Nastav 0 pro úplné skrytí dané položky. Pokud pole nevyplníš, použije se výchozí počet.
+              </p>
+
+              {/* Group by type */}
+              {(() => {
+                const grouped: Record<string, AdminHardwareItem[]> = {}
+                allHardwareItems.filter(i => i.is_available).forEach(item => {
+                  const label = item.type === 'monitor' ? '📺 Monitory' : item.type === 'pc' ? '💻 Počítače' : '🎮 Příslušenství'
+                  if (!grouped[label]) grouped[label] = []
+                  grouped[label].push(item)
+                })
+
+                return Object.entries(grouped).map(([groupLabel, items]) => (
+                  <div key={groupLabel}>
+                    <h5 className="text-sm font-semibold mb-2" style={{ color: 'var(--nest-text-primary)' }}>{groupLabel}</h5>
+                    <div className="space-y-2">
+                      {items.map(item => {
+                        const hasOverride = hardwareOverrides[item.id] !== undefined
+                        const overrideQty = hasOverride ? hardwareOverrides[item.id].quantity : null
+                        const isReduced = hasOverride && overrideQty !== null && overrideQty < item.quantity
+                        const isDisabled = hasOverride && overrideQty === 0
+
+                        return (
+                          <div
+                            key={item.id}
+                            className="flex items-center gap-3 px-3 py-2 rounded-lg transition-colors"
+                            style={{
+                              backgroundColor: isDisabled
+                                ? 'rgba(239, 68, 68, 0.1)'
+                                : isReduced
+                                  ? 'rgba(251, 191, 36, 0.1)'
+                                  : 'var(--nest-surface)',
+                              border: `1px solid ${isDisabled ? 'rgba(239, 68, 68, 0.3)'
+                                : isReduced ? 'rgba(251, 191, 36, 0.3)'
+                                  : 'var(--nest-border)'
+                                }`,
+                            }}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <span
+                                className={`text-sm font-medium ${isDisabled ? 'line-through' : ''}`}
+                                style={{ color: isDisabled ? '#f87171' : 'var(--nest-text-primary)' }}
+                              >
+                                {item.name}
+                              </span>
+                              <span className="text-xs ml-2" style={{ color: 'var(--nest-text-tertiary)' }}>
+                                (výchozí: {item.quantity} ks • {item.price_per_night} Kč/noc)
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <input
+                                type="number"
+                                value={overrideQty !== null ? overrideQty : ''}
+                                onChange={(e) => {
+                                  const val = e.target.value
+                                  if (val === '' || val === undefined) {
+                                    const copy = { ...hardwareOverrides }
+                                    delete copy[item.id]
+                                    setHardwareOverrides(copy)
+                                  } else {
+                                    const num = Math.max(0, Math.min(parseInt(val) || 0, item.quantity))
+                                    setHardwareOverrides({
+                                      ...hardwareOverrides,
+                                      [item.id]: { quantity: num }
+                                    })
+                                  }
+                                }}
+                                placeholder={`${item.quantity}`}
+                                min="0"
+                                max={item.quantity}
+                                className="w-20 px-2 py-1 rounded-lg text-sm text-center font-medium"
+                                style={{
+                                  backgroundColor: 'var(--nest-bg)',
+                                  border: `1px solid ${isDisabled ? 'rgba(239, 68, 68, 0.4)'
+                                    : isReduced ? 'rgba(251, 191, 36, 0.4)'
+                                      : 'var(--nest-border)'
+                                    }`,
+                                  color: isDisabled ? '#f87171'
+                                    : isReduced ? '#fbbf24'
+                                      : 'var(--nest-text-primary)',
+                                }}
+                              />
+                              <span className="text-xs w-6" style={{ color: 'var(--nest-text-tertiary)' }}>ks</span>
+                              {hasOverride && (
+                                <button
+                                  onClick={() => {
+                                    const copy = { ...hardwareOverrides }
+                                    delete copy[item.id]
+                                    setHardwareOverrides(copy)
+                                  }}
+                                  className="transition-colors"
+                                  style={{ color: 'var(--nest-text-tertiary)' }}
+                                  onMouseEnter={(e) => (e.currentTarget.style.color = '#f87171')}
+                                  onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--nest-text-tertiary)')}
+                                  title="Zrušit úpravu"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))
+              })()}
+            </div>
+          )}
         </div>
 
         {/* Menu section - only in create form */}
@@ -825,6 +1095,12 @@ export default function AdminSessionsPage() {
                     {session.name}
                     {session.menu_enabled && (
                       <span className="ml-2 text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">🍽️ Menu</span>
+                    )}
+                    {session.hardware_pricing_enabled === false && (
+                      <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">🚫 HW cena</span>
+                    )}
+                    {session.hardware_overrides && Object.keys(session.hardware_overrides).length > 0 && (
+                      <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">🖥️ HW úpravy</span>
                     )}
                   </td>
                   <td className="px-6 py-4 text-sm">

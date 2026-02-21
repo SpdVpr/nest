@@ -9,12 +9,16 @@ import { formatDateOnly } from '@/lib/utils'
 
 interface LocalMenuItem {
     id?: string
+    _localId: string  // unique client-side ID for stable updates
     day_index: number
     meal_type: MealType
     time: string
     description: string
     order: number
 }
+
+let _nextLocalId = 0
+const genLocalId = () => `local_${Date.now()}_${_nextLocalId++}`
 
 interface MealTemplate {
     id: string
@@ -85,7 +89,12 @@ export default function MenuEditorPage() {
             })
             if (menuRes.ok) {
                 const data = await menuRes.json()
-                setMenuItems(data.items || [])
+                // Assign stable local IDs to fetched items
+                const itemsWithIds = (data.items || []).map((item: any) => ({
+                    ...item,
+                    _localId: item._localId || genLocalId(),
+                }))
+                setMenuItems(itemsWithIds)
             }
 
             // Fetch meal templates
@@ -137,6 +146,7 @@ export default function MenuEditorPage() {
 
     const addMeal = (dayIndex: number, mealType: MealType) => {
         const newItem: LocalMenuItem = {
+            _localId: genLocalId(),
             day_index: dayIndex,
             meal_type: mealType,
             time: MEAL_TYPE_DEFAULTS[mealType],
@@ -147,30 +157,18 @@ export default function MenuEditorPage() {
         setHasChanges(true)
     }
 
-    const updateMeal = (index: number, field: keyof LocalMenuItem, value: any) => {
-        setMenuItems(prev => {
-            const updated = [...prev]
-            updated[index] = { ...updated[index], [field]: value }
-            return updated
-        })
+    const updateMeal = (localId: string, field: keyof LocalMenuItem, value: any) => {
+        setMenuItems(prev =>
+            prev.map(item =>
+                item._localId === localId ? { ...item, [field]: value } : item
+            )
+        )
         setHasChanges(true)
     }
 
-    const removeMeal = (index: number) => {
-        setMenuItems(prev => prev.filter((_, i) => i !== index))
+    const removeMeal = (localId: string) => {
+        setMenuItems(prev => prev.filter(item => item._localId !== localId))
         setHasChanges(true)
-    }
-
-    const getGlobalIndex = (dayIndex: number, localIndex: number): number => {
-        let count = 0
-        for (const item of menuItems) {
-            if (item.day_index === dayIndex) {
-                if (localIndex === 0) return count
-                localIndex--
-            }
-            count++
-        }
-        return -1
     }
 
     const toggleMenuEnabled = async () => {
@@ -197,8 +195,10 @@ export default function MenuEditorPage() {
         try {
             const token = localStorage.getItem('admin_token')
 
-            // Filter out items with no description
-            const validItems = menuItems.filter(item => item.description.trim())
+            // Filter out items with no description, strip _localId before sending
+            const validItems = menuItems
+                .filter(item => item.description.trim())
+                .map(({ _localId, ...rest }) => rest)
 
             const response = await fetch(`/api/admin/sessions/${sessionId}/menu`, {
                 method: 'PUT',
@@ -212,7 +212,12 @@ export default function MenuEditorPage() {
             if (!response.ok) throw new Error('Failed to save menu')
 
             const data = await response.json()
-            setMenuItems(data.items || [])
+            // Re-assign stable local IDs after save
+            const savedItems = (data.items || []).map((item: any) => ({
+                ...item,
+                _localId: genLocalId(),
+            }))
+            setMenuItems(savedItems)
             setHasChanges(false)
             alert('Jídelníček uložen ✅')
         } catch (error) {
@@ -233,6 +238,7 @@ export default function MenuEditorPage() {
         for (const type of toAdd) {
             if (!existingTypes.has(type)) {
                 newItems.push({
+                    _localId: genLocalId(),
                     day_index: dayIndex,
                     meal_type: type,
                     time: MEAL_TYPE_DEFAULTS[type],
@@ -332,8 +338,8 @@ export default function MenuEditorPage() {
                 {menuEnabled && (
                     <div className="space-y-6">
                         {/* Templates info */}
-                        <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-5 py-3">
-                            <span className="text-sm text-amber-800">
+                        <div className="flex items-center justify-between rounded-xl px-5 py-3" style={{ backgroundColor: 'rgba(251, 191, 36, 0.1)', border: '1px solid rgba(251, 191, 36, 0.25)' }}>
+                            <span className="text-sm" style={{ color: '#fbbf24' }}>
                                 {mealTemplates.length > 0
                                     ? `🍽️ ${mealTemplates.length} jídel v databázi – klikni na štítek pro výběr`
                                     : '⚠️ Žádná jídla v databázi – přidej je ve Správě jídelníčku'}
@@ -341,16 +347,17 @@ export default function MenuEditorPage() {
                             <Link
                                 href="/admin/meals"
                                 target="_blank"
-                                className="text-sm text-amber-700 hover:text-amber-900 font-semibold underline"
+                                className="text-sm font-semibold underline"
+                                style={{ color: '#fbbf24' }}
                             >
                                 Spravovat jídla →
                             </Link>
                         </div>
 
                         {days.length === 0 ? (
-                            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-center">
-                                <p className="text-yellow-700 font-medium">Event nemá nastavené datum začátku a konce.</p>
-                                <p className="text-yellow-600 text-sm mt-1">Nastavte prosím datum událost aby se mohly rozložit dny jídelníčku.</p>
+                            <div className="rounded-xl p-6 text-center" style={{ backgroundColor: 'rgba(251, 191, 36, 0.1)', border: '1px solid rgba(251, 191, 36, 0.25)' }}>
+                                <p className="font-medium" style={{ color: '#fbbf24' }}>Event nemá nastavené datum začátku a konce.</p>
+                                <p className="text-sm mt-1" style={{ color: 'rgba(251, 191, 36, 0.7)' }}>Nastavte prosím datum událost aby se mohly rozložit dny jídelníčku.</p>
                             </div>
                         ) : (
                             days.map((day) => {
@@ -358,13 +365,16 @@ export default function MenuEditorPage() {
                                 return (
                                     <div key={day.dayIndex} className="bg-white rounded-xl shadow overflow-hidden">
                                         {/* Day Header */}
-                                        <div className="px-6 py-4 bg-gradient-to-r from-orange-50 to-amber-50 border-b border-orange-100 flex items-center justify-between">
-                                            <h2 className="text-lg font-bold text-gray-900">
+                                        <div className="px-6 py-4 flex items-center justify-between" style={{ background: 'linear-gradient(to right, rgba(249, 115, 22, 0.12), rgba(251, 191, 36, 0.08))', borderBottom: '1px solid rgba(249, 115, 22, 0.2)' }}>
+                                            <h2 className="text-lg font-bold" style={{ color: 'var(--nest-text-primary)' }}>
                                                 📅 {day.label}
                                             </h2>
                                             <button
                                                 onClick={() => addQuickDayMeals(day.dayIndex)}
-                                                className="text-sm text-orange-600 hover:text-orange-700 font-medium bg-orange-100 px-3 py-1 rounded-lg hover:bg-orange-200 transition-colors"
+                                                className="text-sm font-medium px-3 py-1 rounded-lg transition-colors"
+                                                style={{ color: '#fb923c', backgroundColor: 'rgba(249, 115, 22, 0.15)' }}
+                                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(249, 115, 22, 0.25)')}
+                                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(249, 115, 22, 0.15)')}
                                             >
                                                 + Přidat snídani/oběd/večeři
                                             </button>
@@ -375,16 +385,16 @@ export default function MenuEditorPage() {
                                             {dayMeals.length === 0 ? (
                                                 <p className="text-gray-400 text-sm text-center py-4">Žádná jídla pro tento den</p>
                                             ) : (
-                                                dayMeals.map((meal, localIdx) => {
-                                                    const globalIdx = getGlobalIndex(day.dayIndex, localIdx)
+                                                dayMeals.map((meal) => {
                                                     return (
-                                                        <div key={`${day.dayIndex}-${localIdx}`} className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg">
+                                                        <div key={meal._localId} className="flex items-start gap-4 p-4 rounded-lg" style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)' }}>
                                                             {/* Meal type */}
                                                             <div className="w-40">
                                                                 <select
                                                                     value={meal.meal_type}
-                                                                    onChange={(e) => updateMeal(globalIdx, 'meal_type', e.target.value as MealType)}
-                                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 text-sm"
+                                                                    onChange={(e) => updateMeal(meal._localId, 'meal_type', e.target.value as MealType)}
+                                                                    className="w-full px-3 py-2 rounded-lg text-sm"
+                                                                    style={{ backgroundColor: 'var(--nest-surface)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
                                                                 >
                                                                     <option value="breakfast">🌅 Snídaně</option>
                                                                     <option value="lunch">☀️ Oběd</option>
@@ -397,8 +407,9 @@ export default function MenuEditorPage() {
                                                                 <input
                                                                     type="time"
                                                                     value={meal.time}
-                                                                    onChange={(e) => updateMeal(globalIdx, 'time', e.target.value)}
-                                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 text-sm"
+                                                                    onChange={(e) => updateMeal(meal._localId, 'time', e.target.value)}
+                                                                    className="w-full px-3 py-2 rounded-lg text-sm"
+                                                                    style={{ backgroundColor: 'var(--nest-surface)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
                                                                 />
                                                             </div>
 
@@ -407,12 +418,13 @@ export default function MenuEditorPage() {
                                                                 <input
                                                                     type="text"
                                                                     value={meal.description}
-                                                                    onChange={(e) => updateMeal(globalIdx, 'description', e.target.value)}
+                                                                    onChange={(e) => updateMeal(meal._localId, 'description', e.target.value)}
                                                                     placeholder="Začni psát nebo vyber z databáze níže..."
-                                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 text-sm"
-                                                                    list={`templates-${day.dayIndex}-${localIdx}`}
+                                                                    className="w-full px-3 py-2 rounded-lg text-sm"
+                                                                    style={{ backgroundColor: 'var(--nest-surface)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
+                                                                    list={`templates-${meal._localId}`}
                                                                 />
-                                                                <datalist id={`templates-${day.dayIndex}-${localIdx}`}>
+                                                                <datalist id={`templates-${meal._localId}`}>
                                                                     {mealTemplates.map(t => (
                                                                         <option key={t.id} value={t.name} />
                                                                     ))}
@@ -425,12 +437,12 @@ export default function MenuEditorPage() {
                                                                                 key={t.id}
                                                                                 type="button"
                                                                                 onClick={() => {
-                                                                                    updateMeal(globalIdx, 'description', t.name)
+                                                                                    updateMeal(meal._localId, 'description', t.name)
                                                                                 }}
-                                                                                className={`text-xs px-2.5 py-1 rounded-full transition-colors border ${meal.description === t.name
-                                                                                    ? 'bg-amber-200 text-amber-900 border-amber-400 font-semibold'
-                                                                                    : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200'
-                                                                                    }`}
+                                                                                className="text-xs px-2.5 py-1 rounded-full transition-colors"
+                                                                                style={meal.description === t.name
+                                                                                    ? { backgroundColor: 'rgba(251, 191, 36, 0.3)', color: '#fbbf24', border: '1px solid rgba(251, 191, 36, 0.5)', fontWeight: 600 }
+                                                                                    : { backgroundColor: 'rgba(251, 191, 36, 0.1)', color: '#fbbf24', border: '1px solid rgba(251, 191, 36, 0.25)' }}
                                                                                 title={t.allergens?.length ? `Alergeny: ${t.allergens.join(', ')}` : undefined}
                                                                             >
                                                                                 🍽️ {t.name}
@@ -442,8 +454,11 @@ export default function MenuEditorPage() {
 
                                                             {/* Delete */}
                                                             <button
-                                                                onClick={() => removeMeal(globalIdx)}
-                                                                className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                                                                onClick={() => removeMeal(meal._localId)}
+                                                                className="p-2 rounded-lg transition-colors"
+                                                                style={{ color: '#f87171' }}
+                                                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.15)' }}
+                                                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
                                                             >
                                                                 <Trash2 className="w-4 h-4" />
                                                             </button>
@@ -458,7 +473,10 @@ export default function MenuEditorPage() {
                                                     <button
                                                         key={type}
                                                         onClick={() => addMeal(day.dayIndex, type)}
-                                                        className="text-xs px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+                                                        className="text-xs px-3 py-1.5 rounded-lg transition-colors"
+                                                        style={{ backgroundColor: 'var(--nest-surface)', color: 'var(--nest-text-secondary)', border: '1px solid var(--nest-border)' }}
+                                                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)')}
+                                                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--nest-surface)')}
                                                     >
                                                         + {MEAL_TYPE_LABELS[type]}
                                                     </button>

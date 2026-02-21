@@ -92,6 +92,12 @@ export async function PATCH(
     if (body.menu_enabled !== undefined) {
       updateData.menu_enabled = Boolean(body.menu_enabled)
     }
+    if (body.hardware_pricing_enabled !== undefined) {
+      updateData.hardware_pricing_enabled = Boolean(body.hardware_pricing_enabled)
+    }
+    if (body.hardware_overrides !== undefined) {
+      updateData.hardware_overrides = body.hardware_overrides || {}
+    }
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json(

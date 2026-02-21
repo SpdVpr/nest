@@ -156,8 +156,11 @@ export async function getAllHardwareItems(): Promise<HardwareItem[]> {
     return { ...item, quantity: item.quantity || 1 }
   })
 
-  // Sort in memory to avoid composite index requirement
+  // Sort by sort_order first, then category, then name
   return items.sort((a, b) => {
+    const orderA = a.sort_order ?? 999
+    const orderB = b.sort_order ?? 999
+    if (orderA !== orderB) return orderA - orderB
     const categoryCompare = a.category.localeCompare(b.category)
     if (categoryCompare !== 0) return categoryCompare
     return a.name.localeCompare(b.name)
@@ -175,8 +178,11 @@ export async function getAvailableHardwareItems(): Promise<HardwareItem[]> {
 
   const items = snapshot.docs.map(doc => docToObject<HardwareItem>(doc.data(), doc.id))
 
-  // Sort in memory to avoid composite index requirement
+  // Sort by sort_order first, then category, then name
   return items.sort((a, b) => {
+    const orderA = a.sort_order ?? 999
+    const orderB = b.sort_order ?? 999
+    if (orderA !== orderB) return orderA - orderB
     const categoryCompare = a.category.localeCompare(b.category)
     if (categoryCompare !== 0) return categoryCompare
     return a.name.localeCompare(b.name)

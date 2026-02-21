@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { ArrowLeft, Gamepad2, Plus, ThumbsUp, Loader2, Trophy, Sparkles, Library } from 'lucide-react'
+import { ArrowLeft, Gamepad2, Plus, ThumbsUp, Loader2, Trophy, Sparkles, Library, Monitor, ChevronRight } from 'lucide-react'
 import NestPage from '@/components/NestPage'
 import { Session, Game, GameVote, GameLibraryItem } from '@/types/database.types'
 import { guestStorage } from '@/lib/guest-storage'
@@ -198,53 +198,81 @@ export default function EventGamesPage() {
                 </div>
             )}
 
-            {/* Library games to suggest — quick pick buttons */}
-            {unaddedLibraryGames.length > 0 && currentGuest && (
+            {/* Pre-installed games info section */}
+            {libraryGames.length > 0 && (
                 <div className="mb-6">
                     <h2 className="text-lg font-bold text-[var(--nest-text-primary)] mb-3 flex items-center gap-2">
                         <Library className="w-5 h-5 text-[var(--nest-yellow)]" />
-                        Dostupné hry k instalaci
+                        Hry k předinstalaci
                     </h2>
-                    <p className="text-sm text-[var(--nest-text-tertiary)] mb-3">
-                        Klikni na hru pro navržení na event — ostatní pro ni mohou hlasovat:
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                        {unaddedLibraryGames.map(lg => (
-                            <button
-                                key={lg.id}
-                                onClick={async () => {
-                                    if (!currentGuest || submitting) return
-                                    try {
-                                        setSubmitting(true)
-                                        const res = await fetch(`/api/event/${slug}/games`, {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({
-                                                action: 'suggest',
-                                                guest_id: currentGuest.id,
-                                                name: lg.name,
-                                            }),
-                                        })
-                                        if (res.ok) {
-                                            await fetchData()
-                                        }
-                                    } catch (error) {
-                                        console.error('Error suggesting library game:', error)
-                                    } finally {
-                                        setSubmitting(false)
-                                    }
-                                }}
-                                disabled={submitting}
-                                className="group relative px-3 py-2 rounded-xl bg-[var(--nest-yellow)]/5 hover:bg-[var(--nest-yellow)]/10 border border-[var(--nest-yellow)]/20 hover:border-[var(--nest-yellow)]/40 transition-all text-left disabled:opacity-50"
-                            >
-                                <span className="font-medium text-[var(--nest-text-primary)] text-sm">{lg.name}</span>
-                                {lg.category && (
-                                    <span className="ml-1.5 text-[10px] text-[var(--nest-text-tertiary)]">({lg.category})</span>
-                                )}
-                                <span className="ml-1.5 text-xs text-[var(--nest-yellow)]/60 group-hover:text-[var(--nest-yellow)]">+ navrhnout</span>
-                            </button>
-                        ))}
+
+                    {/* Info banner */}
+                    <div className="bg-gradient-to-r from-[var(--nest-yellow)]/5 to-[var(--nest-yellow)]/10 border border-[var(--nest-yellow)]/20 rounded-xl p-4 mb-4">
+                        <p className="text-sm text-[var(--nest-text-secondary)] leading-relaxed">
+                            💡 Pokud si <strong className="text-[var(--nest-text-primary)]">rezervuješ PC</strong>, můžeš mít tyto hry <strong className="text-[var(--nest-text-primary)]">předinstalované a připravené ke hraní</strong> hned po příchodu. Nemusíš nic stahovat!
+                        </p>
+                        <Link
+                            href={`/event/${slug}/hardware`}
+                            className="mt-3 inline-flex items-center gap-2 bg-[var(--nest-yellow)] hover:bg-[var(--nest-yellow-dark)] text-[var(--nest-bg)] px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-lg shadow-[var(--nest-yellow)]/20"
+                        >
+                            <Monitor className="w-4 h-4" />
+                            Rezervovat PC
+                            <ChevronRight className="w-4 h-4" />
+                        </Link>
                     </div>
+
+                    {/* Games list grouped by category */}
+                    {(() => {
+                        const availableGames = libraryGames.filter(g => g.is_available)
+                        const grouped = availableGames.reduce((acc, game) => {
+                            const cat = game.category || 'Ostatní'
+                            if (!acc[cat]) acc[cat] = []
+                            acc[cat].push(game)
+                            return acc
+                        }, {} as Record<string, GameLibraryItem[]>)
+
+                        const categoryOrder = ['FPS', 'RTS', 'Racing', 'Sport', 'Party', 'Ostatní']
+                        const sortedCategories = Object.keys(grouped).sort((a, b) => {
+                            const ai = categoryOrder.indexOf(a)
+                            const bi = categoryOrder.indexOf(b)
+                            return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi)
+                        })
+
+                        return (
+                            <div className="space-y-3">
+                                {sortedCategories.map(cat => (
+                                    <div key={cat} className="bg-[var(--nest-surface)] border border-[var(--nest-border)] rounded-xl overflow-hidden">
+                                        <div className="px-4 py-2 bg-[var(--nest-surface-alt)] border-b border-[var(--nest-border)]">
+                                            <span className="text-sm font-bold text-[var(--nest-text-secondary)]">
+                                                {cat}
+                                            </span>
+                                            <span className="ml-2 text-xs text-[var(--nest-text-tertiary)]">
+                                                ({grouped[cat].length})
+                                            </span>
+                                        </div>
+                                        <div className="divide-y divide-[var(--nest-border)]">
+                                            {grouped[cat].sort((a, b) => a.name.localeCompare(b.name)).map(game => (
+                                                <div key={game.id} className="flex items-center gap-3 px-4 py-2.5">
+                                                    <Gamepad2 className="w-4 h-4 flex-shrink-0 text-[var(--nest-text-tertiary)]" />
+                                                    <span className="font-medium text-[var(--nest-text-primary)] text-sm">{game.name}</span>
+                                                    {game.max_players && (
+                                                        <span className="ml-auto text-xs text-[var(--nest-text-tertiary)]">
+                                                            max {game.max_players} hráčů
+                                                        </span>
+                                                    )}
+                                                    {game.notes && (
+                                                        <span className="text-xs text-[var(--nest-text-tertiary)]">
+                                                            {game.notes}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )
+                    })()}
                 </div>
             )}
 

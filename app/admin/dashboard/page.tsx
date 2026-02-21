@@ -8,7 +8,6 @@ import {
   Users,
   DollarSign,
   TrendingUp,
-  Settings,
   Calendar,
   History,
   LogOut,
@@ -29,15 +28,6 @@ export default function AdminDashboard() {
   const [productsCount, setProductsCount] = useState(0)
   const [totalRevenue, setTotalRevenue] = useState(0)
   const [todayConsumption, setTodayConsumption] = useState(0)
-  const [showCreateForm, setShowCreateForm] = useState(false)
-  const [newSessionName, setNewSessionName] = useState('')
-  const [newSessionStartDate, setNewSessionStartDate] = useState('')
-  const [newSessionEndDate, setNewSessionEndDate] = useState('')
-  const [newSessionStartTime, setNewSessionStartTime] = useState('')
-  const [newSessionEndTime, setNewSessionEndTime] = useState('')
-  const [newSessionDescription, setNewSessionDescription] = useState('')
-  const [newPricePerNight, setNewPricePerNight] = useState('')
-  const [savingSession, setSavingSession] = useState(false)
 
   useEffect(() => {
     const token = localStorage.getItem('admin_token')
@@ -199,94 +189,6 @@ export default function AdminDashboard() {
     }
   }
 
-  const createSession = async () => {
-    if (!newSessionName.trim()) {
-      alert('Název eventu je povinný')
-      return
-    }
-
-    setSavingSession(true)
-    try {
-      const token = localStorage.getItem('admin_token')
-      const sessionData: any = { name: newSessionName }
-
-      if (newSessionStartDate) {
-        const startDate = new Date(newSessionStartDate)
-        if (newSessionStartTime) {
-          const [hours, minutes] = newSessionStartTime.split(':').map(Number)
-          startDate.setHours(hours, minutes, 0, 0)
-        } else {
-          startDate.setHours(0, 0, 0, 0)
-        }
-        sessionData.start_date = startDate.toISOString()
-      }
-
-      if (newSessionEndDate && newSessionEndDate.trim()) {
-        const endDate = new Date(newSessionEndDate)
-        if (newSessionEndTime) {
-          const [hours, minutes] = newSessionEndTime.split(':').map(Number)
-          endDate.setHours(hours, minutes, 59, 999)
-        } else {
-          endDate.setHours(23, 59, 59, 999)
-        }
-        sessionData.end_date = endDate.toISOString()
-      } else {
-        sessionData.end_date = null
-      }
-
-      if (newSessionDescription.trim()) {
-        sessionData.description = newSessionDescription
-      }
-
-      if (newSessionStartTime && newSessionStartTime.trim()) {
-        sessionData.start_time = newSessionStartTime
-      }
-
-      if (newSessionEndTime && newSessionEndTime.trim()) {
-        sessionData.end_time = newSessionEndTime
-      }
-
-      const priceVal = parseFloat(newPricePerNight)
-      sessionData.price_per_night = !isNaN(priceVal) && priceVal >= 0 ? priceVal : 0
-
-      const response = await fetch('/api/admin/sessions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(sessionData),
-      })
-
-      if (!response.ok) throw new Error('Failed to create session')
-
-      setNewSessionName('')
-      setNewSessionStartDate('')
-      setNewSessionEndDate('')
-      setNewSessionStartTime('')
-      setNewSessionEndTime('')
-      setNewSessionDescription('')
-      setNewPricePerNight('')
-      setShowCreateForm(false)
-      fetchDashboardData()
-    } catch (error) {
-      console.error('Error creating session:', error)
-      alert('Nepodařilo se vytvořit session')
-    } finally {
-      setSavingSession(false)
-    }
-  }
-
-  const cancelCreateForm = () => {
-    setShowCreateForm(false)
-    setNewSessionName('')
-    setNewSessionStartDate('')
-    setNewSessionEndDate('')
-    setNewSessionStartTime('')
-    setNewSessionEndTime('')
-    setNewSessionDescription('')
-    setNewPricePerNight('')
-  }
 
   if (!isAuthenticated) {
     return null
@@ -319,12 +221,12 @@ export default function AdminDashboard() {
               <h2 className="text-2xl font-bold text-gray-900">🎯 Vyber Event</h2>
               <p className="text-sm text-gray-600 mt-1">Klikni na event pro zobrazení detailů a statistik</p>
             </div>
-            <button
-              onClick={() => setShowCreateForm(true)}
+            <Link
+              href="/admin/sessions?create=true"
               className="text-blue-600 hover:text-blue-700 font-medium text-sm bg-blue-50 px-3 py-2 rounded-lg hover:bg-blue-100 transition-colors"
             >
               + Nový event
-            </button>
+            </Link>
           </div>
 
           {sessions.length > 0 ? (
@@ -389,134 +291,15 @@ export default function AdminDashboard() {
             <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-8 text-center">
               <p className="text-yellow-700 font-bold text-lg">⚠️ Žádné eventy</p>
               <p className="text-yellow-600 text-sm mt-1 mb-4">Zatím neexistuje žádný event. Vytvoř si nový!</p>
-              <button
-                onClick={() => setShowCreateForm(true)}
+              <Link
+                href="/admin/sessions?create=true"
                 className="inline-block bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-2 rounded-lg font-medium transition-colors"
               >
                 Vytvořit nový event
-              </button>
+              </Link>
             </div>
           )}
         </div>
-
-        {/* Create Event Form */}
-        {showCreateForm && (
-          <div className="bg-green-50 border-2 border-green-300 rounded-xl shadow p-6 mb-8">
-            <h3 className="font-semibold text-gray-900 mb-4">✨ Nový event</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Název eventu *
-                </label>
-                <input
-                  type="text"
-                  value={newSessionName}
-                  onChange={(e) => setNewSessionName(e.target.value)}
-                  placeholder="např. LAN Party - Listopad 2025"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Datum začátku
-                  </label>
-                  <input
-                    type="date"
-                    value={newSessionStartDate}
-                    onChange={(e) => setNewSessionStartDate(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Datum konce
-                  </label>
-                  <input
-                    type="date"
-                    value={newSessionEndDate || ''}
-                    onChange={(e) => setNewSessionEndDate(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Čas začátku
-                  </label>
-                  <input
-                    type="time"
-                    value={newSessionStartTime}
-                    onChange={(e) => setNewSessionStartTime(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
-                    placeholder="např. 18:00"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Čas konce
-                  </label>
-                  <input
-                    type="time"
-                    value={newSessionEndTime}
-                    onChange={(e) => setNewSessionEndTime(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
-                    placeholder="např. 22:00"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Popis eventu
-                </label>
-                <textarea
-                  value={newSessionDescription}
-                  onChange={(e) => setNewSessionDescription(e.target.value)}
-                  placeholder="Popis eventu..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
-                  rows={3}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Cena za noc (Kč)
-                </label>
-                <input
-                  type="number"
-                  value={newPricePerNight}
-                  onChange={(e) => setNewPricePerNight(e.target.value)}
-                  placeholder="např. 300"
-                  min="0"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
-                />
-              </div>
-
-              <div className="flex gap-4 justify-end">
-                <button
-                  onClick={cancelCreateForm}
-                  disabled={savingSession}
-                  className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-900 disabled:bg-gray-100"
-                >
-                  Zrušit
-                </button>
-                <button
-                  onClick={createSession}
-                  disabled={savingSession}
-                  className="bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-2 rounded-lg disabled:bg-gray-400"
-                >
-                  {savingSession ? 'Vytvářím...' : 'Vytvořit event'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Stats Cards - Placeholder */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">

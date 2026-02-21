@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Users, Monitor, Utensils, TrendingUp, Loader2, Edit2, Check, X, Edit, UtensilsCrossed, Heart } from 'lucide-react'
-import { Session, Guest, MenuItem, MealType, Game, GameLibraryItem } from '@/types/database.types'
+import { ArrowLeft, Users, Monitor, Utensils, TrendingUp, Loader2, Edit2, Check, X, Edit, UtensilsCrossed, Heart, Cpu, ChevronDown, ChevronUp } from 'lucide-react'
+import { Session, Guest, MenuItem, MealType, Game, GameLibraryItem, HardwareOverride } from '@/types/database.types'
 import { HardwareItem } from '@/types/hardware.types'
 import { formatDate, formatDateOnly } from '@/lib/utils'
 
@@ -16,6 +16,16 @@ interface HardwareReservation {
   nights_count: number
   total_price: number
   created_at: string
+}
+
+interface AdminHardwareItemDetail {
+  id: string
+  name: string
+  type: 'monitor' | 'pc' | 'accessory'
+  category: string
+  price_per_night: number
+  quantity: number
+  is_available: boolean
 }
 
 interface ConsumptionRecord {
@@ -59,6 +69,11 @@ export default function EventDetailPage() {
   const [editEventEndDate, setEditEventEndDate] = useState('')
   const [editEventDescription, setEditEventDescription] = useState('')
   const [savingEvent, setSavingEvent] = useState(false)
+  // Hardware edit state
+  const [editHwPricingEnabled, setEditHwPricingEnabled] = useState(true)
+  const [editHwOverrides, setEditHwOverrides] = useState<Record<string, HardwareOverride>>({})
+  const [allHardwareItemsForEdit, setAllHardwareItemsForEdit] = useState<AdminHardwareItemDetail[]>([])
+  const [showHwConfigEdit, setShowHwConfigEdit] = useState(false)
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
   const [menuEnabled, setMenuEnabled] = useState(false)
   const [guestSelections, setGuestSelections] = useState<Record<string, any>>({})
@@ -94,6 +109,27 @@ export default function EventDetailPage() {
     setEditEventStartDate(startDate)
     setEditEventEndDate(endDate)
     setEditEventDescription(sessionToEdit.description || '')
+    // Load HW settings
+    setEditHwPricingEnabled(sessionToEdit.hardware_pricing_enabled !== false)
+    setEditHwOverrides(sessionToEdit.hardware_overrides || {})
+    setShowHwConfigEdit(false)
+    // Fetch HW items for override UI
+    fetchHardwareItemsForEdit()
+  }
+
+  const fetchHardwareItemsForEdit = async () => {
+    try {
+      const token = localStorage.getItem('admin_token')
+      const res = await fetch('/api/admin/hardware', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setAllHardwareItemsForEdit(data.items || [])
+      }
+    } catch (e) {
+      console.error('Error fetching HW items for edit:', e)
+    }
   }
 
   const formatDateTimeLocal = (date: Date): string => {
@@ -131,6 +167,10 @@ export default function EventDetailPage() {
       if (editEventDescription.trim()) {
         eventData.description = editEventDescription
       }
+
+      // Hardware settings
+      eventData.hardware_pricing_enabled = editHwPricingEnabled
+      eventData.hardware_overrides = editHwOverrides
 
       const response = await fetch(`/api/admin/sessions/${sessionId}`, {
         method: 'PATCH',
@@ -509,6 +549,12 @@ export default function EventDetailPage() {
                 Pochutiny
               </Link>
               <Link
+                href={`/admin/sessions/${sessionId}/seatmap`}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium"
+              >
+                🗺️ Mapa míst
+              </Link>
+              <Link
                 href={`/admin/sessions/${sessionId}/settlement`}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium"
               >
@@ -528,15 +574,15 @@ export default function EventDetailPage() {
 
       {/* Edit Event Form */}
       {editingEvent && (
-        <div className="bg-blue-50 border-b border-blue-300 py-6">
+        <div style={{ backgroundColor: 'var(--nest-surface)', borderBottom: '1px solid var(--nest-border)' }} className="py-6">
           <div className="max-w-7xl mx-auto px-4">
-            <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: 'var(--nest-text-primary)' }}>
               <Edit className="w-5 h-5" />
               Upravit event
             </h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--nest-text-secondary)' }}>
                   Název eventu *
                 </label>
                 <input
@@ -544,54 +590,216 @@ export default function EventDetailPage() {
                   value={editEventName}
                   onChange={(e) => setEditEventName(e.target.value)}
                   placeholder="např. LAN Party - Listopad 2025"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+                  className="w-full px-4 py-2 rounded-lg"
+                  style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--nest-text-secondary)' }}>
                     Datum začátku
                   </label>
                   <input
                     type="date"
                     value={editEventStartDate}
                     onChange={(e) => setEditEventStartDate(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+                    className="w-full px-4 py-2 rounded-lg"
+                    style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--nest-text-secondary)' }}>
                     Datum konce
                   </label>
                   <input
                     type="date"
                     value={editEventEndDate || ''}
                     onChange={(e) => setEditEventEndDate(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+                    className="w-full px-4 py-2 rounded-lg"
+                    style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--nest-text-secondary)' }}>
                   Popis eventu
                 </label>
                 <textarea
                   value={editEventDescription}
                   onChange={(e) => setEditEventDescription(e.target.value)}
                   placeholder="Popis eventu..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+                  className="w-full px-4 py-2 rounded-lg"
+                  style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
                   rows={3}
                 />
+              </div>
+
+              {/* Hardware Configuration */}
+              <hr style={{ borderColor: 'var(--nest-border)' }} />
+
+              <div className="space-y-4">
+                {/* HW pricing toggle */}
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <div className="relative">
+                      <input
+                        type="checkbox"
+                        checked={editHwPricingEnabled}
+                        onChange={(e) => setEditHwPricingEnabled(e.target.checked)}
+                        className="sr-only"
+                      />
+                      <div
+                        className="block w-12 h-7 rounded-full transition-colors"
+                        style={{ backgroundColor: editHwPricingEnabled ? '#3b82f6' : 'var(--nest-border)' }}
+                      ></div>
+                      <div
+                        className={`absolute left-0.5 top-0.5 w-6 h-6 rounded-full transition-transform ${editHwPricingEnabled ? 'translate-x-5' : ''}`}
+                        style={{ backgroundColor: 'var(--nest-text-primary)' }}
+                      ></div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Monitor className="w-5 h-5" style={{ color: '#60a5fa' }} />
+                      <span className="font-semibold" style={{ color: 'var(--nest-text-primary)' }}>Cena techniky</span>
+                    </div>
+                  </label>
+                  {!editHwPricingEnabled && (
+                    <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ color: '#fbbf24', backgroundColor: 'rgba(251, 191, 36, 0.15)' }}>
+                      🚫 Cena techniky nebude zobrazena hostům
+                    </span>
+                  )}
+                </div>
+
+                {!editHwPricingEnabled && (
+                  <div className="rounded-lg p-3 text-sm" style={{ backgroundColor: 'rgba(251, 191, 36, 0.1)', border: '1px solid rgba(251, 191, 36, 0.25)', color: '#fbbf24' }}>
+                    💡 Hostům nebudou vidět ceny za hardware. Technika se jim nebude počítat do nákladů.
+                  </div>
+                )}
+
+                {/* HW overrides */}
+                <div>
+                  <button
+                    onClick={() => setShowHwConfigEdit(!showHwConfigEdit)}
+                    className="flex items-center gap-2 font-medium text-sm transition-colors"
+                    style={{ color: '#60a5fa' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = '#93bbfd')}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = '#60a5fa')}
+                  >
+                    <Cpu className="w-4 h-4" />
+                    {showHwConfigEdit ? 'Skrýt úpravy HW' : '🖥️ Upravit dostupnost HW pro tuto akci'}
+                    {showHwConfigEdit ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    {Object.keys(editHwOverrides).length > 0 && (
+                      <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ backgroundColor: 'rgba(96, 165, 250, 0.2)', color: '#93bbfd' }}>
+                        {Object.keys(editHwOverrides).length} změn
+                      </span>
+                    )}
+                  </button>
+                </div>
+
+                {showHwConfigEdit && (
+                  <div className="rounded-lg p-4 space-y-3" style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)' }}>
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold flex items-center gap-2" style={{ color: 'var(--nest-text-primary)' }}>
+                        🖥️ Úpravy dostupnosti HW
+                        <span className="text-sm font-normal" style={{ color: 'var(--nest-text-secondary)' }}>(změň počet kusů pro tuto akci)</span>
+                      </h4>
+                      {Object.keys(editHwOverrides).length > 0 && (
+                        <button onClick={() => setEditHwOverrides({})} className="text-xs font-medium underline" style={{ color: '#f87171' }}>
+                          Resetovat vše
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-xs mb-3" style={{ color: 'var(--nest-text-secondary)' }}>
+                      ⚠️ Nastav 0 pro úplné skrytí dané položky. Pokud pole nevyplníš, použije se výchozí počet.
+                    </p>
+
+                    {(() => {
+                      const grouped: Record<string, AdminHardwareItemDetail[]> = {}
+                      allHardwareItemsForEdit.filter(i => i.is_available).forEach(item => {
+                        const label = item.type === 'monitor' ? '📺 Monitory' : item.type === 'pc' ? '💻 Počítače' : '🎮 Příslušenství'
+                        if (!grouped[label]) grouped[label] = []
+                        grouped[label].push(item)
+                      })
+                      return Object.entries(grouped).map(([groupLabel, items]) => (
+                        <div key={groupLabel}>
+                          <h5 className="text-sm font-semibold mb-2" style={{ color: 'var(--nest-text-primary)' }}>{groupLabel}</h5>
+                          <div className="space-y-2">
+                            {items.map(item => {
+                              const hasOverride = editHwOverrides[item.id] !== undefined
+                              const overrideQty = hasOverride ? editHwOverrides[item.id].quantity : null
+                              const isReduced = hasOverride && overrideQty !== null && overrideQty < item.quantity
+                              const isDisabled = hasOverride && overrideQty === 0
+                              return (
+                                <div key={item.id} className="flex items-center gap-3 px-3 py-2 rounded-lg transition-colors" style={{
+                                  backgroundColor: isDisabled ? 'rgba(239, 68, 68, 0.1)' : isReduced ? 'rgba(251, 191, 36, 0.1)' : 'var(--nest-surface)',
+                                  border: `1px solid ${isDisabled ? 'rgba(239, 68, 68, 0.3)' : isReduced ? 'rgba(251, 191, 36, 0.3)' : 'var(--nest-border)'}`,
+                                }}>
+                                  <div className="flex-1 min-w-0">
+                                    <span className={`text-sm font-medium ${isDisabled ? 'line-through' : ''}`} style={{ color: isDisabled ? '#f87171' : 'var(--nest-text-primary)' }}>
+                                      {item.name}
+                                    </span>
+                                    <span className="text-xs ml-2" style={{ color: 'var(--nest-text-tertiary)' }}>
+                                      (výchozí: {item.quantity} ks • {item.price_per_night} Kč/noc)
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2 flex-shrink-0">
+                                    <input
+                                      type="number"
+                                      value={overrideQty !== null ? overrideQty : ''}
+                                      onChange={(e) => {
+                                        const val = e.target.value
+                                        if (val === '' || val === undefined) {
+                                          const copy = { ...editHwOverrides }
+                                          delete copy[item.id]
+                                          setEditHwOverrides(copy)
+                                        } else {
+                                          const num = Math.max(0, Math.min(parseInt(val) || 0, item.quantity))
+                                          setEditHwOverrides({ ...editHwOverrides, [item.id]: { quantity: num } })
+                                        }
+                                      }}
+                                      placeholder={`${item.quantity}`}
+                                      min="0"
+                                      max={item.quantity}
+                                      className="w-20 px-2 py-1 rounded-lg text-sm text-center font-medium"
+                                      style={{
+                                        backgroundColor: 'var(--nest-bg)',
+                                        border: `1px solid ${isDisabled ? 'rgba(239, 68, 68, 0.4)' : isReduced ? 'rgba(251, 191, 36, 0.4)' : 'var(--nest-border)'}`,
+                                        color: isDisabled ? '#f87171' : isReduced ? '#fbbf24' : 'var(--nest-text-primary)',
+                                      }}
+                                    />
+                                    <span className="text-xs w-6" style={{ color: 'var(--nest-text-tertiary)' }}>ks</span>
+                                    {hasOverride && (
+                                      <button
+                                        onClick={() => { const copy = { ...editHwOverrides }; delete copy[item.id]; setEditHwOverrides(copy) }}
+                                        className="transition-colors"
+                                        style={{ color: 'var(--nest-text-tertiary)' }}
+                                        onMouseEnter={(e) => (e.currentTarget.style.color = '#f87171')}
+                                        onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--nest-text-tertiary)')}
+                                        title="Zrušit úpravu"
+                                      >
+                                        <X className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      ))
+                    })()}
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-4 justify-end">
                 <button
                   onClick={cancelEditEvent}
                   disabled={savingEvent}
-                  className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-900 disabled:bg-gray-100"
+                  className="px-6 py-2 rounded-lg transition-colors"
+                  style={{ border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)', backgroundColor: 'var(--nest-bg)' }}
                 >
                   Zrušit
                 </button>
@@ -730,7 +938,7 @@ export default function EventDetailPage() {
                             return seats.length > 0 ? (
                               <div className="flex flex-wrap gap-1">
                                 {seats.map(s => (
-                                  <span key={s} className="text-[11px] px-1.5 py-0.5 rounded bg-green-50 text-green-700 border border-green-200 font-semibold whitespace-nowrap">
+                                  <span key={s} className="text-[11px] px-1.5 py-0.5 rounded font-semibold whitespace-nowrap" style={{ backgroundColor: 'rgba(34, 197, 94, 0.12)', color: '#4ade80', border: '1px solid rgba(34, 197, 94, 0.25)' }}>
                                     🪑 {s}
                                   </span>
                                 ))}
@@ -741,7 +949,7 @@ export default function EventDetailPage() {
                           })()}
                         </td>
                         <td className="px-4 py-3 text-sm">
-                          <span className="bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full font-semibold text-xs">
+                          <span className="px-2.5 py-0.5 rounded-full font-semibold text-xs" style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa' }}>
                             {guest.nights_count}
                           </span>
                         </td>
@@ -753,7 +961,7 @@ export default function EventDetailPage() {
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap gap-1 max-w-xs">
                             {guestHw.length > 0 ? guestHw.map((hw, i) => (
-                              <span key={i} className="text-[11px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap">
+                              <span key={i} className="text-[11px] px-1.5 py-0.5 rounded whitespace-nowrap" style={{ backgroundColor: 'rgba(59, 130, 246, 0.12)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.25)' }}>
                                 {hw.quantity > 1 ? `${hw.quantity}× ` : ''}{hw.name}
                               </span>
                             )) : (
@@ -832,12 +1040,12 @@ export default function EventDetailPage() {
                         {guest.items.map((item, i) => (
                           <span
                             key={i}
-                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${item.type === 'monitor'
-                              ? 'bg-orange-50 text-orange-700 border-orange-200'
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
+                            style={item.type === 'monitor'
+                              ? { backgroundColor: 'rgba(249, 115, 22, 0.12)', color: '#fb923c', border: '1px solid rgba(249, 115, 22, 0.25)' }
                               : item.type === 'pc'
-                                ? 'bg-blue-50 text-blue-700 border-blue-200'
-                                : 'bg-purple-50 text-purple-700 border-purple-200'
-                              }`}
+                                ? { backgroundColor: 'rgba(59, 130, 246, 0.12)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.25)' }
+                                : { backgroundColor: 'rgba(168, 85, 247, 0.12)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.25)' }}
                           >
                             {item.type === 'monitor' ? '📺' : item.type === 'pc' ? '💻' : '🎮'}
                             {item.qty > 1 ? `${item.qty}× ` : ''}{item.name}
@@ -883,7 +1091,7 @@ export default function EventDetailPage() {
                         {pcNames.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1">
                             {pcNames.map((name: string, i: number) => (
-                              <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                              <span key={i} className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: 'rgba(59, 130, 246, 0.12)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.25)' }}>
                                 💻 {name}
                               </span>
                             ))}
@@ -895,14 +1103,15 @@ export default function EventDetailPage() {
                         {(req.game_names || []).map((gameName: string, i: number) => (
                           <span
                             key={i}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-violet-50 text-violet-700 border border-violet-200"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
+                            style={{ backgroundColor: 'rgba(139, 92, 246, 0.12)', color: '#a78bfa', border: '1px solid rgba(139, 92, 246, 0.25)' }}
                           >
                             🎮 {gameName}
                           </span>
                         ))}
                       </div>
                       {/* Game count */}
-                      <span className="flex-shrink-0 text-xs font-semibold bg-violet-100 text-violet-700 px-2 py-1 rounded-full">
+                      <span className="flex-shrink-0 text-xs font-semibold px-2 py-1 rounded-full" style={{ backgroundColor: 'rgba(139, 92, 246, 0.18)', color: '#a78bfa' }}>
                         {(req.game_names || []).length} her
                       </span>
                     </div>
@@ -984,7 +1193,7 @@ export default function EventDetailPage() {
                                       <span className="text-xs text-gray-400">{mealInfo.time}</span>
                                     )}
                                   </div>
-                                  <span className="bg-green-100 text-green-800 text-xs font-bold px-2.5 py-0.5 rounded-full">
+                                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(34, 197, 94, 0.15)', color: '#4ade80' }}>
                                     {presentGuests.length} porcí
                                   </span>
                                 </div>
@@ -993,7 +1202,7 @@ export default function EventDetailPage() {
                                 )}
                                 <div className="flex flex-wrap gap-1">
                                   {presentGuests.map(g => (
-                                    <span key={g.id} className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                                    <span key={g.id} className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)', color: '#ffffff' }}>
                                       {g.name}
                                     </span>
                                   ))}
@@ -1009,25 +1218,25 @@ export default function EventDetailPage() {
 
                 {/* Guest dietary restrictions */}
                 {getGuestsDietaryInfo().length > 0 && (
-                  <div className="border-t border-gray-200 pt-4">
-                    <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <div style={{ borderTop: '1px solid var(--nest-border)', paddingTop: '1rem' }}>
+                    <h3 className="font-semibold mb-3 flex items-center gap-2" style={{ color: 'var(--nest-text-primary)' }}>
                       ⚠️ Stravovací omezení hostů
-                      <span className="text-sm font-normal text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
+                      <span className="text-sm font-normal px-2 py-0.5 rounded-full" style={{ color: '#f87171', backgroundColor: 'rgba(239, 68, 68, 0.15)' }}>
                         {getGuestsDietaryInfo().length} hostů
                       </span>
                     </h3>
                     <div className="space-y-2">
                       {getGuestsDietaryInfo().map(guest => (
-                        <div key={guest.id} className="flex items-start gap-3 p-3 bg-red-50 border border-red-100 rounded-lg">
-                          <span className="font-semibold text-gray-900 w-32 flex-shrink-0">{guest.name}</span>
+                        <div key={guest.id} className="flex items-start gap-3 p-3 rounded-lg" style={{ backgroundColor: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                          <span className="font-semibold w-32 flex-shrink-0" style={{ color: 'var(--nest-text-primary)' }}>{guest.name}</span>
                           <div className="flex flex-wrap gap-1.5">
                             {guest.dietary_restrictions?.map((r: string) => (
-                              <span key={r} className="text-xs px-2 py-1 bg-red-100 text-red-800 rounded-full font-medium">
+                              <span key={r} className="text-xs px-2 py-1 rounded-full font-medium" style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#fca5a5' }}>
                                 {r === 'vegan' ? '🌱 Vegan' : r === 'vegetarian' ? '🥬 Vegetarián' : r === 'gluten-free' ? '🌾 Bez lepku' : r === 'lactose-free' ? '🥛 Bez laktózy' : r}
                               </span>
                             ))}
                             {guest.dietary_note && (
-                              <span className="text-xs px-2 py-1 bg-amber-100 text-amber-800 rounded-full">
+                              <span className="text-xs px-2 py-1 rounded-full" style={{ backgroundColor: 'rgba(251, 191, 36, 0.15)', color: '#fbbf24' }}>
                                 📝 {guest.dietary_note}
                               </span>
                             )}
@@ -1081,9 +1290,9 @@ export default function EventDetailPage() {
                     <span className="font-semibold text-gray-900 w-36 flex-shrink-0 truncate">{guest.name}</span>
                     <div className="flex-1 flex flex-wrap gap-1.5">
                       {guest.itemList.map((item, i) => (
-                        <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                        <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(251, 191, 36, 0.12)', color: '#fbbf24', border: '1px solid rgba(251, 191, 36, 0.25)' }}>
                           {item.qty > 1 ? `${item.qty}× ` : ''}{item.product}
-                          <span className="text-amber-500 font-normal">({item.price} Kč)</span>
+                          <span style={{ color: 'rgba(251, 191, 36, 0.6)' }} className="font-normal">({item.price} Kč)</span>
                         </span>
                       ))}
                     </div>

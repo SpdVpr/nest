@@ -173,6 +173,31 @@ select {
   background-color: var(--nest-surface-alt) !important;
 }
 
+/* Hover variants → slightly lighter surface for feedback */
+.hover\:bg-gray-50:hover,
+.hover\:bg-gray-100:hover {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+.hover\:bg-gray-200:hover,
+.hover\:bg-gray-300:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.hover\:bg-gray-400:hover {
+  background-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* Blue hover variants */
+.hover\:bg-blue-50:hover,
+.hover\:bg-blue-100:hover {
+  background-color: rgba(96, 165, 250, 0.12) !important;
+}
+
+.hover\:bg-blue-200:hover {
+  background-color: rgba(96, 165, 250, 0.2) !important;
+}
+
 .bg-gray-200,
 .bg-gray-300 {
   background-color: var(--nest-border) !important;

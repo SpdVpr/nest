@@ -63,6 +63,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No active session found' }, { status: 400 })
     }
 
+    // Fetch session data for hardware overrides
+    const sessionDoc = await db.collection('sessions').doc(activeSessionId!).get()
+    const sessionData = sessionDoc.exists ? sessionDoc.data() : {}
+    const hwOverrides = sessionData?.hardware_overrides || {}
+
     // Check availability for each item
     for (const item of itemsToReserve) {
       const itemDoc = await db.collection('hardware_items').doc(item.hardware_item_id).get()
@@ -71,7 +76,16 @@ export async function POST(request: Request) {
       }
 
       const itemData = itemDoc.data()
-      const totalStock = itemData.quantity || 1
+      // Apply session override if exists
+      const totalStock = hwOverrides[item.hardware_item_id] !== undefined
+        ? hwOverrides[item.hardware_item_id].quantity
+        : (itemData.quantity || 1)
+
+      if (totalStock === 0) {
+        return NextResponse.json({
+          error: `Položka ${itemData.name} není pro tuto akci dostupná`,
+        }, { status: 400 })
+      }
 
       // Count existing active reservations for this item in this session
       const existingRes = await db.collection('hardware_reservations')
@@ -90,6 +104,9 @@ export async function POST(request: Request) {
       }
     }
 
+    // Check if hardware pricing is enabled for this session
+    const pricingEnabled = sessionData?.hardware_pricing_enabled !== false
+
     // Create reservations
     const now = Timestamp.now()
     const createdReservations = []
@@ -104,7 +121,9 @@ export async function POST(request: Request) {
         session_id: activeSessionId,
         quantity: item.quantity,
         nights_count: nights_count || 1,
-        total_price: (itemData.price_per_night || 0) * item.quantity * (nights_count || 1),
+        total_price: pricingEnabled
+          ? (itemData.price_per_night || 0) * item.quantity * (nights_count || 1)
+          : 0,
         status: 'active',
         created_at: now,
         updated_at: now,

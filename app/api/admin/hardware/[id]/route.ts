@@ -70,6 +70,7 @@ export async function PATCH(
     if (body.quantity !== undefined) updateData.quantity = parseInt(body.quantity)
     if (body.is_available !== undefined) updateData.is_available = body.is_available
     if (body.specs !== undefined) updateData.specs = body.specs
+    if (body.sort_order !== undefined) updateData.sort_order = parseInt(body.sort_order)
 
     await db.collection('hardware_items').doc(id).update(updateData)
 

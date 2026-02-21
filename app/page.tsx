@@ -74,26 +74,14 @@ export default function HomePage() {
     return <NestLoading message="Načítám eventy..." />
   }
 
-  // Not authenticated — show gate
+  // Not authenticated — show only branding
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-[var(--nest-dark)] flex items-center justify-center p-4">
-        <div className="max-w-sm w-full text-center">
-          <div className="text-6xl mb-6">🎮</div>
-          <h1 className="text-3xl font-bold text-[var(--nest-white)] mb-2">
+        <div className="text-center">
+          <h1 className="text-5xl md:text-7xl font-bold text-[var(--nest-white)] tracking-tight">
             The Nest
           </h1>
-          <p className="text-[var(--nest-white-60)] text-sm mb-8 leading-relaxed">
-            Tato stránka je určena pouze pro správu eventů.<br />
-            Pokud jsi účastník, admin ti pošle přímý odkaz.
-          </p>
-          <Link
-            href="/admin/login"
-            className="inline-flex items-center gap-2 bg-[var(--nest-yellow)] hover:bg-[var(--nest-yellow-dark)] text-[var(--nest-dark)] px-6 py-3 rounded-xl font-semibold text-sm transition-colors"
-          >
-            <Shield className="w-4 h-4" />
-            Admin přihlášení
-          </Link>
         </div>
       </div>
     )

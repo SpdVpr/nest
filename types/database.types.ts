@@ -4,6 +4,10 @@
 // SESSION TYPES
 // =============================================
 
+export interface HardwareOverride {
+  quantity: number  // overridden quantity for this session (can be 0 to disable entirely)
+}
+
 export interface Session {
   id: string
   name: string
@@ -15,6 +19,8 @@ export interface Session {
   price_per_night: number
   is_active: boolean
   menu_enabled?: boolean
+  hardware_pricing_enabled?: boolean  // if false, HW prices are hidden from guests (default true)
+  hardware_overrides?: Record<string, HardwareOverride>  // per-item quantity overrides for this session
   status?: 'draft' | 'upcoming' | 'active' | 'completed' | 'cancelled'
   description?: string | null
   created_at: string
@@ -144,6 +150,7 @@ export interface HardwareItem {
     gpu?: string
   } | null
   is_available: boolean
+  sort_order?: number
   created_at: string
   updated_at: string
 }

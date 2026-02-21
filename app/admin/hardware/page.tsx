@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Plus, Edit2, Trash2, Monitor, Cpu, Save, X, Gamepad2, Keyboard, Mouse, Headphones, Cable, Copy } from 'lucide-react'
+import { ArrowLeft, Plus, Edit2, Trash2, Monitor, Cpu, Save, X, Gamepad2, Keyboard, Mouse, Headphones, Cable, Copy, GripVertical } from 'lucide-react'
 
 interface HardwareItem {
   id: string
@@ -13,6 +13,7 @@ interface HardwareItem {
   price_per_night: number
   quantity: number
   is_available: boolean
+  sort_order?: number
   specs?: {
     diagonal?: string
     hz?: string
@@ -79,6 +80,12 @@ export default function AdminHardwarePage() {
   const [editingItem, setEditingItem] = useState<EditingItem | null>(null)
   const [isCreating, setIsCreating] = useState(false)
   const [activeTab, setActiveTab] = useState<string>('all')
+  const [savingOrder, setSavingOrder] = useState(false)
+
+  // Drag & Drop state
+  const dragItem = useRef<number | null>(null)
+  const dragOverItem = useRef<number | null>(null)
+  const [draggedIdx, setDraggedIdx] = useState<number | null>(null)
 
   const typeToCategory = (type: string) => {
     switch (type) {
@@ -138,11 +145,6 @@ export default function AdminHardwarePage() {
   }, {} as Record<string, HardwareItem[]>)
 
   const categories = Object.keys(itemsByCategory).sort()
-
-  // Filter items based on active tab
-  const filteredCategories = activeTab === 'all'
-    ? categories
-    : categories.filter(cat => cat === activeTab)
 
   const handleEdit = (item: HardwareItem) => {
     setIsCreating(false)
@@ -221,33 +223,99 @@ export default function AdminHardwarePage() {
     }
   }
 
+  // Drag & Drop handlers
+  const handleDragStart = (index: number) => {
+    dragItem.current = index
+    setDraggedIdx(index)
+  }
+
+  const handleDragEnter = (index: number) => {
+    dragOverItem.current = index
+  }
+
+  const handleDragEnd = async () => {
+    if (dragItem.current === null || dragOverItem.current === null || dragItem.current === dragOverItem.current) {
+      setDraggedIdx(null)
+      return
+    }
+
+    const reordered = [...displayItems]
+    const [draggedItemEl] = reordered.splice(dragItem.current, 1)
+    reordered.splice(dragOverItem.current, 0, draggedItemEl)
+
+    // Assign sort_order based on new position
+    const updatedItems = reordered.map((item, idx) => ({ ...item, sort_order: idx }))
+
+    // Update local state immediately for responsiveness
+    setItems(prevItems => {
+      const newItems = [...prevItems]
+      updatedItems.forEach(updated => {
+        const existingIdx = newItems.findIndex(i => i.id === updated.id)
+        if (existingIdx !== -1) {
+          newItems[existingIdx] = { ...newItems[existingIdx], sort_order: updated.sort_order }
+        }
+      })
+      return newItems
+    })
+
+    dragItem.current = null
+    dragOverItem.current = null
+    setDraggedIdx(null)
+
+    // Save to backend
+    setSavingOrder(true)
+    try {
+      const token = localStorage.getItem('admin_token')
+      await fetch('/api/admin/hardware/reorder', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          items: updatedItems.map(item => ({ id: item.id, sort_order: item.sort_order }))
+        }),
+      })
+    } catch (error) {
+      console.error('Error saving order:', error)
+    } finally {
+      setSavingOrder(false)
+    }
+  }
+
   // Total items count (sum of quantities)
   const totalItemsCount = items.reduce((sum, item) => sum + (item.quantity || 1), 0)
 
+  // Filter and sort items based on active tab
+  const displayItems: HardwareItem[] = activeTab === 'all'
+    ? [...items].sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999))
+    : items.filter(item => typeToCategory(item.type) === activeTab).sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999))
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-600">Načítám...</p>
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--nest-bg)' }}>
+        <p style={{ color: 'var(--nest-text-secondary)' }}>Načítám...</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
+    <div className="min-h-screen py-8 px-4" style={{ backgroundColor: 'var(--nest-bg)' }}>
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <Link
             href="/admin/dashboard"
-            className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
+            className="inline-flex items-center gap-2 mb-4"
+            style={{ color: 'var(--nest-text-secondary)' }}
           >
             <ArrowLeft className="w-5 h-5" />
             Zpět na dashboard
           </Link>
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">💻 Správa Hardware</h1>
-              <p className="text-gray-600 mt-1">
+              <h1 className="text-3xl font-bold" style={{ color: 'var(--nest-text-primary)' }}>💻 Správa Hardware</h1>
+              <p className="mt-1" style={{ color: 'var(--nest-text-secondary)' }}>
                 {items.length} modelů • {totalItemsCount} ks celkem
               </p>
             </div>
@@ -262,22 +330,23 @@ export default function AdminHardwarePage() {
         </div>
 
         {/* Info Banner */}
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
-          <p className="text-blue-900 text-sm">
+        <div className="rounded-xl p-4 mb-6" style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+          <p className="text-sm" style={{ color: '#60a5fa' }}>
             ⚠️ <strong>Změny se projeví okamžitě ve všech eventech!</strong> Tento seznam je sdílený
             pro všechny LAN party. Každý model má nastavený počet kusů (ks).
           </p>
         </div>
 
         {/* Tabs */}
-        <div className="bg-[#efefef] rounded-xl shadow-sm p-2 mb-6">
+        <div className="rounded-xl shadow-sm p-2 mb-6" style={{ backgroundColor: 'var(--nest-surface)' }}>
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setActiveTab('all')}
               className={`px-4 py-2 rounded-lg font-semibold transition ${activeTab === 'all'
                 ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white'
-                : 'text-gray-600 hover:bg-gray-100'
+                : ''
                 }`}
+              style={activeTab !== 'all' ? { color: 'var(--nest-text-secondary)' } : {}}
             >
               Vše ({items.length})
             </button>
@@ -287,10 +356,11 @@ export default function AdminHardwarePage() {
                 onClick={() => setActiveTab(category)}
                 className={`px-4 py-2 rounded-lg font-semibold transition ${activeTab === category
                   ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white'
-                  : 'text-gray-600 hover:bg-gray-100'
+                  : ''
                   }`}
+                style={activeTab !== category ? { color: 'var(--nest-text-secondary)' } : {}}
               >
-                {category} ({itemsByCategory[category].length})
+                {category} ({itemsByCategory[category]?.length || 0})
               </button>
             ))}
           </div>
@@ -299,27 +369,28 @@ export default function AdminHardwarePage() {
         {/* Editing Modal */}
         {editingItem && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-[#efefef] rounded-2xl shadow-xl p-8 max-w-md w-full">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">
+            <div className="rounded-2xl shadow-xl p-8 max-w-md w-full" style={{ backgroundColor: 'var(--nest-surface)' }}>
+              <h2 className="text-2xl font-bold mb-6" style={{ color: 'var(--nest-text-primary)' }}>
                 {isCreating ? 'Nová HW položka' : 'Upravit HW položku'}
               </h2>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--nest-text-secondary)' }}>
                     Název *
                   </label>
                   <input
                     type="text"
                     value={editingItem.name || ''}
                     onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+                    className="w-full px-4 py-2 rounded-lg"
+                    style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
                     placeholder='např. Monitor 24" Samsung'
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--nest-text-secondary)' }}>
                     Typ *
                   </label>
                   <select
@@ -332,7 +403,8 @@ export default function AdminHardwarePage() {
                         category: typeToCategory(type),
                       })
                     }}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+                    className="w-full px-4 py-2 rounded-lg"
+                    style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
                   >
                     <option value="monitor">📺 Monitor</option>
                     <option value="pc">💻 PC</option>
@@ -342,33 +414,35 @@ export default function AdminHardwarePage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium mb-1" style={{ color: 'var(--nest-text-secondary)' }}>
                       Cena za noc (Kč) *
                     </label>
                     <input
                       type="number"
                       value={editingItem.price_per_night ?? ''}
                       onChange={(e) => setEditingItem({ ...editingItem, price_per_night: e.target.value === '' ? undefined : Number(e.target.value) })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+                      className="w-full px-4 py-2 rounded-lg"
+                      style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
                       min="0"
                     />
                     {editingItem.type === 'accessory' && (
-                      <p className="text-xs text-gray-500 mt-1">Příslušenství je obvykle zdarma</p>
+                      <p className="text-xs mt-1" style={{ color: 'var(--nest-text-tertiary)' }}>Příslušenství je obvykle zdarma</p>
                     )}
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium mb-1" style={{ color: 'var(--nest-text-secondary)' }}>
                       Počet kusů *
                     </label>
                     <input
                       type="number"
                       value={editingItem.quantity ?? ''}
                       onChange={(e) => setEditingItem({ ...editingItem, quantity: e.target.value === '' ? undefined : Number(e.target.value) })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+                      className="w-full px-4 py-2 rounded-lg"
+                      style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
                       min="1"
                     />
-                    <p className="text-xs text-gray-500 mt-1">Kolik fyzických kusů máš k dispozici</p>
+                    <p className="text-xs mt-1" style={{ color: 'var(--nest-text-tertiary)' }}>Kolik fyzických kusů máš k dispozici</p>
                   </div>
                 </div>
 
@@ -379,41 +453,44 @@ export default function AdminHardwarePage() {
                     onChange={(e) => setEditingItem({ ...editingItem, is_available: e.target.checked })}
                     className="w-4 h-4"
                   />
-                  <label className="text-sm text-gray-700">Dostupné pro rezervace</label>
+                  <label className="text-sm" style={{ color: 'var(--nest-text-secondary)' }}>Dostupné pro rezervace</label>
                 </div>
 
                 {/* Monitor specs */}
                 {editingItem.type === 'monitor' && (
-                  <div className="border-t border-gray-200 pt-4">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">📺 Specifikace monitoru</h3>
+                  <div style={{ borderTop: '1px solid var(--nest-border)', paddingTop: '1rem' }}>
+                    <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--nest-text-secondary)' }}>📺 Specifikace monitoru</h3>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Úhlopříčka</label>
+                        <label className="block text-sm font-medium mb-1" style={{ color: 'var(--nest-text-secondary)' }}>Úhlopříčka</label>
                         <input
                           type="text"
                           value={editingItem.specs?.diagonal || ''}
                           onChange={(e) => setEditingItem({ ...editingItem, specs: { ...editingItem.specs, diagonal: e.target.value } })}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+                          className="w-full px-4 py-2 rounded-lg"
+                          style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
                           placeholder='např. 24"'
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Obnovovací frekvence</label>
+                        <label className="block text-sm font-medium mb-1" style={{ color: 'var(--nest-text-secondary)' }}>Obnovovací frekvence</label>
                         <input
                           type="text"
                           value={editingItem.specs?.hz || ''}
                           onChange={(e) => setEditingItem({ ...editingItem, specs: { ...editingItem.specs, hz: e.target.value } })}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+                          className="w-full px-4 py-2 rounded-lg"
+                          style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
                           placeholder='např. 144 Hz'
                         />
                       </div>
                       <div className="col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Rozlišení</label>
+                        <label className="block text-sm font-medium mb-1" style={{ color: 'var(--nest-text-secondary)' }}>Rozlišení</label>
                         <input
                           type="text"
                           value={editingItem.specs?.resolution || ''}
                           onChange={(e) => setEditingItem({ ...editingItem, specs: { ...editingItem.specs, resolution: e.target.value } })}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+                          className="w-full px-4 py-2 rounded-lg"
+                          style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
                           placeholder='např. 1920×1080'
                         />
                       </div>
@@ -423,38 +500,41 @@ export default function AdminHardwarePage() {
 
                 {/* PC specs */}
                 {editingItem.type === 'pc' && (
-                  <div className="border-t border-gray-200 pt-4">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">💻 Specifikace PC</h3>
+                  <div style={{ borderTop: '1px solid var(--nest-border)', paddingTop: '1rem' }}>
+                    <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--nest-text-secondary)' }}>💻 Specifikace PC</h3>
                     <div className="space-y-3">
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Procesor</label>
+                          <label className="block text-sm font-medium mb-1" style={{ color: 'var(--nest-text-secondary)' }}>Procesor</label>
                           <input
                             type="text"
                             value={editingItem.specs?.cpu || ''}
                             onChange={(e) => setEditingItem({ ...editingItem, specs: { ...editingItem.specs, cpu: e.target.value } })}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+                            className="w-full px-4 py-2 rounded-lg"
+                            style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
                             placeholder='např. Intel i5-12400F'
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Paměť</label>
+                          <label className="block text-sm font-medium mb-1" style={{ color: 'var(--nest-text-secondary)' }}>Paměť</label>
                           <input
                             type="text"
                             value={editingItem.specs?.ram || ''}
                             onChange={(e) => setEditingItem({ ...editingItem, specs: { ...editingItem.specs, ram: e.target.value } })}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+                            className="w-full px-4 py-2 rounded-lg"
+                            style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
                             placeholder='např. 16 GB DDR4'
                           />
                         </div>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Grafická karta</label>
+                        <label className="block text-sm font-medium mb-1" style={{ color: 'var(--nest-text-secondary)' }}>Grafická karta</label>
                         <input
                           type="text"
                           value={editingItem.specs?.gpu || ''}
                           onChange={(e) => setEditingItem({ ...editingItem, specs: { ...editingItem.specs, gpu: e.target.value } })}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+                          className="w-full px-4 py-2 rounded-lg"
+                          style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
                           placeholder='např. RTX 4060'
                         />
                       </div>
@@ -469,7 +549,8 @@ export default function AdminHardwarePage() {
                     setEditingItem(null)
                     setIsCreating(false)
                   }}
-                  className="flex-1 px-6 py-3 border-2 border-gray-300 rounded-xl font-semibold hover:bg-gray-50 text-gray-900"
+                  className="flex-1 px-6 py-3 rounded-xl font-semibold"
+                  style={{ border: '2px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
                 >
                   <X className="w-5 h-5 inline mr-2" />
                   Zrušit
@@ -486,93 +567,126 @@ export default function AdminHardwarePage() {
           </div>
         )}
 
-        {/* Hardware List - Grouped by Category */}
-        {items.length === 0 ? (
-          <div className="bg-[#efefef] rounded-xl shadow-sm p-8 text-center">
-            <p className="text-gray-500">
+        {/* Hardware List - Drag & Drop Sortable */}
+        {displayItems.length === 0 ? (
+          <div className="rounded-xl shadow-sm p-8 text-center" style={{ backgroundColor: 'var(--nest-surface)' }}>
+            <p style={{ color: 'var(--nest-text-secondary)' }}>
               Zatím žádné HW položky. Klikni na &quot;Přidat HW&quot; pro vytvoření první.
             </p>
           </div>
         ) : (
-          <div className="space-y-6">
-            {filteredCategories.map((category) => {
-              const categoryQty = itemsByCategory[category].reduce((sum, item) => sum + (item.quantity || 1), 0)
-              return (
-                <div key={category} className="bg-[#efefef] rounded-xl shadow-sm overflow-hidden">
-                  <div className="bg-gradient-to-r from-orange-500 to-red-500 px-6 py-3 flex items-center justify-between">
-                    <h2 className="text-xl font-bold text-white">
-                      {category} ({itemsByCategory[category].length} modelů)
-                    </h2>
-                    <span className="text-white/80 text-sm font-medium">
-                      {categoryQty} ks celkem
+          <div className="rounded-xl shadow-sm overflow-hidden" style={{ backgroundColor: 'var(--nest-surface)' }}>
+            <div className="px-6 py-3 flex items-center justify-between" style={{ background: 'linear-gradient(to right, #ea580c, #dc2626)' }}>
+              <h2 className="text-xl font-bold text-white">
+                Technika ({displayItems.length} modelů)
+              </h2>
+              <div className="flex items-center gap-3">
+                {savingOrder && (
+                  <span className="text-white/70 text-xs animate-pulse">Ukládám pořadí...</span>
+                )}
+                <span className="text-white/80 text-sm font-medium">
+                  {totalItemsCount} ks celkem
+                </span>
+              </div>
+            </div>
+            <p className="px-6 py-2 text-xs" style={{ color: 'var(--nest-text-tertiary)', borderBottom: '1px solid var(--nest-border)' }}>
+              ⠿ Přetáhni položky pro změnu pořadí — toto pořadí uvidí i hosté při rezervaci
+            </p>
+            <div>
+              {displayItems.map((item, index) => (
+                <div
+                  key={item.id}
+                  draggable
+                  onDragStart={() => handleDragStart(index)}
+                  onDragEnter={() => handleDragEnter(index)}
+                  onDragEnd={handleDragEnd}
+                  onDragOver={(e) => e.preventDefault()}
+                  className="flex items-center gap-4 transition-all"
+                  style={{
+                    padding: '1rem 1.5rem',
+                    borderBottom: '1px solid var(--nest-border)',
+                    opacity: draggedIdx === index ? 0.4 : 1,
+                    cursor: 'grab',
+                    backgroundColor: draggedIdx === index ? 'rgba(249, 115, 22, 0.08)' : 'transparent',
+                  }}
+                >
+                  {/* Drag Handle */}
+                  <div className="flex-shrink-0 cursor-grab active:cursor-grabbing" style={{ color: 'var(--nest-text-tertiary)' }}>
+                    <GripVertical className="w-5 h-5" />
+                  </div>
+
+                  {/* Order number */}
+                  <div className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold" style={{ backgroundColor: 'rgba(249, 115, 22, 0.15)', color: '#fb923c' }}>
+                    {index + 1}
+                  </div>
+
+                  {/* Icon */}
+                  <div className="flex-shrink-0">
+                    {getItemIcon(item, "w-7 h-7")}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-lg" style={{ color: 'var(--nest-text-primary)' }}>{item.name}</p>
+                    <p className="text-sm" style={{ color: 'var(--nest-text-secondary)' }}>
+                      {item.type === 'monitor' ? '📺 Monitor' : item.type === 'pc' ? '💻 PC' : '🎮 Příslušenství'}
+                      {formatSpecs(item.specs) && ` • ${formatSpecs(item.specs)}`}
+                    </p>
+                  </div>
+
+                  {/* Quantity badge */}
+                  <div className="flex-shrink-0">
+                    <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-bold" style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa' }}>
+                      {item.quantity || 1} ks
                     </span>
                   </div>
-                  <div className="divide-y divide-gray-200">
-                    {itemsByCategory[category].map((item) => (
-                      <div key={item.id} className="p-4 hover:bg-gray-50 flex items-center gap-4">
-                        <div className="flex-shrink-0">
-                          {getItemIcon(item, "w-8 h-8")}
-                        </div>
 
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-gray-900 text-lg">{item.name}</p>
-                          <p className="text-sm text-gray-600">
-                            {item.type === 'monitor' ? '📺 Monitor' : item.type === 'pc' ? '💻 PC' : '🎮 Příslušenství'}
-                            {formatSpecs(item.specs) && ` • ${formatSpecs(item.specs)}`}
-                          </p>
-                        </div>
+                  {/* Price */}
+                  <div className="flex-shrink-0 text-right">
+                    <p className="font-bold text-xl" style={{ color: '#fb923c' }}>
+                      {item.price_per_night === 0 ? 'Zdarma' : `${item.price_per_night} Kč/noc`}
+                    </p>
+                    {item.is_available ? (
+                      <span className="inline-flex px-3 py-1 rounded-full text-xs font-semibold mt-1" style={{ backgroundColor: 'rgba(34, 197, 94, 0.15)', color: '#4ade80' }}>
+                        Dostupné
+                      </span>
+                    ) : (
+                      <span className="inline-flex px-3 py-1 rounded-full text-xs font-semibold mt-1" style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#f87171' }}>
+                        Nedostupné
+                      </span>
+                    )}
+                  </div>
 
-                        {/* Quantity badge */}
-                        <div className="flex-shrink-0">
-                          <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-bold bg-blue-100 text-blue-800">
-                            {item.quantity || 1} ks
-                          </span>
-                        </div>
-
-                        <div className="flex-shrink-0 text-right">
-                          <p className="font-bold text-orange-600 text-xl">
-                            {item.price_per_night === 0 ? 'Zdarma' : `${item.price_per_night} Kč/noc`}
-                          </p>
-                          {item.is_available ? (
-                            <span className="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 mt-1">
-                              Dostupné
-                            </span>
-                          ) : (
-                            <span className="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800 mt-1">
-                              Nedostupné
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="flex-shrink-0 flex gap-1">
-                          <button
-                            onClick={() => handleDuplicate(item)}
-                            className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition"
-                            title="Duplikovat"
-                          >
-                            <Copy className="w-5 h-5" />
-                          </button>
-                          <button
-                            onClick={() => handleEdit(item)}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                            title="Upravit"
-                          >
-                            <Edit2 className="w-5 h-5" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(item.id)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                            title="Smazat"
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                  {/* Actions */}
+                  <div className="flex-shrink-0 flex gap-1" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => handleDuplicate(item)}
+                      className="p-2 rounded-lg transition"
+                      style={{ color: 'var(--nest-text-tertiary)' }}
+                      title="Duplikovat"
+                    >
+                      <Copy className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => handleEdit(item)}
+                      className="p-2 rounded-lg transition"
+                      style={{ color: '#60a5fa' }}
+                      title="Upravit"
+                    >
+                      <Edit2 className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(item.id)}
+                      className="p-2 rounded-lg transition"
+                      style={{ color: '#f87171' }}
+                      title="Smazat"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
                   </div>
                 </div>
-              )
-            })}
+              ))}
+            </div>
           </div>
         )}
       </div>

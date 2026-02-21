@@ -28,11 +28,14 @@ export async function GET(request: NextRequest) {
       created_at: doc.data()?.created_at?.toDate?.()?.toISOString() || doc.data()?.created_at,
     }))
 
-    // Sort by category, then by name
+    // Sort by sort_order first, then category, then name
     items.sort((a, b) => {
-      const categoryCompare = a.category.localeCompare(b.category)
+      const orderA = a.sort_order ?? 999
+      const orderB = b.sort_order ?? 999
+      if (orderA !== orderB) return orderA - orderB
+      const categoryCompare = (a.category || '').localeCompare(b.category || '')
       if (categoryCompare !== 0) return categoryCompare
-      return a.name.localeCompare(b.name)
+      return (a.name || '').localeCompare(b.name || '')
     })
 
     return NextResponse.json({ items })
@@ -73,6 +76,7 @@ export async function POST(request: NextRequest) {
       is_available: is_available !== undefined ? is_available : true,
       description: description || null,
       specs: specs || null,
+      sort_order: body.sort_order ?? 0,
       created_at: Timestamp.now(),
     }
 
