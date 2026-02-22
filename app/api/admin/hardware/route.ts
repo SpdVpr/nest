@@ -74,6 +74,7 @@ export async function POST(request: NextRequest) {
       price_per_night: parseFloat(price_per_night),
       quantity: parseInt(quantity) || 1,
       is_available: is_available !== undefined ? is_available : true,
+      is_top: body.is_top || false,
       description: description || null,
       specs: specs || null,
       sort_order: body.sort_order ?? 0,

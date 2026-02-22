@@ -339,8 +339,8 @@ export default function EventSnacksPage() {
                                 .map((grouped) => (
                                   <div key={grouped.products.id} className="flex items-center justify-between bg-[var(--nest-dark-3)] rounded-lg p-2">
                                     <div className="flex-1 min-w-0">
-                                      <p className="text-[10px] text-[var(--nest-white-40)]">{grouped.products.category}</p>
-                                      <p className="font-medium text-xs">{grouped.products.name}</p>
+                                      <p className="text-xs text-[var(--nest-white-40)]">{grouped.products.category}</p>
+                                      <p className="font-medium text-sm">{grouped.products.name}</p>
                                     </div>
                                     <div className="flex items-center gap-1 flex-shrink-0">
                                       <button
@@ -383,19 +383,20 @@ export default function EventSnacksPage() {
                               : 'nest-card hover:border-[var(--nest-yellow)]/30'
                               }`}
                           >
-                            {product.image_url ? (
-                              <div className="bg-white rounded-lg p-3 mb-3">
+                            <div
+                              className="rounded-lg mb-3 flex items-center justify-center overflow-hidden"
+                              style={{ backgroundColor: '#ffffff', height: 140 }}
+                            >
+                              {product.image_url ? (
                                 <img
                                   src={product.image_url}
                                   alt={product.name}
-                                  className="w-full h-32 object-contain"
+                                  style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', padding: 12 }}
                                 />
-                              </div>
-                            ) : (
-                              <div className="bg-[var(--nest-dark-3)] rounded-lg p-3 mb-3 h-32 flex items-center justify-center">
+                              ) : (
                                 <span className="text-4xl">🍽️</span>
-                              </div>
-                            )}
+                              )}
+                            </div>
                             <p className="font-semibold text-sm mb-1">{product.name}</p>
                             <p className={`font-bold text-sm ${justAdded === product.id ? 'text-[var(--nest-dark)]' : 'text-[var(--nest-yellow)]'
                               }`}>
@@ -434,7 +435,12 @@ export default function EventSnacksPage() {
                                 return acc
                               }, new Map<string, typeof products>()).entries()
                             )
-                              .sort(([catA], [catB]) => catA.localeCompare(catB))
+                              .sort(([catA], [catB]) => {
+                                const order = ['Pivo', 'Nealko', 'Sladkosti', 'Jídlo', 'Alkoholické nápoje']
+                                const iA = order.findIndex(o => catA.toLowerCase().startsWith(o.toLowerCase()))
+                                const iB = order.findIndex(o => catB.toLowerCase().startsWith(o.toLowerCase()))
+                                return (iA === -1 ? 99 : iA) - (iB === -1 ? 99 : iB)
+                              })
                               .map(([category, categoryProducts]) => (
                                 <div key={category}>
                                   <h3 className="text-sm font-bold mb-3 pb-2 border-b border-[var(--nest-dark-4)]">

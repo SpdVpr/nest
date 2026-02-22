@@ -103,10 +103,20 @@ export default function EventSeatsPage() {
 
   const handleSeatClick = (seatId: string) => {
     if (!selectedGuest) { alert('Nejdřív si vyber svého hosta'); return }
-    const reservation = reservations.find(r => r.seat_id === seatId)
+    const reservation = reservations.find(r => r.seat_id === seatId) as any
     if (reservation) {
       if (reservation.guest_id === selectedGuest.id) {
-        if (confirm(`Chceš zrušit svou rezervaci místa ${seatId}?`)) handleCancelReservation(reservation.id)
+        // Own reservation (manual or auto) → offer cancel
+        if (!reservation.auto_reserved) {
+          if (confirm(`Chceš zrušit svou rezervaci místa ${seatId}?`)) handleCancelReservation(reservation.id)
+        } else {
+          // Auto-reserved own seat — just inform
+          alert(`Toto místo je automaticky rezervované jako tvůj druhý stůl.`)
+        }
+      } else if (reservation.auto_reserved) {
+        // Auto-reserved by someone else → allow override
+        setSelectedSeat(seatId)
+        setShowConfirm(true)
       } else {
         alert(`Toto místo je již rezervováno pro ${reservation.guest_name}`)
       }
@@ -130,7 +140,6 @@ export default function EventSeatsPage() {
       })
       if (response.ok) {
         setSelectedSeat(null); setShowConfirm(false); fetchData()
-        alert('Místo bylo úspěšně rezervováno!')
       } else {
         const ed = await response.json()
         alert(`Chyba: ${ed.details || ed.error || 'Neznámá chyba'}`)
@@ -148,9 +157,10 @@ export default function EventSeatsPage() {
   }
 
   const getSeatStatus = (seatId: string) => {
-    const r = reservations.find(r => r.seat_id === seatId)
-    if (!r) return { status: 'available' as const, guestName: null, isOwn: false }
-    return { status: 'reserved' as const, guestName: r.guest_name, isOwn: !!(selectedGuest && r.guest_id === selectedGuest.id) }
+    const r = reservations.find(r => r.seat_id === seatId) as any
+    if (!r) return { status: 'available' as const, guestName: null, isOwn: false, autoReserved: false }
+    const isOwn = !!(selectedGuest && r.guest_id === selectedGuest.id)
+    return { status: 'reserved' as const, guestName: r.guest_name, isOwn, autoReserved: !!r.auto_reserved }
   }
 
   // ─── Seat cell ───
@@ -159,7 +169,9 @@ export default function EventSeatsPage() {
   const GAP = 6
 
   const SeatCell = ({ id }: { id: string }) => {
-    const { status, guestName, isOwn } = getSeatStatus(id)
+    const { status, guestName, isOwn, autoReserved } = getSeatStatus(id)
+    const isAutoReservedByOther = status === 'reserved' && autoReserved && !isOwn
+
     return (
       <button
         onClick={() => handleSeatClick(id)}
@@ -167,21 +179,34 @@ export default function EventSeatsPage() {
         onMouseLeave={() => setHoveredSeat(null)}
         disabled={!selectedGuest}
         className={`
-          relative flex flex-col items-center justify-center rounded-md border-2 font-bold transition-all duration-150
+          relative flex flex-col items-center justify-center rounded-md font-bold transition-all duration-150
           ${status === 'available'
-            ? 'bg-emerald-700/60 hover:bg-emerald-600/70 text-white border-emerald-600/80 hover:border-emerald-400 hover:shadow-lg hover:scale-105'
+            ? 'bg-emerald-700/60 hover:bg-emerald-600/70 text-white border-2 border-solid border-emerald-600/80 hover:border-emerald-400 hover:shadow-lg hover:scale-105'
             : isOwn
-              ? 'bg-[var(--nest-yellow)]/30 hover:bg-[var(--nest-yellow)]/40 text-white border-[var(--nest-yellow)]/60 hover:shadow-lg hover:scale-105'
-              : 'bg-red-900/50 text-white/80 border-red-700/60 cursor-not-allowed'
+              ? autoReserved
+                ? 'bg-[var(--nest-yellow)]/15 text-white/70 border-2 border-dashed border-[var(--nest-yellow)]/40'
+                : 'bg-[var(--nest-yellow)]/30 hover:bg-[var(--nest-yellow)]/40 text-white border-2 border-solid border-[var(--nest-yellow)]/60 hover:shadow-lg hover:scale-105'
+              : isAutoReservedByOther
+                ? 'bg-amber-900/25 text-white/60 border-2 border-dashed border-amber-500/30 hover:border-amber-400/60 hover:bg-amber-800/30 hover:scale-105 cursor-pointer'
+                : 'bg-red-900/50 text-white/80 border-2 border-solid border-red-700/60 cursor-not-allowed'
           }
           ${!selectedGuest ? 'opacity-50 cursor-not-allowed' : ''}
         `}
         style={{ width: CELL_W, height: CELL_H }}
-        title={guestName ? `${id}: ${guestName}` : `${id}: Volné`}
+        title={
+          isAutoReservedByOther
+            ? `${id}: Autorezervace (${guestName}) — klikni pro přerezervování`
+            : guestName ? `${id}: ${guestName}` : `${id}: Volné`
+        }
       >
         <span className="text-xs font-extrabold leading-none opacity-70">{id}</span>
         {guestName ? (
-          <span className="text-[11px] font-bold max-w-[90px] leading-tight mt-1 text-center" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{guestName}</span>
+          <>
+            <span className="text-[11px] font-bold max-w-[90px] leading-tight mt-1 text-center" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{guestName}</span>
+            {autoReserved && (
+              <span className="text-[8px] opacity-50 mt-0.5">auto</span>
+            )}
+          </>
         ) : (
           <span className="text-[10px] font-medium opacity-50 mt-1">volné</span>
         )}
@@ -189,16 +214,34 @@ export default function EventSeatsPage() {
     )
   }
 
-  // Row of seat cells
-  const SeatRow = ({ ids }: { ids: string[] }) => (
-    <div className="flex" style={{ gap: GAP }}>
-      {ids.map(id => <SeatCell key={id} id={id} />)}
-    </div>
-  )
+  // Row of seat cells — pairs wrapped in table rectangles
+  const SeatRow = ({ ids }: { ids: string[] }) => {
+    const tables: string[][] = []
+    for (let i = 0; i < ids.length; i += 2) {
+      tables.push(ids.slice(i, i + 2))
+    }
+    return (
+      <div className="flex" style={{ gap: GAP }}>
+        {tables.map((tableSeats, tableIdx) => (
+          <div
+            key={tableIdx}
+            className="flex rounded-lg"
+            style={{
+              gap: GAP,
+              border: '2px solid rgba(245, 158, 11, 0.3)',
+              padding: 3,
+            }}
+          >
+            {tableSeats.map(id => <SeatCell key={id} id={id} />)}
+          </div>
+        ))}
+      </div>
+    )
+  }
 
   // Aisle gap with ↕ arrows
   const Aisle = ({ count }: { count: number }) => (
-    <div className="flex" style={{ gap: GAP }}>
+    <div className="flex" style={{ gap: 11 }}>
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="flex items-center justify-center text-[var(--nest-text-tertiary)] text-sm font-bold" style={{ width: CELL_W, height: 42 }}>
           ↕
@@ -208,11 +251,11 @@ export default function EventSeatsPage() {
   )
 
   // Table surface bar (visual divider between facing rows like B/C or D/E)
-  const TableBar = ({ cols }: { cols: number }) => (
+  const TableBar = () => (
     <div
       className="rounded-sm"
       style={{
-        width: cols * CELL_W + (cols - 1) * GAP,
+        width: 656,
         height: 6,
         background: 'rgba(255,255,255,0.15)',
       }}
@@ -302,6 +345,10 @@ export default function EventSeatsPage() {
             <span className="text-[var(--nest-text-secondary)]">Obsazené</span>
           </div>
           <div className="flex items-center gap-2">
+            <div className="w-6 h-5 rounded bg-amber-900/25 border-2 border-dashed border-amber-500/30"></div>
+            <span className="text-[var(--nest-text-secondary)]">Auto-rezervace (lze obsadit)</span>
+          </div>
+          <div className="flex items-center gap-2">
             <div className="w-6 h-5 rounded bg-[var(--nest-yellow)]/30 border-2 border-[var(--nest-yellow)]/60"></div>
             <span className="text-[var(--nest-text-secondary)]">Tvoje rezervace</span>
           </div>
@@ -334,7 +381,7 @@ export default function EventSeatsPage() {
                 <div style={{ marginTop: 28 }}>
 
                   {/* ── WALL (top) ── */}
-                  <div className="mb-1 rounded" style={{ height: 4, background: 'rgba(255,255,255,0.1)', width: 6 * CELL_W + 5 * GAP }}></div>
+
 
                   {/* Row A — u horní zdi */}
                   <SeatRow ids={['A1', 'A2', 'A3', 'A4', 'A5', 'A6']} />
@@ -347,7 +394,7 @@ export default function EventSeatsPage() {
 
                   {/* ── stůl (tenká čára = deska stolu) ── */}
                   <div className="flex justify-start my-0.5">
-                    <TableBar cols={6} />
+                    <TableBar />
                   </div>
 
                   {/* Row C — druhá strana téhož stolu */}
@@ -361,7 +408,7 @@ export default function EventSeatsPage() {
 
                   {/* ── stůl ── */}
                   <div className="flex justify-start my-0.5">
-                    <TableBar cols={6} />
+                    <TableBar />
                   </div>
 
                   {/* Row E — druhá strana stolu */}
@@ -374,7 +421,7 @@ export default function EventSeatsPage() {
                   <SeatRow ids={['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8']} />
 
                   {/* ── WALL (bottom) ── */}
-                  <div className="mt-1 rounded" style={{ height: 4, background: 'rgba(255,255,255,0.1)', width: 8 * CELL_W + 7 * GAP }}></div>
+
 
                 </div>
               </div>

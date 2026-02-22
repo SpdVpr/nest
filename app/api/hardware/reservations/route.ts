@@ -138,6 +138,18 @@ export async function POST(request: Request) {
       })
     }
 
+    // Reset hw_prepared flag for this guest (admin needs to re-check)
+    if (activeSessionId) {
+      try {
+        const { FieldValue } = await import('firebase-admin/firestore')
+        await db.collection('sessions').doc(activeSessionId).update({
+          [`hw_prepared.${guest_id}`]: FieldValue.delete(),
+        })
+      } catch (e) {
+        console.log('Could not reset hw_prepared flag:', e)
+      }
+    }
+
     return NextResponse.json({ reservations: createdReservations })
   } catch (error) {
     console.error('Error in hardware reservations API:', error)

@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Plus, Loader2, PlayCircle, StopCircle, Edit, Eye, Trash2, UtensilsCrossed, X, Monitor, Cpu, Gamepad2, ChevronDown, ChevronUp } from 'lucide-react'
+import { ArrowLeft, Plus, Loader2, PlayCircle, StopCircle, Edit, Eye, Trash2, UtensilsCrossed, X, Monitor, Cpu, Gamepad2, ChevronDown, ChevronUp, Copy } from 'lucide-react'
 import { Session, MealType, HardwareOverride } from '@/types/database.types'
 import { formatDate, formatDateOnly } from '@/lib/utils'
 
@@ -60,6 +60,10 @@ function AdminSessionsPageInner() {
   const [allHardwareItems, setAllHardwareItems] = useState<AdminHardwareItem[]>([])
   const [showHardwareConfig, setShowHardwareConfig] = useState(false)
 
+  // Copy from previous event
+  const [copiedGames, setCopiedGames] = useState<{ name: string }[]>([])
+  const [loadingCopy, setLoadingCopy] = useState(false)
+
   const searchParams = useSearchParams()
 
   useEffect(() => {
@@ -76,6 +80,15 @@ function AdminSessionsPageInner() {
       if (searchParams.get('create') === 'true') {
         resetForm()
         setShowCreateForm(true)
+      }
+
+      // Copy from another session if redirected with copyFrom param
+      const copyFromId = searchParams.get('copyFrom')
+      if (copyFromId) {
+        resetForm()
+        setShowCreateForm(true)
+        // Small delay to ensure state is initialized
+        setTimeout(() => copyFromSession(copyFromId), 300)
       }
     }
   }, [router, searchParams])
@@ -266,6 +279,47 @@ function AdminSessionsPageInner() {
     ))
   }
 
+  const copyFromSession = async (sourceSessionId: string) => {
+    if (!sourceSessionId) return
+    setLoadingCopy(true)
+    try {
+      const token = localStorage.getItem('admin_token')
+      const res = await fetch(`/api/admin/sessions/${sourceSessionId}/config`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      if (!res.ok) throw new Error('Failed to fetch config')
+      const { config } = await res.json()
+
+      // Apply settings
+      setNewPricePerNight(config.price_per_night?.toString() || '0')
+      setHardwarePricingEnabled(config.hardware_pricing_enabled !== false)
+      setHardwareOverrides(config.hardware_overrides || {})
+      setMenuEnabled(config.menu_enabled || false)
+
+      // Copy menu items (adapt day_index if dates differ)
+      if (config.menu_items && config.menu_items.length > 0) {
+        const items = config.menu_items.map((item: any) => ({
+          day_index: item.day_index || 0,
+          meal_type: item.meal_type as MealType,
+          time: item.time || '',
+          description: item.description || '',
+          order: item.order || 0,
+        }))
+        setMenuItems(items)
+      }
+
+      // Store games for later creation
+      setCopiedGames(config.games || [])
+
+      alert(`Nastavení zkopírováno! Zkopírováno: cena, HW konfigurace${config.menu_enabled ? ', jídelníček' : ''}${config.games?.length > 0 ? `, ${config.games.length} her` : ''}`)
+    } catch (error) {
+      console.error('Error copying config:', error)
+      alert('Nepodařilo se zkopírovat nastavení')
+    } finally {
+      setLoadingCopy(false)
+    }
+  }
+
   const createSession = async () => {
     if (!newSessionName.trim()) {
       alert('Název eventu je povinný')
@@ -344,6 +398,20 @@ function AdminSessionsPageInner() {
               'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({ items: validItems })
+          })
+        }
+      }
+
+      // Copy games if any were copied from another session
+      if (newSessionId && copiedGames.length > 0) {
+        for (const game of copiedGames) {
+          await fetch(`/api/admin/sessions/${newSessionId}/games`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ name: game.name })
           })
         }
       }
@@ -466,6 +534,7 @@ function AdminSessionsPageInner() {
     setHardwarePricingEnabled(true)
     setHardwareOverrides({})
     setShowHardwareConfig(false)
+    setCopiedGames([])
   }
 
   const cancelEdit = () => {
@@ -1051,10 +1120,12 @@ function AdminSessionsPageInner() {
           </div>
         )}
 
-        {/* Create form */}
         {showCreateForm && (
           <div className="bg-[#efefef] rounded-xl shadow p-6 mb-6">
             <h3 className="font-semibold text-gray-900 mb-4">Vytvořit nový event</h3>
+            {copiedGames.length > 0 && (
+              <p className="text-xs text-green-600 mb-3 font-medium">✅ Zkopírováno nastavení + {copiedGames.length} her z předchozí akce</p>
+            )}
             {renderFormFields()}
             <div className="flex gap-4 justify-end mt-4">
               <button
@@ -1167,6 +1238,20 @@ function AdminSessionsPageInner() {
                             Aktivovat
                           </>
                         )}
+                      </button>
+                      <button
+                        onClick={() => {
+                          resetForm()
+                          copyFromSession(session.id)
+                          setShowCreateForm(true)
+                          setEditingSession(null)
+                          window.scrollTo({ top: 0, behavior: 'smooth' })
+                        }}
+                        className="flex items-center text-gray-500 hover:text-gray-700"
+                        title="Vytvořit nový event s nastavením tohoto"
+                      >
+                        <Copy className="w-4 h-4 mr-1" />
+                        Kopírovat
                       </button>
                     </div>
                   </td>

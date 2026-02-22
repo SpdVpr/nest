@@ -183,9 +183,10 @@ export default function AdminSeatMapPage() {
     const GAP = 6
 
     const SeatCell = ({ id }: { id: string }) => {
-        const reservation = getSeatReservation(id)
+        const reservation = getSeatReservation(id) as any
         const isSelected = selectedSeat === id
-        const guestHw = reservation ? getGuestHardware(reservation.guest_id) : []
+        const isAutoReserved = reservation?.auto_reserved
+        const guestHw = (reservation && !isAutoReserved) ? getGuestHardware(reservation.guest_id) : []
         const hasPc = guestHw.some(h => h.itemType === 'pc')
         const hasMonitor = guestHw.some(h => h.itemType === 'monitor')
 
@@ -193,26 +194,34 @@ export default function AdminSeatMapPage() {
             <button
                 onClick={() => setSelectedSeat(isSelected ? null : id)}
                 className={`
-          relative flex flex-col items-center justify-center rounded-md border-2 font-bold transition-all duration-150
+          relative flex flex-col items-center justify-center rounded-md font-bold transition-all duration-150
           ${reservation
-                        ? isSelected
-                            ? 'bg-amber-600/40 border-amber-400 shadow-lg shadow-amber-500/20 scale-105'
-                            : 'bg-red-900/50 text-white/90 border-red-700/60 hover:border-amber-400 hover:bg-red-800/60'
-                        : 'bg-emerald-700/40 text-white/60 border-emerald-600/50'
+                        ? isAutoReserved
+                            ? isSelected
+                                ? 'bg-amber-600/25 border-2 border-dashed border-amber-400/60 shadow-lg scale-105'
+                                : 'bg-amber-900/25 text-white/60 border-2 border-dashed border-amber-500/30 hover:border-amber-400/60'
+                            : isSelected
+                                ? 'bg-amber-600/40 border-2 border-solid border-amber-400 shadow-lg shadow-amber-500/20 scale-105'
+                                : 'bg-red-900/50 text-white/90 border-2 border-solid border-red-700/60 hover:border-amber-400 hover:bg-red-800/60'
+                        : 'bg-emerald-700/40 text-white/60 border-2 border-solid border-emerald-600/50'
                     }
         `}
                 style={{ width: CELL_W, height: CELL_H }}
-                title={reservation ? `${id}: ${reservation.guest_name}` : `${id}: Volné`}
+                title={reservation ? `${id}: ${reservation.guest_name}${isAutoReserved ? ' (auto)' : ''}` : `${id}: Volné`}
             >
                 <span className="text-[10px] font-extrabold leading-none opacity-60">{id}</span>
                 {reservation ? (
                     <>
                         <span className="text-[11px] font-bold max-w-[100px] leading-tight mt-0.5 text-center truncate">{reservation.guest_name}</span>
-                        <div className="flex gap-1 mt-0.5">
-                            {hasPc && <Cpu className="w-3 h-3 text-blue-400" />}
-                            {hasMonitor && <Monitor className="w-3 h-3 text-purple-400" />}
-                            {guestHw.filter(h => h.itemType === 'accessory').length > 0 && <Gamepad2 className="w-3 h-3 text-green-400" />}
-                        </div>
+                        {isAutoReserved ? (
+                            <span className="text-[8px] opacity-40 mt-0.5">auto</span>
+                        ) : (
+                            <div className="flex gap-1 mt-0.5">
+                                {hasPc && <Cpu className="w-3 h-3 text-blue-400" />}
+                                {hasMonitor && <Monitor className="w-3 h-3 text-purple-400" />}
+                                {guestHw.filter(h => h.itemType === 'accessory').length > 0 && <Gamepad2 className="w-3 h-3 text-green-400" />}
+                            </div>
+                        )}
                     </>
                 ) : (
                     <span className="text-[10px] font-medium opacity-40 mt-1">volné</span>
@@ -221,14 +230,34 @@ export default function AdminSeatMapPage() {
         )
     }
 
-    const SeatRow = ({ ids }: { ids: string[] }) => (
-        <div className="flex" style={{ gap: GAP }}>
-            {ids.map(id => <SeatCell key={id} id={id} />)}
-        </div>
-    )
+    const SeatRow = ({ ids }: { ids: string[] }) => {
+        // Group seats into pairs (tables of 2)
+        const tables: string[][] = []
+        for (let i = 0; i < ids.length; i += 2) {
+            tables.push(ids.slice(i, i + 2))
+        }
+
+        return (
+            <div className="flex" style={{ gap: GAP }}>
+                {tables.map((tableSeats, tableIdx) => (
+                    <div
+                        key={tableIdx}
+                        className="flex rounded-lg"
+                        style={{
+                            gap: GAP,
+                            border: '2px solid rgba(245, 158, 11, 0.3)',
+                            padding: 3,
+                        }}
+                    >
+                        {tableSeats.map(id => <SeatCell key={id} id={id} />)}
+                    </div>
+                ))}
+            </div>
+        )
+    }
 
     const Aisle = ({ count }: { count: number }) => (
-        <div className="flex" style={{ gap: GAP }}>
+        <div className="flex" style={{ gap: 11 }}>
             {Array.from({ length: count }).map((_, i) => (
                 <div key={i} className="flex items-center justify-center text-[var(--nest-text-tertiary)] text-sm font-bold" style={{ width: CELL_W, height: 36 }}>
                     ↕
@@ -237,11 +266,11 @@ export default function AdminSeatMapPage() {
         </div>
     )
 
-    const TableBar = ({ cols }: { cols: number }) => (
+    const TableBar = () => (
         <div
             className="rounded-sm"
             style={{
-                width: cols * CELL_W + (cols - 1) * GAP,
+                width: 656,
                 height: 6,
                 background: 'rgba(255,255,255,0.15)',
             }}
@@ -265,9 +294,11 @@ export default function AdminSeatMapPage() {
             )
         }
 
+        const reservationData = reservation as any
+        const isAutoReserved = reservationData?.auto_reserved
         const guest = getGuest(reservation.guest_id)
-        const hw = getGuestHardware(reservation.guest_id)
-        const gameInstalls = getGuestGameInstalls(reservation.guest_id)
+        const hw = isAutoReserved ? [] : getGuestHardware(reservation.guest_id)
+        const gameInstalls = isAutoReserved ? [] : getGuestGameInstalls(reservation.guest_id)
         const pcs = hw.filter(h => h.itemType === 'pc')
         const monitors = hw.filter(h => h.itemType === 'monitor')
         const accessories = hw.filter(h => h.itemType === 'accessory')
@@ -275,15 +306,23 @@ export default function AdminSeatMapPage() {
         return (
             <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: 'var(--nest-surface)', borderColor: 'var(--nest-border)' }}>
                 {/* Header */}
-                <div className="px-6 py-4" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.15), rgba(239,68,68,0.1))' }}>
+                <div className="px-6 py-4" style={{ background: isAutoReserved ? 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(245,158,11,0.04))' : 'linear-gradient(135deg, rgba(245,158,11,0.15), rgba(239,68,68,0.1))' }}>
                     <h3 className="text-xl font-bold" style={{ color: 'var(--nest-text-primary)' }}>
                         <Armchair className="w-5 h-5 inline mr-2 text-amber-400" />
                         Místo {selectedSeat}
+                        {isAutoReserved && (
+                            <span className="ml-2 text-xs font-medium px-2 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(245,158,11,0.15)', color: '#fbbf24', border: '1px dashed rgba(245,158,11,0.4)' }}>auto-rezervace</span>
+                        )}
                     </h3>
                     <p className="text-lg font-semibold mt-1" style={{ color: '#fbbf24' }}>
                         <User className="w-4 h-4 inline mr-1" />
                         {reservation.guest_name}
                     </p>
+                    {isAutoReserved && (
+                        <p className="text-xs mt-2" style={{ color: 'var(--nest-text-tertiary)' }}>
+                            ℹ️ Automaticky rezervované místo — technika je na hlavním místě hosta
+                        </p>
+                    )}
                 </div>
 
                 <div className="p-6 space-y-5">
@@ -451,19 +490,19 @@ export default function AdminSeatMapPage() {
                                                 Nest — nová herní místnost
                                             </div>
                                             <div style={{ marginTop: 28 }}>
-                                                <div className="mb-1 rounded" style={{ height: 4, background: 'rgba(255,255,255,0.1)', width: 6 * CELL_W + 5 * GAP }}></div>
+
                                                 <SeatRow ids={['A1', 'A2', 'A3', 'A4', 'A5', 'A6']} />
                                                 <Aisle count={6} />
                                                 <SeatRow ids={['B1', 'B2', 'B3', 'B4', 'B5', 'B6']} />
-                                                <div className="flex justify-start my-0.5"><TableBar cols={6} /></div>
+                                                <div className="flex justify-start my-0.5"><TableBar /></div>
                                                 <SeatRow ids={['C1', 'C2', 'C3', 'C4', 'C5', 'C6']} />
                                                 <Aisle count={6} />
                                                 <SeatRow ids={['D1', 'D2', 'D3', 'D4', 'D5', 'D6']} />
-                                                <div className="flex justify-start my-0.5"><TableBar cols={6} /></div>
+                                                <div className="flex justify-start my-0.5"><TableBar /></div>
                                                 <SeatRow ids={['E1', 'E2', 'E3', 'E4', 'E5', 'E6']} />
                                                 <Aisle count={8} />
                                                 <SeatRow ids={['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8']} />
-                                                <div className="mt-1 rounded" style={{ height: 4, background: 'rgba(255,255,255,0.1)', width: 8 * CELL_W + 7 * GAP }}></div>
+
                                             </div>
                                         </div>
 
@@ -530,8 +569,10 @@ export default function AdminSeatMapPage() {
                                     seatReservations
                                         .sort((a, b) => a.seat_id.localeCompare(b.seat_id))
                                         .map(res => {
-                                            const hw = getGuestHardware(res.guest_id)
-                                            const gameInstalls = getGuestGameInstalls(res.guest_id)
+                                            const resData = res as any
+                                            const isAuto = resData.auto_reserved
+                                            const hw = isAuto ? [] : getGuestHardware(res.guest_id)
+                                            const gameInstalls = isAuto ? [] : getGuestGameInstalls(res.guest_id)
                                             return (
                                                 <button
                                                     key={res.id}
@@ -540,18 +581,24 @@ export default function AdminSeatMapPage() {
                                                     style={{ borderColor: 'var(--nest-border)' }}
                                                 >
                                                     <div className="flex items-center gap-3">
-                                                        <span className="text-sm font-bold px-2 py-0.5 rounded" style={{ backgroundColor: 'rgba(245,158,11,0.15)', color: '#fbbf24', minWidth: 32, textAlign: 'center' }}>
+                                                        <span className="text-sm font-bold px-2 py-0.5 rounded" style={{ backgroundColor: isAuto ? 'rgba(245,158,11,0.08)' : 'rgba(245,158,11,0.15)', color: isAuto ? 'rgba(251,191,36,0.5)' : '#fbbf24', minWidth: 32, textAlign: 'center', border: isAuto ? '1px dashed rgba(245,158,11,0.3)' : 'none' }}>
                                                             {res.seat_id}
                                                         </span>
-                                                        <span className="font-semibold text-sm" style={{ color: 'var(--nest-text-primary)' }}>{res.guest_name}</span>
+                                                        <span className="font-semibold text-sm" style={{ color: isAuto ? 'var(--nest-text-tertiary)' : 'var(--nest-text-primary)' }}>{res.guest_name}</span>
                                                         <div className="flex gap-1 ml-auto">
-                                                            {hw.some(h => h.itemType === 'pc') && <Cpu className="w-3.5 h-3.5 text-blue-400" />}
-                                                            {hw.some(h => h.itemType === 'monitor') && <Monitor className="w-3.5 h-3.5 text-purple-400" />}
-                                                            {hw.some(h => h.itemType === 'accessory') && <Gamepad2 className="w-3.5 h-3.5 text-green-400" />}
-                                                            {gameInstalls.length > 0 && (
-                                                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: 'rgba(251,191,36,0.1)', color: '#fbbf24' }}>
-                                                                    {gameInstalls.length}🎮
-                                                                </span>
+                                                            {isAuto ? (
+                                                                <span className="text-[10px] opacity-40">auto</span>
+                                                            ) : (
+                                                                <>
+                                                                    {hw.some(h => h.itemType === 'pc') && <Cpu className="w-3.5 h-3.5 text-blue-400" />}
+                                                                    {hw.some(h => h.itemType === 'monitor') && <Monitor className="w-3.5 h-3.5 text-purple-400" />}
+                                                                    {hw.some(h => h.itemType === 'accessory') && <Gamepad2 className="w-3.5 h-3.5 text-green-400" />}
+                                                                    {gameInstalls.length > 0 && (
+                                                                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: 'rgba(251,191,36,0.1)', color: '#fbbf24' }}>
+                                                                            {gameInstalls.length}🎮
+                                                                        </span>
+                                                                    )}
+                                                                </>
                                                             )}
                                                         </div>
                                                     </div>
@@ -563,6 +610,131 @@ export default function AdminSeatMapPage() {
                         </div>
                     </div>
                 </div>
+
+                {/* Kompletní soupis techniky */}
+                {hardwareReservations.length > 0 && (() => {
+                    // Aggregate hardware by item
+                    const itemMap: Record<string, { name: string; type: string; category: string; totalQty: number; guests: { name: string; qty: number; seatId: string }[] }> = {}
+                    hardwareReservations.forEach(r => {
+                        const hw = hardwareItems.find(h => h.id === r.hardware_item_id)
+                        if (!hw) return
+                        if (!itemMap[r.hardware_item_id]) {
+                            itemMap[r.hardware_item_id] = { name: hw.name, type: hw.type, category: hw.category, totalQty: 0, guests: [] }
+                        }
+                        itemMap[r.hardware_item_id].totalQty += (r.quantity || 1)
+                        const guest = guests.find(g => g.id === r.guest_id)
+                        const seat = seatReservations.find(s => s.guest_id === r.guest_id)
+                        itemMap[r.hardware_item_id].guests.push({
+                            name: guest?.name || 'Neznámý',
+                            qty: r.quantity || 1,
+                            seatId: seat?.seat_id || '—',
+                        })
+                    })
+
+                    const typeOrder: Record<string, number> = { pc: 0, monitor: 1, accessory: 2 }
+                    const typeLabels: Record<string, string> = { pc: '💻 Počítače', monitor: '📺 Monitory', accessory: '🎮 Příslušenství' }
+                    const typeColors: Record<string, { bg: string; color: string; border: string }> = {
+                        pc: { bg: 'rgba(59, 130, 246, 0.08)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.2)' },
+                        monitor: { bg: 'rgba(168, 85, 247, 0.08)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.2)' },
+                        accessory: { bg: 'rgba(34, 197, 94, 0.08)', color: '#4ade80', border: '1px solid rgba(34, 197, 94, 0.2)' },
+                    }
+
+                    // Group items by type
+                    const grouped: Record<string, typeof itemMap[string][]> = {}
+                    Object.values(itemMap).forEach(item => {
+                        if (!grouped[item.type]) grouped[item.type] = []
+                        grouped[item.type].push(item)
+                    })
+
+                    // Sort types
+                    const sortedTypes = Object.keys(grouped).sort((a, b) => (typeOrder[a] ?? 9) - (typeOrder[b] ?? 9))
+
+                    // Unique games
+                    const allGames = new Set<string>()
+                    gameInstallRequests.forEach(req => {
+                        (req.game_names || []).forEach((g: string) => allGames.add(g))
+                    })
+
+                    const totalItems = Object.values(itemMap).reduce((s, i) => s + i.totalQty, 0)
+
+                    return (
+                        <div className="mt-8 rounded-xl border overflow-hidden" style={{ backgroundColor: 'var(--nest-surface)', borderColor: 'var(--nest-border)' }}>
+                            <div className="px-6 py-4" style={{ background: 'linear-gradient(to right, #0369a1, #0e7490)' }}>
+                                <h2 className="text-xl font-bold text-white">📋 Kompletní soupis techniky</h2>
+                                <p className="text-cyan-200/70 text-sm mt-0.5">{totalItems} kusů celkem • {Object.keys(itemMap).length} různých položek</p>
+                            </div>
+
+                            <div className="p-6 space-y-6">
+                                {sortedTypes.map(type => {
+                                    const items = grouped[type]!
+                                    const colors = typeColors[type] || typeColors.accessory
+                                    const totalTypeQty = items.reduce((s, i) => s + i.totalQty, 0)
+                                    return (
+                                        <div key={type}>
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <h3 className="font-bold" style={{ color: colors.color }}>{typeLabels[type] || type}</h3>
+                                                <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ backgroundColor: colors.bg, color: colors.color, border: colors.border }}>
+                                                    {totalTypeQty}×
+                                                </span>
+                                            </div>
+                                            <div className="space-y-2">
+                                                {items
+                                                    .sort((a, b) => b.totalQty - a.totalQty)
+                                                    .map(item => (
+                                                        <div
+                                                            key={item.name}
+                                                            className="rounded-lg px-4 py-3"
+                                                            style={{ backgroundColor: colors.bg, border: colors.border }}
+                                                        >
+                                                            <div className="flex items-center justify-between mb-1.5">
+                                                                <span className="font-semibold text-sm" style={{ color: 'var(--nest-text-primary)' }}>{item.name}</span>
+                                                                <span className="font-bold text-sm" style={{ color: colors.color }}>{item.totalQty}×</span>
+                                                            </div>
+                                                            <div className="flex flex-wrap gap-1.5">
+                                                                {item.guests
+                                                                    .sort((a, b) => a.seatId.localeCompare(b.seatId))
+                                                                    .map((g, i) => (
+                                                                        <span key={i} className="text-[11px] px-2 py-0.5 rounded" style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: 'var(--nest-text-secondary)', border: '1px solid var(--nest-border)' }}>
+                                                                            <strong style={{ color: '#fbbf24' }}>{g.seatId}</strong> {g.name}{g.qty > 1 ? ` (${g.qty}×)` : ''}
+                                                                        </span>
+                                                                    ))}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+
+                                {/* Games summary */}
+                                {allGames.size > 0 && (
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <h3 className="font-bold" style={{ color: '#fbbf24' }}>🎮 Hry k instalaci</h3>
+                                            <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ backgroundColor: 'rgba(251,191,36,0.1)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.2)' }}>
+                                                {allGames.size} her
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            {[...allGames].sort().map(game => {
+                                                // Count how many guests want this game
+                                                const requestCount = gameInstallRequests.filter(r => (r.game_names || []).includes(game)).length
+                                                return (
+                                                    <span key={game} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ backgroundColor: 'rgba(251,191,36,0.08)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.2)' }}>
+                                                        🎮 {game}
+                                                        {requestCount > 1 && (
+                                                            <span className="text-[10px] opacity-60">({requestCount}×)</span>
+                                                        )}
+                                                    </span>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )
+                })()}
             </div>
         </div>
     )

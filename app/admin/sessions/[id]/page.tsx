@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Users, Monitor, Utensils, TrendingUp, Loader2, Edit2, Check, X, Edit, UtensilsCrossed, Heart, Cpu, ChevronDown, ChevronUp } from 'lucide-react'
+import { ArrowLeft, Users, Monitor, Utensils, TrendingUp, Loader2, Edit2, Check, X, Edit, UtensilsCrossed, Heart, Cpu, ChevronDown, ChevronUp, CheckCircle2, Circle } from 'lucide-react'
 import { Session, Guest, MenuItem, MealType, Game, GameLibraryItem, HardwareOverride } from '@/types/database.types'
 import { HardwareItem } from '@/types/hardware.types'
 import { formatDate, formatDateOnly } from '@/lib/utils'
@@ -84,6 +84,8 @@ export default function EventDetailPage() {
   const [gameInstallRequests, setGameInstallRequests] = useState<any[]>([])
   const [seatReservations, setSeatReservations] = useState<{ id: string, seat_id: string, guest_id: string, guest_name: string }[]>([])
   const [tips, setTips] = useState<Record<string, { amount: number; percentage: number | null }>>({})
+  const [hwPrepared, setHwPrepared] = useState<Record<string, string>>({})
+  const [gamesPrepared, setGamesPrepared] = useState<Record<string, string>>({})
 
   useEffect(() => {
     const token = localStorage.getItem('admin_token')
@@ -292,6 +294,16 @@ export default function EventDetailPage() {
         setSeatReservations(seatsData.reservations || [])
       }
 
+      // Fetch prepared state
+      const preparedRes = await fetch(`/api/admin/sessions/${sessionId}/prepared`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      if (preparedRes.ok) {
+        const preparedData = await preparedRes.json()
+        setHwPrepared(preparedData.hw_prepared || {})
+        setGamesPrepared(preparedData.games_prepared || {})
+      }
+
       // Fetch tips for this session (use session slug from state or just-fetched data)
       const tipSlug = session?.slug || sessionId
       const tipsRes = await fetch(`/api/event/${tipSlug}/tips`)
@@ -403,6 +415,26 @@ export default function EventDetailPage() {
 
   const getTotalTips = () => {
     return Object.values(tips).reduce((sum, t) => sum + (t.amount || 0), 0)
+  }
+
+  const togglePrepared = async (guestId: string, type: 'hw' | 'games') => {
+    const current = type === 'hw' ? hwPrepared : gamesPrepared
+    const isPrepared = !!current[guestId]
+    try {
+      const token = localStorage.getItem('admin_token')
+      const res = await fetch(`/api/admin/sessions/${sessionId}/prepared`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ guest_id: guestId, type, prepared: !isPrepared }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setHwPrepared(data.hw_prepared || {})
+        setGamesPrepared(data.games_prepared || {})
+      }
+    } catch (e) {
+      console.error('Error toggling prepared state:', e)
+    }
   }
 
   const getHardwareStats = () => {
@@ -1003,11 +1035,11 @@ export default function EventDetailPage() {
         {/* Hardware Reservations - grouped by guest */}
         {reservations.length > 0 && (() => {
           // Group reservations by guest
-          const guestHwMap: Record<string, { name: string; items: { name: string; type: string; qty: number; nights: number; price: number }[] }> = {}
+          const guestHwMap: Record<string, { guestId: string; name: string; items: { name: string; type: string; qty: number; nights: number; price: number }[] }> = {}
           reservations.forEach(r => {
             const gid = r.guest_id
             if (!guestHwMap[gid]) {
-              guestHwMap[gid] = { name: getGuestName(gid), items: [] }
+              guestHwMap[gid] = { guestId: gid, name: getGuestName(gid), items: [] }
             }
             const hw = hardwareItems.find(h => h.id === r.hardware_item_id)
             guestHwMap[gid].items.push({
@@ -1024,18 +1056,33 @@ export default function EventDetailPage() {
             g.items.sort((a, b) => (typeOrder[a.type] ?? 9) - (typeOrder[b.type] ?? 9))
           })
           const sortedGuests = Object.values(guestHwMap).sort((a, b) => a.name.localeCompare(b.name))
+          const preparedCount = sortedGuests.filter(g => hwPrepared[g.guestId]).length
 
           return (
             <div className="bg-white rounded-xl shadow mb-8 overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-200">
+              <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                 <h2 className="text-xl font-bold text-gray-900">💻 HW Rezervace ({reservations.length})</h2>
+                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${preparedCount === sortedGuests.length ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                  {preparedCount}/{sortedGuests.length} nachystáno
+                </span>
               </div>
               <div className="divide-y divide-gray-100">
                 {sortedGuests.map((guest, idx) => {
                   const guestTotal = guest.items.reduce((s, i) => s + i.price, 0)
+                  const isPrepared = !!hwPrepared[guest.guestId]
                   return (
-                    <div key={idx} className="px-6 py-3 flex items-center gap-4 hover:bg-gray-50">
-                      <span className="font-semibold text-gray-900 w-36 flex-shrink-0 truncate">{guest.name}</span>
+                    <div key={idx} className={`px-6 py-3 flex items-center gap-4 hover:bg-gray-50`} style={isPrepared ? { borderLeft: '3px solid #22c55e', backgroundColor: 'rgba(34, 197, 94, 0.04)' } : { borderLeft: '3px solid transparent' }}>
+                      <button
+                        onClick={() => togglePrepared(guest.guestId, 'hw')}
+                        className="flex-shrink-0 transition-colors"
+                        title={isPrepared ? 'Označeno jako nachystané — klikni pro zrušení' : 'Označit jako nachystané'}
+                      >
+                        {isPrepared
+                          ? <CheckCircle2 className="w-5 h-5 text-green-500" />
+                          : <Circle className="w-5 h-5 text-gray-300 hover:text-gray-400" />
+                        }
+                      </button>
+                      <span className="font-semibold w-36 flex-shrink-0 truncate text-gray-900">{guest.name}</span>
                       <div className="flex-1 flex flex-wrap gap-1.5">
                         {guest.items.map((item, i) => (
                           <span
@@ -1064,70 +1111,89 @@ export default function EventDetailPage() {
 
 
         {/* Game Install Requests for Admin Overview */}
-        {gameInstallRequests.length > 0 && (
-          <div className="bg-white rounded-xl shadow mb-8 overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">💿 Hry k instalaci na PC</h2>
-              <p className="text-sm text-gray-500 mt-1">Přehled her, které si hosté přejí nainstalovat na svůj PC</p>
-            </div>
-            <div className="divide-y divide-gray-100">
-              {gameInstallRequests.map((req: any) => {
-                const guestName = getGuestName(req.guest_id)
-                // Find which PCs this guest has reserved
-                const guestPcReservations = reservations.filter(
-                  (r: any) => r.guest_id === req.guest_id && hardwareItems.find(h => h.id === r.hardware_item_id)?.type === 'pc'
-                )
-                const pcNames = guestPcReservations.map((r: any) => {
-                  const hw = hardwareItems.find(h => h.id === r.hardware_item_id)
-                  return hw?.name || 'PC'
-                })
+        {gameInstallRequests.length > 0 && (() => {
+          const gamesPreparedCount = gameInstallRequests.filter((req: any) => gamesPrepared[req.guest_id]).length
+          return (
+            <div className="bg-white rounded-xl shadow mb-8 overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">💿 Hry k instalaci na PC</h2>
+                  <p className="text-sm text-gray-500 mt-1">Přehled her, které si hosté přejí nainstalovat na svůj PC</p>
+                </div>
+                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${gamesPreparedCount === gameInstallRequests.length ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                  {gamesPreparedCount}/{gameInstallRequests.length} nachystáno
+                </span>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {gameInstallRequests.map((req: any) => {
+                  const guestName = getGuestName(req.guest_id)
+                  const isPrepared = !!gamesPrepared[req.guest_id]
+                  // Find which PCs this guest has reserved
+                  const guestPcReservations = reservations.filter(
+                    (r: any) => r.guest_id === req.guest_id && hardwareItems.find(h => h.id === r.hardware_item_id)?.type === 'pc'
+                  )
+                  const pcNames = guestPcReservations.map((r: any) => {
+                    const hw = hardwareItems.find(h => h.id === r.hardware_item_id)
+                    return hw?.name || 'PC'
+                  })
 
-                return (
-                  <div key={req.id} className="px-6 py-4 hover:bg-gray-50">
-                    <div className="flex items-start gap-4">
-                      {/* Guest info */}
-                      <div className="flex-shrink-0">
-                        <span className="font-semibold text-gray-900">{guestName}</span>
-                        {pcNames.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {pcNames.map((name: string, i: number) => (
-                              <span key={i} className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: 'rgba(59, 130, 246, 0.12)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.25)' }}>
-                                💻 {name}
-                              </span>
-                            ))}
-                          </div>
-                        )}
+                  return (
+                    <div key={req.id} className={`px-6 py-4 hover:bg-gray-50`} style={isPrepared ? { borderLeft: '3px solid #22c55e', backgroundColor: 'rgba(34, 197, 94, 0.04)' } : { borderLeft: '3px solid transparent' }}>
+                      <div className="flex items-start gap-4">
+                        <button
+                          onClick={() => togglePrepared(req.guest_id, 'games')}
+                          className="flex-shrink-0 mt-0.5 transition-colors"
+                          title={isPrepared ? 'Označeno jako nachystané — klikni pro zrušení' : 'Označit jako nachystané'}
+                        >
+                          {isPrepared
+                            ? <CheckCircle2 className="w-5 h-5 text-green-500" />
+                            : <Circle className="w-5 h-5 text-gray-300 hover:text-gray-400" />
+                          }
+                        </button>
+                        {/* Guest info */}
+                        <div className="flex-shrink-0">
+                          <span className="font-semibold text-gray-900">{guestName}</span>
+                          {pcNames.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {pcNames.map((name: string, i: number) => (
+                                <span key={i} className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: 'rgba(59, 130, 246, 0.12)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.25)' }}>
+                                  💻 {name}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        {/* Games */}
+                        <div className="flex-1 flex flex-wrap gap-1.5">
+                          {(req.game_names || []).map((gameName: string, i: number) => (
+                            <span
+                              key={i}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
+                              style={{ backgroundColor: 'rgba(139, 92, 246, 0.12)', color: '#a78bfa', border: '1px solid rgba(139, 92, 246, 0.25)' }}
+                            >
+                              🎮 {gameName}
+                            </span>
+                          ))}
+                        </div>
+                        {/* Game count */}
+                        <span className="flex-shrink-0 text-xs font-semibold px-2 py-1 rounded-full" style={{ backgroundColor: 'rgba(139, 92, 246, 0.18)', color: '#a78bfa' }}>
+                          {(req.game_names || []).length} her
+                        </span>
                       </div>
-                      {/* Games */}
-                      <div className="flex-1 flex flex-wrap gap-1.5">
-                        {(req.game_names || []).map((gameName: string, i: number) => (
-                          <span
-                            key={i}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
-                            style={{ backgroundColor: 'rgba(139, 92, 246, 0.12)', color: '#a78bfa', border: '1px solid rgba(139, 92, 246, 0.25)' }}
-                          >
-                            🎮 {gameName}
-                          </span>
-                        ))}
-                      </div>
-                      {/* Game count */}
-                      <span className="flex-shrink-0 text-xs font-semibold px-2 py-1 rounded-full" style={{ backgroundColor: 'rgba(139, 92, 246, 0.18)', color: '#a78bfa' }}>
-                        {(req.game_names || []).length} her
-                      </span>
                     </div>
-                  </div>
-                )
-              })}
+                  )
+                })}
+              </div>
+              {/* Summary footer */}
+              <div className="px-6 py-3 bg-gray-50 border-t border-gray-200">
+                <p className="text-xs text-gray-500">
+                  📊 Celkem {gameInstallRequests.length} hostů si vyžádalo instalaci her •{' '}
+                  {[...new Set(gameInstallRequests.flatMap((r: any) => r.game_names || []))].length} unikátních her
+                </p>
+              </div>
             </div>
-            {/* Summary footer */}
-            <div className="px-6 py-3 bg-gray-50 border-t border-gray-200">
-              <p className="text-xs text-gray-500">
-                📊 Celkem {gameInstallRequests.length} hostů si vyžádalo instalaci her •{' '}
-                {[...new Set(gameInstallRequests.flatMap((r: any) => r.game_names || []))].length} unikátních her
-              </p>
-            </div>
-          </div>
-        )}
+          )
+        })()}
 
         {/* Meal Attendance per Day */}
         {(() => {

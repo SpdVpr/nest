@@ -454,6 +454,7 @@ export default function EventHardwarePage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="font-bold text-[var(--nest-text-primary)] text-base">
+                        {reservation.hardware_items?.is_top && <span style={{ color: '#f59e0b' }}>★ </span>}
                         {reservation.quantity > 1 ? `${reservation.quantity}× ` : ''}{reservation.hardware_items?.name || 'Neznámé zařízení'}
                       </h3>
                       {formatSpecs(reservation.hardware_items?.specs) && (
@@ -553,86 +554,101 @@ export default function EventHardwarePage() {
               const isSelected = qty > 0
               const soldOut = available === 0
 
+              const isTop = !!(item as any).is_top
+
               return (
                 <div
                   key={item.id}
-                  className={`p-5 rounded-xl border-2 transition-all ${soldOut
+                  className={`relative rounded-xl border-2 transition-all overflow-hidden ${soldOut
                     ? 'border-[var(--nest-border)] bg-[var(--nest-bg)] opacity-60'
                     : isSelected
                       ? 'border-emerald-600/60 bg-emerald-900/10 shadow-lg'
-                      : 'border-[var(--nest-border)] hover:border-[var(--nest-border-light)] hover:bg-[var(--nest-surface-alt)]'
+                      : isTop
+                        ? 'border-[var(--nest-yellow)]/25 hover:border-[var(--nest-yellow)]/45'
+                        : 'border-[var(--nest-border)] hover:border-[var(--nest-border-light)] hover:bg-[var(--nest-surface-alt)]'
                     }`}
                 >
-                  {/* Header */}
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="text-[var(--nest-yellow)]">
-                        {getItemIcon(item, "w-6 h-6")}
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-[var(--nest-text-primary)]">{item.name}</h3>
-                        {formatSpecs(item.specs) && (
-                          <p className="text-xs text-[var(--nest-text-secondary)]">
-                            {formatSpecs(item.specs)}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    {isSelected && <Check className="w-5 h-5 text-emerald-500/80" />}
-                  </div>
-
-                  {/* Price */}
-                  <p className="text-lg font-bold text-[var(--nest-yellow)] mb-3">
-                    {!hardwarePricingEnabled ? '' : item.price_per_night === 0 ? 'Zdarma' : `${item.price_per_night} Kč/noc`}
-                  </p>
-
-                  {/* Availability */}
-                  <div className="flex items-center justify-between mb-3">
-                    <span className={`text-sm font-semibold ${available > 0 ? 'text-emerald-500/80' : 'text-red-400'
-                      }`}>
-                      {soldOut ? '❌ Vše obsazeno' : `✅ ${available} ks volných`}
-                    </span>
-                    <span className="text-xs text-[var(--nest-text-tertiary)]">
-                      z {getEffectiveQuantity(item)} ks celkem
-                    </span>
-                  </div>
-
-                  {/* +/- Quantity controls — always shown for available items */}
-                  {!soldOut && (
-                    <div className="flex items-center justify-center gap-3 pt-3 border-t border-[var(--nest-border)]">
-                      <button
-                        onClick={() => changeQuantity(item.id, -1, available)}
-                        disabled={qty === 0}
-                        className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors font-bold text-lg ${qty === 0
-                          ? 'bg-[var(--nest-bg)] text-[var(--nest-text-tertiary)] cursor-not-allowed'
-                          : 'bg-red-900/30 text-red-400 hover:bg-red-900/50'
-                          }`}
-                      >
-                        <Minus className="w-5 h-5" />
-                      </button>
-
-                      <span className={`text-2xl font-bold w-10 text-center ${qty > 0 ? 'text-emerald-400' : 'text-[var(--nest-text-tertiary)]'
-                        }`}>
-                        {qty}
-                      </span>
-
-                      <button
-                        onClick={() => changeQuantity(item.id, 1, available)}
-                        disabled={qty >= available && !!selectedGuest}
-                        className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors font-bold text-lg ${qty >= available && !!selectedGuest
-                          ? 'bg-[var(--nest-bg)] text-[var(--nest-text-tertiary)] cursor-not-allowed'
-                          : 'bg-emerald-900/20 text-emerald-400 hover:bg-emerald-900/30'
-                          }`}
-                      >
-                        <Plus className="w-5 h-5" />
-                      </button>
-                    </div>
+                  {/* TOP accent bar */}
+                  {isTop && (
+                    <div style={{ height: 3, background: 'linear-gradient(90deg, transparent, rgba(245,158,11,0.5), transparent)' }} />
                   )}
+
+                  <div className="p-5">
+                    {/* Header */}
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <div className={isTop ? 'text-[#f59e0b]' : 'text-[var(--nest-yellow)]'}>
+                          {getItemIcon(item, "w-6 h-6")}
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-[var(--nest-text-primary)]">
+                            {isTop && <span style={{ color: '#f59e0b' }}>★ </span>}
+                            {item.name}
+                          </h3>
+                          {formatSpecs(item.specs) && (
+                            <p className="text-xs text-[var(--nest-text-secondary)]">
+                              {formatSpecs(item.specs)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {isSelected && <Check className="w-5 h-5 text-emerald-500/80" />}
+                    </div>
+
+                    {/* Price */}
+                    <p className="text-lg font-bold text-[var(--nest-yellow)] mb-3">
+                      {!hardwarePricingEnabled ? '' : item.price_per_night === 0 ? 'Zdarma' : `${item.price_per_night} Kč/noc`}
+                    </p>
+
+                    {/* Availability */}
+                    <div className="flex items-center justify-between mb-3">
+                      <span className={`text-sm font-semibold ${available > 0 ? 'text-emerald-500/80' : 'text-red-400'
+                        }`}>
+                        {soldOut ? '❌ Vše obsazeno' : `✅ ${available} ks volných`}
+                      </span>
+                      <span className="text-xs text-[var(--nest-text-tertiary)]">
+                        z {getEffectiveQuantity(item)} ks celkem
+                      </span>
+                    </div>
+
+                    {/* +/- Quantity controls — always shown for available items */}
+                    {!soldOut && (
+                      <div className="flex items-center justify-center gap-3 pt-3 border-t border-[var(--nest-border)]">
+                        <button
+                          onClick={() => changeQuantity(item.id, -1, available)}
+                          disabled={qty === 0}
+                          className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors font-bold text-lg ${qty === 0
+                            ? 'bg-[var(--nest-bg)] text-[var(--nest-text-tertiary)] cursor-not-allowed'
+                            : 'bg-red-900/30 text-red-400 hover:bg-red-900/50'
+                            }`}
+                        >
+                          <Minus className="w-5 h-5" />
+                        </button>
+
+                        <span className={`text-2xl font-bold w-10 text-center ${qty > 0 ? 'text-emerald-400' : 'text-[var(--nest-text-tertiary)]'
+                          }`}>
+                          {qty}
+                        </span>
+
+                        <button
+                          onClick={() => changeQuantity(item.id, 1, available)}
+                          disabled={qty >= available && !!selectedGuest}
+                          className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors font-bold text-lg ${qty >= available && !!selectedGuest
+                            ? 'bg-[var(--nest-bg)] text-[var(--nest-text-tertiary)] cursor-not-allowed'
+                            : 'bg-emerald-900/20 text-emerald-400 hover:bg-emerald-900/30'
+                            }`}
+                        >
+                          <Plus className="w-5 h-5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )
             })}
           </div>
-        )}
+        )
+        }
       </div>
 
       {/* Selected items summary */}

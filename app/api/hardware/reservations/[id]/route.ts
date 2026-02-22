@@ -78,7 +78,23 @@ export async function DELETE(
     const db = getFirebaseAdminDb()
     const { id } = await params
 
+    // Read reservation data before deleting (to get guest_id and session_id)
+    const docSnap = await db.collection('hardware_reservations').doc(id).get()
+    const resData = docSnap.exists ? docSnap.data() : null
+
     await db.collection('hardware_reservations').doc(id).delete()
+
+    // Reset hw_prepared flag for this guest
+    if (resData?.session_id && resData?.guest_id) {
+      try {
+        const { FieldValue } = await import('firebase-admin/firestore')
+        await db.collection('sessions').doc(resData.session_id).update({
+          [`hw_prepared.${resData.guest_id}`]: FieldValue.delete(),
+        })
+      } catch (e) {
+        console.log('Could not reset hw_prepared flag:', e)
+      }
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

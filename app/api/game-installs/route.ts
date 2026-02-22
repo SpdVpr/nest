@@ -69,6 +69,16 @@ export async function POST(request: NextRequest) {
         batch.set(docRef, requestData)
         await batch.commit()
 
+        // Reset games_prepared flag for this guest (admin needs to re-check)
+        try {
+            const { FieldValue } = await import('firebase-admin/firestore')
+            await db.collection('sessions').doc(session_id).update({
+                [`games_prepared.${guest_id}`]: FieldValue.delete(),
+            })
+        } catch (e) {
+            console.log('Could not reset games_prepared flag:', e)
+        }
+
         return NextResponse.json({
             request: {
                 id: docRef.id,

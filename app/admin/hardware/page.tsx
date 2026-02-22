@@ -13,6 +13,7 @@ interface HardwareItem {
   price_per_night: number
   quantity: number
   is_available: boolean
+  is_top?: boolean
   sort_order?: number
   specs?: {
     diagonal?: string
@@ -160,6 +161,7 @@ export default function AdminHardwarePage() {
       price_per_night: item.price_per_night,
       quantity: item.quantity,
       is_available: item.is_available,
+      is_top: item.is_top,
       specs: item.specs ? { ...item.specs } : {},
     })
   }
@@ -456,6 +458,16 @@ export default function AdminHardwarePage() {
                   <label className="text-sm" style={{ color: 'var(--nest-text-secondary)' }}>Dostupné pro rezervace</label>
                 </div>
 
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={editingItem.is_top === true}
+                    onChange={(e) => setEditingItem({ ...editingItem, is_top: e.target.checked })}
+                    className="w-4 h-4"
+                  />
+                  <label className="text-sm" style={{ color: 'var(--nest-text-secondary)' }}>⭐ Označit jako TOP (prémiový produkt)</label>
+                </div>
+
                 {/* Monitor specs */}
                 {editingItem.type === 'monitor' && (
                   <div style={{ borderTop: '1px solid var(--nest-border)', paddingTop: '1rem' }}>
@@ -627,7 +639,10 @@ export default function AdminHardwarePage() {
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-lg" style={{ color: 'var(--nest-text-primary)' }}>{item.name}</p>
+                    <p className="font-semibold text-lg" style={{ color: 'var(--nest-text-primary)' }}>
+                      {item.is_top && <span style={{ color: '#f59e0b' }}>★ </span>}
+                      {item.name}
+                    </p>
                     <p className="text-sm" style={{ color: 'var(--nest-text-secondary)' }}>
                       {item.type === 'monitor' ? '📺 Monitor' : item.type === 'pc' ? '💻 PC' : '🎮 Příslušenství'}
                       {formatSpecs(item.specs) && ` • ${formatSpecs(item.specs)}`}

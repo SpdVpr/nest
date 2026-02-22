@@ -15,7 +15,8 @@ import {
   Edit,
   Trash2,
   UtensilsCrossed,
-  Gamepad2
+  Gamepad2,
+  Copy
 } from 'lucide-react'
 import { Session } from '@/types/database.types'
 import { formatDate } from '@/lib/utils'
@@ -273,6 +274,13 @@ export default function AdminDashboard() {
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
+                          <Link
+                            href={`/admin/sessions?copyFrom=${session.id}`}
+                            className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
+                            title="Vytvořit nový event s nastavením tohoto"
+                          >
+                            <Copy className="w-4 h-4" />
+                          </Link>
                           <Link
                             href={`/event/${session.slug}`}
                             target="_blank"

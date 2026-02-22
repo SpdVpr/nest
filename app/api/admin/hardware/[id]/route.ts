@@ -69,6 +69,7 @@ export async function PATCH(
     if (body.price_per_night !== undefined) updateData.price_per_night = parseFloat(body.price_per_night)
     if (body.quantity !== undefined) updateData.quantity = parseInt(body.quantity)
     if (body.is_available !== undefined) updateData.is_available = body.is_available
+    if (body.is_top !== undefined) updateData.is_top = body.is_top
     if (body.specs !== undefined) updateData.specs = body.specs
     if (body.sort_order !== undefined) updateData.sort_order = parseInt(body.sort_order)
 
