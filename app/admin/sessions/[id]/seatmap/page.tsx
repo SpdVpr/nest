@@ -3,9 +3,11 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Armchair, Monitor, Cpu, Gamepad2, User, Printer, Loader2 } from 'lucide-react'
+import { ArrowLeft, Armchair, Monitor, Cpu, Gamepad2, User, Printer, Loader2, CheckCircle2, Circle } from 'lucide-react'
 import { Session } from '@/types/database.types'
 import { formatDate } from '@/lib/utils'
+import { useAdminAuth } from '@/lib/admin-auth-context'
+import { canViewFinances } from '@/lib/admin-roles'
 
 interface SeatReservation {
     id: string
@@ -55,6 +57,8 @@ export default function AdminSeatMapPage() {
     const router = useRouter()
     const params = useParams()
     const sessionId = params?.id as string
+    const { role } = useAdminAuth()
+    const showFinances = role ? canViewFinances(role) : false
 
     const [session, setSession] = useState<Session | null>(null)
     const [guests, setGuests] = useState<Guest[]>([])
@@ -64,6 +68,8 @@ export default function AdminSeatMapPage() {
     const [gameInstallRequests, setGameInstallRequests] = useState<GameInstallRequest[]>([])
     const [loading, setLoading] = useState(true)
     const [selectedSeat, setSelectedSeat] = useState<string | null>(null)
+    const [hwPrepared, setHwPrepared] = useState<Record<string, string>>({})
+    const [gamesPrepared, setGamesPrepared] = useState<Record<string, string>>({})
 
     const planContainerRef = useRef<HTMLDivElement>(null)
     const planContentRef = useRef<HTMLDivElement>(null)
@@ -150,6 +156,16 @@ export default function AdminSeatMapPage() {
                 const installData = await installRes.json()
                 setGameInstallRequests(installData.requests || [])
             }
+
+            // Fetch prepared state
+            const prepRes = await fetch(`/api/admin/sessions/${sessionId}/prepared`, {
+                headers: { Authorization: `Bearer ${token}` },
+            })
+            if (prepRes.ok) {
+                const prepData = await prepRes.json()
+                setHwPrepared(prepData.hw_prepared || {})
+                setGamesPrepared(prepData.games_prepared || {})
+            }
         } catch (error) {
             console.error('Error fetching seat map data:', error)
         } finally {
@@ -173,6 +189,26 @@ export default function AdminSeatMapPage() {
         return req?.game_names || []
     }
 
+    const togglePrepared = async (guestId: string, type: 'hw' | 'games') => {
+        const current = type === 'hw' ? hwPrepared : gamesPrepared
+        const isPrepared = !!current[guestId]
+        try {
+            const token = localStorage.getItem('admin_token')
+            const res = await fetch(`/api/admin/sessions/${sessionId}/prepared`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ guest_id: guestId, type, prepared: !isPrepared }),
+            })
+            if (res.ok) {
+                const data = await res.json()
+                setHwPrepared(data.hw_prepared || {})
+                setGamesPrepared(data.games_prepared || {})
+            }
+        } catch (e) {
+            console.error('Error toggling prepared state:', e)
+        }
+    }
+
     // Stats
     const reservedSeats = seatReservations.length
     const availableSeats = ALL_SEATS.length - reservedSeats
@@ -189,6 +225,9 @@ export default function AdminSeatMapPage() {
         const guestHw = (reservation && !isAutoReserved) ? getGuestHardware(reservation.guest_id) : []
         const hasPc = guestHw.some(h => h.itemType === 'pc')
         const hasMonitor = guestHw.some(h => h.itemType === 'monitor')
+        const isHwReady = reservation && !isAutoReserved && !!hwPrepared[reservation.guest_id]
+        const isGamesReady = reservation && !isAutoReserved && !!gamesPrepared[reservation.guest_id]
+        const isFullyReady = reservation && !isAutoReserved && (guestHw.length === 0 || isHwReady) && (getGuestGameInstalls(reservation.guest_id).length === 0 || isGamesReady)
 
         return (
             <button
@@ -200,15 +239,25 @@ export default function AdminSeatMapPage() {
                             ? isSelected
                                 ? 'bg-amber-600/25 border-2 border-dashed border-amber-400/60 shadow-lg scale-105'
                                 : 'bg-amber-900/25 text-white/60 border-2 border-dashed border-amber-500/30 hover:border-amber-400/60'
-                            : isSelected
-                                ? 'bg-amber-600/40 border-2 border-solid border-amber-400 shadow-lg shadow-amber-500/20 scale-105'
-                                : 'bg-red-900/50 text-white/90 border-2 border-solid border-red-700/60 hover:border-amber-400 hover:bg-red-800/60'
+                            : isFullyReady
+                                ? isSelected
+                                    ? 'bg-emerald-600/40 border-2 border-solid border-emerald-400 shadow-lg shadow-emerald-500/20 scale-105'
+                                    : 'bg-emerald-900/50 text-white/90 border-2 border-solid border-emerald-600/60 hover:border-emerald-400 hover:bg-emerald-800/60'
+                                : isSelected
+                                    ? 'bg-amber-600/40 border-2 border-solid border-amber-400 shadow-lg shadow-amber-500/20 scale-105'
+                                    : 'bg-red-900/50 text-white/90 border-2 border-solid border-red-700/60 hover:border-amber-400 hover:bg-red-800/60'
                         : 'bg-emerald-700/40 text-white/60 border-2 border-solid border-emerald-600/50'
                     }
         `}
                 style={{ width: CELL_W, height: CELL_H }}
-                title={reservation ? `${id}: ${reservation.guest_name}${isAutoReserved ? ' (auto)' : ''}` : `${id}: Volné`}
+                title={reservation ? `${id}: ${reservation.guest_name}${isAutoReserved ? ' (auto)' : ''}${isFullyReady ? ' ✅' : ''}` : `${id}: Volné`}
             >
+                {/* Prepared badge */}
+                {isFullyReady && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center shadow">
+                        <CheckCircle2 className="w-3 h-3 text-white" />
+                    </span>
+                )}
                 <span className="text-[10px] font-extrabold leading-none opacity-60">{id}</span>
                 {reservation ? (
                     <>
@@ -326,6 +375,44 @@ export default function AdminSeatMapPage() {
                 </div>
 
                 <div className="p-6 space-y-5">
+                    {/* Preparation status toggles */}
+                    {!isAutoReserved && (hw.length > 0 || gameInstalls.length > 0) && (
+                        <div className="flex flex-wrap gap-2">
+                            {hw.length > 0 && (
+                                <button
+                                    onClick={() => togglePrepared(reservation.guest_id, 'hw')}
+                                    className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${hwPrepared[reservation.guest_id]
+                                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-500/30'
+                                        : 'bg-white/5 border border-white/10 hover:bg-white/10'
+                                        }`}
+                                    style={!hwPrepared[reservation.guest_id] ? { color: 'var(--nest-text-secondary)' } : undefined}
+                                >
+                                    {hwPrepared[reservation.guest_id]
+                                        ? <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                                        : <Circle className="w-4 h-4" />
+                                    }
+                                    HW nachystáno
+                                </button>
+                            )}
+                            {gameInstalls.length > 0 && (
+                                <button
+                                    onClick={() => togglePrepared(reservation.guest_id, 'games')}
+                                    className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${gamesPrepared[reservation.guest_id]
+                                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-500/30'
+                                        : 'bg-white/5 border border-white/10 hover:bg-white/10'
+                                        }`}
+                                    style={!gamesPrepared[reservation.guest_id] ? { color: 'var(--nest-text-secondary)' } : undefined}
+                                >
+                                    {gamesPrepared[reservation.guest_id]
+                                        ? <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                                        : <Circle className="w-4 h-4" />
+                                    }
+                                    Hry nainstalovány
+                                </button>
+                            )}
+                        </div>
+                    )}
+
                     {/* Hardware */}
                     <div>
                         <h4 className="text-sm font-bold mb-2 flex items-center gap-2" style={{ color: 'var(--nest-text-secondary)' }}>
@@ -341,7 +428,7 @@ export default function AdminSeatMapPage() {
                                         <Cpu className="w-4 h-4 text-blue-400 flex-shrink-0" />
                                         <span className="font-medium" style={{ color: 'var(--nest-text-primary)' }}>{h.itemName}</span>
                                         <span className="ml-auto text-xs" style={{ color: 'var(--nest-text-tertiary)' }}>{h.quantity}× • {h.nights_count} nocí</span>
-                                        <span className="font-bold text-blue-400">{h.total_price} Kč</span>
+                                        {showFinances && <span className="font-bold text-blue-400">{h.total_price} Kč</span>}
                                     </div>
                                 ))}
                                 {monitors.map((h, i) => (
@@ -349,7 +436,7 @@ export default function AdminSeatMapPage() {
                                         <Monitor className="w-4 h-4 text-purple-400 flex-shrink-0" />
                                         <span className="font-medium" style={{ color: 'var(--nest-text-primary)' }}>{h.itemName}</span>
                                         <span className="ml-auto text-xs" style={{ color: 'var(--nest-text-tertiary)' }}>{h.quantity}× • {h.nights_count} nocí</span>
-                                        <span className="font-bold text-purple-400">{h.total_price} Kč</span>
+                                        {showFinances && <span className="font-bold text-purple-400">{h.total_price} Kč</span>}
                                     </div>
                                 ))}
                                 {accessories.map((h, i) => (
@@ -357,7 +444,7 @@ export default function AdminSeatMapPage() {
                                         <Gamepad2 className="w-4 h-4 text-green-400 flex-shrink-0" />
                                         <span className="font-medium" style={{ color: 'var(--nest-text-primary)' }}>{h.itemName}</span>
                                         <span className="ml-auto text-xs" style={{ color: 'var(--nest-text-tertiary)' }}>{h.quantity}× • {h.nights_count} nocí</span>
-                                        <span className="font-bold text-green-400">{h.total_price} Kč</span>
+                                        {showFinances && <span className="font-bold text-green-400">{h.total_price} Kč</span>}
                                     </div>
                                 ))}
                             </div>
@@ -464,6 +551,10 @@ export default function AdminSeatMapPage() {
                     <div className="flex items-center gap-2">
                         <Gamepad2 className="w-3 h-3 text-green-400" />
                         <span className="text-sm" style={{ color: 'var(--nest-text-secondary)' }}>= příslušenství</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                        <span className="text-sm" style={{ color: 'var(--nest-text-secondary)' }}>= připraveno</span>
                     </div>
                 </div>
 
@@ -590,6 +681,10 @@ export default function AdminSeatMapPage() {
                                                                 <span className="text-[10px] opacity-40">auto</span>
                                                             ) : (
                                                                 <>
+                                                                    {(() => {
+                                                                        const isReady = (hw.length === 0 || !!hwPrepared[res.guest_id]) && (gameInstalls.length === 0 || !!gamesPrepared[res.guest_id])
+                                                                        return isReady ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : null
+                                                                    })()}
                                                                     {hw.some(h => h.itemType === 'pc') && <Cpu className="w-3.5 h-3.5 text-blue-400" />}
                                                                     {hw.some(h => h.itemType === 'monitor') && <Monitor className="w-3.5 h-3.5 text-purple-400" />}
                                                                     {hw.some(h => h.itemType === 'accessory') && <Gamepad2 className="w-3.5 h-3.5 text-green-400" />}

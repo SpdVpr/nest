@@ -7,6 +7,8 @@ import { ArrowLeft, Users, Monitor, Utensils, TrendingUp, Loader2, Edit2, Check,
 import { Session, Guest, MenuItem, MealType, Game, GameLibraryItem, HardwareOverride } from '@/types/database.types'
 import { HardwareItem } from '@/types/hardware.types'
 import { formatDate, formatDateOnly } from '@/lib/utils'
+import { useAdminAuth } from '@/lib/admin-auth-context'
+import { canViewFinances, canEditSettings, canEditPrices } from '@/lib/admin-roles'
 
 interface HardwareReservation {
   id: string
@@ -52,6 +54,10 @@ export default function EventDetailPage() {
   const params = useParams()
   const searchParams = useSearchParams()
   const sessionId = params?.id as string
+  const { role } = useAdminAuth()
+  const showFinances = role ? canViewFinances(role) : false
+  const showEdit = role ? canEditSettings(role) : false
+  const showPrices = role ? canEditPrices(role) : false
 
   const [session, setSession] = useState<ExtendedSession | null>(null)
   const [guests, setGuests] = useState<ExtendedGuest[]>([])
@@ -67,7 +73,11 @@ export default function EventDetailPage() {
   const [editEventName, setEditEventName] = useState('')
   const [editEventStartDate, setEditEventStartDate] = useState('')
   const [editEventEndDate, setEditEventEndDate] = useState('')
+  const [editEventStartTime, setEditEventStartTime] = useState('')
+  const [editEventEndTime, setEditEventEndTime] = useState('')
   const [editEventDescription, setEditEventDescription] = useState('')
+  const [editPricePerNight, setEditPricePerNight] = useState('')
+  const [editSurchargeEnabled, setEditSurchargeEnabled] = useState(false)
   const [savingEvent, setSavingEvent] = useState(false)
   // Hardware edit state
   const [editHwPricingEnabled, setEditHwPricingEnabled] = useState(true)
@@ -98,10 +108,10 @@ export default function EventDetailPage() {
   }, [sessionId, router])
 
   useEffect(() => {
-    if (session && searchParams.get('edit') === 'true') {
+    if (session && searchParams.get('edit') === 'true' && showEdit) {
       startEditEvent(session)
     }
-  }, [session, searchParams])
+  }, [session, searchParams, showEdit])
 
   const startEditEvent = (sessionToEdit: ExtendedSession) => {
     setEditingEvent(true)
@@ -110,7 +120,11 @@ export default function EventDetailPage() {
     const endDate = sessionToEdit.end_date ? formatDateTimeLocal(new Date(sessionToEdit.end_date)) : ''
     setEditEventStartDate(startDate)
     setEditEventEndDate(endDate)
+    setEditEventStartTime((sessionToEdit as any).start_time || '')
+    setEditEventEndTime((sessionToEdit as any).end_time || '')
     setEditEventDescription(sessionToEdit.description || '')
+    setEditPricePerNight((sessionToEdit.price_per_night || 0).toString())
+    setEditSurchargeEnabled((sessionToEdit as any).surcharge_enabled || false)
     // Load HW settings
     setEditHwPricingEnabled(sessionToEdit.hardware_pricing_enabled !== false)
     setEditHwOverrides(sessionToEdit.hardware_overrides || {})
@@ -170,6 +184,15 @@ export default function EventDetailPage() {
         eventData.description = editEventDescription
       }
 
+      // Time settings
+      eventData.start_time = editEventStartTime || null
+      eventData.end_time = editEventEndTime || null
+
+      // Price settings
+      const priceVal = parseFloat(editPricePerNight)
+      eventData.price_per_night = !isNaN(priceVal) && priceVal >= 0 ? priceVal : 0
+      eventData.surcharge_enabled = editSurchargeEnabled
+
       // Hardware settings
       eventData.hardware_pricing_enabled = editHwPricingEnabled
       eventData.hardware_overrides = editHwOverrides
@@ -200,7 +223,11 @@ export default function EventDetailPage() {
     setEditEventName('')
     setEditEventStartDate('')
     setEditEventEndDate('')
+    setEditEventStartTime('')
+    setEditEventEndTime('')
     setEditEventDescription('')
+    setEditPricePerNight('')
+    setEditSurchargeEnabled(false)
     router.push(`/admin/sessions/${sessionId}`)
   }
 
@@ -586,12 +613,14 @@ export default function EventDetailPage() {
               >
                 🗺️ Mapa míst
               </Link>
-              <Link
-                href={`/admin/sessions/${sessionId}/settlement`}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium"
-              >
-                💳 Vyúčtování
-              </Link>
+              {showFinances && (
+                <Link
+                  href={`/admin/sessions/${sessionId}/settlement`}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium"
+                >
+                  💳 Vyúčtování
+                </Link>
+              )}
               <Link
                 href={`/event/${session.slug}`}
                 target="_blank"
@@ -605,7 +634,7 @@ export default function EventDetailPage() {
       </div>
 
       {/* Edit Event Form */}
-      {editingEvent && (
+      {editingEvent && showEdit && (
         <div style={{ backgroundColor: 'var(--nest-surface)', borderBottom: '1px solid var(--nest-border)' }} className="py-6">
           <div className="max-w-7xl mx-auto px-4">
             <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: 'var(--nest-text-primary)' }}>
@@ -655,6 +684,33 @@ export default function EventDetailPage() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--nest-text-secondary)' }}>
+                    Čas začátku
+                  </label>
+                  <input
+                    type="time"
+                    value={editEventStartTime}
+                    onChange={(e) => setEditEventStartTime(e.target.value)}
+                    className="w-full px-4 py-2 rounded-lg"
+                    style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--nest-text-secondary)' }}>
+                    Čas konce
+                  </label>
+                  <input
+                    type="time"
+                    value={editEventEndTime}
+                    onChange={(e) => setEditEventEndTime(e.target.value)}
+                    className="w-full px-4 py-2 rounded-lg"
+                    style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium mb-2" style={{ color: 'var(--nest-text-secondary)' }}>
                   Popis eventu
@@ -668,6 +724,68 @@ export default function EventDetailPage() {
                   rows={3}
                 />
               </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--nest-text-secondary)' }}>
+                  Cena za noc (Kč)
+                </label>
+                <input
+                  type="number"
+                  value={editPricePerNight}
+                  onChange={(e) => setEditPricePerNight(e.target.value)}
+                  placeholder="např. 300"
+                  min="0"
+                  className="w-full px-4 py-2 rounded-lg"
+                  style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
+                />
+              </div>
+
+              {/* Surcharge toggle */}
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      checked={editSurchargeEnabled}
+                      onChange={(e) => setEditSurchargeEnabled(e.target.checked)}
+                      className="sr-only"
+                    />
+                    <div
+                      className="block w-12 h-7 rounded-full transition-colors"
+                      style={{ backgroundColor: editSurchargeEnabled ? '#f59e0b' : 'var(--nest-border)' }}
+                    ></div>
+                    <div
+                      className={`absolute left-0.5 top-0.5 w-6 h-6 rounded-full transition-transform ${editSurchargeEnabled ? 'translate-x-5' : ''}`}
+                      style={{ backgroundColor: 'var(--nest-text-primary)' }}
+                    ></div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold" style={{ color: 'var(--nest-text-primary)' }}>Příplatek pod 10 lidí</span>
+                  </div>
+                </label>
+                {editSurchargeEnabled && (
+                  <span
+                    className="text-xs px-2 py-1 rounded-full font-medium"
+                    style={{ color: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.15)' }}
+                  >
+                    +150 Kč/noc za každého chybějícího
+                  </span>
+                )}
+              </div>
+
+              {editSurchargeEnabled && (
+                <div
+                  className="rounded-lg p-3 text-sm"
+                  style={{
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                    border: '1px solid rgba(245, 158, 11, 0.25)',
+                    color: '#f59e0b',
+                  }}
+                >
+                  💡 Při méně než 10 účastnících se cena za noc zvýší o 150 Kč za každého chybějícího.
+                  Např. při 7 lidech: {editPricePerNight ? `${parseInt(editPricePerNight) + 3 * 150} Kč` : '—'} /noc.
+                </div>
+              )}
 
               {/* Hardware Configuration */}
               <hr style={{ borderColor: 'var(--nest-border)' }} />
@@ -874,64 +992,68 @@ export default function EventDetailPage() {
             </div>
           </div>
 
-          {/* Price Per Night */}
-          <div className="bg-white rounded-xl shadow p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <p className="text-sm text-gray-600">Cena za noc</p>
-                {editingPrice ? (
-                  <div className="mt-2 flex gap-2">
-                    <input
-                      type="number"
-                      value={newPrice}
-                      onChange={(e) => setNewPrice(e.target.value)}
-                      placeholder="Cena"
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
-                      disabled={savingPrice}
-                    />
-                    <button
-                      onClick={handleSavePrice}
-                      disabled={savingPrice}
-                      className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400"
-                    >
-                      <Check className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        setEditingPrice(false)
-                        setNewPrice((session?.price_per_night || 0).toString())
-                      }}
-                      disabled={savingPrice}
-                      className="px-3 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 mt-2">
-                    <p className="text-3xl font-bold text-gray-900">{session.price_per_night} Kč</p>
-                    <button
-                      onClick={() => setEditingPrice(true)}
-                      className="p-2 text-gray-500 hover:text-blue-600"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
+          {/* Price Per Night - Admin only */}
+          {showFinances && (
+            <div className="bg-white rounded-xl shadow p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <p className="text-sm text-gray-600">Cena za noc</p>
+                  {editingPrice ? (
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        type="number"
+                        value={newPrice}
+                        onChange={(e) => setNewPrice(e.target.value)}
+                        placeholder="Cena"
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                        disabled={savingPrice}
+                      />
+                      <button
+                        onClick={handleSavePrice}
+                        disabled={savingPrice}
+                        className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400"
+                      >
+                        <Check className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingPrice(false)
+                          setNewPrice((session?.price_per_night || 0).toString())
+                        }}
+                        disabled={savingPrice}
+                        className="px-3 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 mt-2">
+                      <p className="text-3xl font-bold text-gray-900">{session.price_per_night} Kč</p>
+                      <button
+                        onClick={() => setEditingPrice(true)}
+                        className="p-2 text-gray-500 hover:text-blue-600"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
-          {/* Revenue */}
-          <div className="bg-white rounded-xl shadow p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Celkový obrat</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">{totalRevenue} Kč</p>
+          {/* Revenue - Admin only */}
+          {showFinances && (
+            <div className="bg-white rounded-xl shadow p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Celkový obrat</p>
+                  <p className="text-3xl font-bold text-gray-900 mt-2">{totalRevenue} Kč</p>
+                </div>
+                <TrendingUp className="w-12 h-12 text-purple-500 opacity-20" />
               </div>
-              <TrendingUp className="w-12 h-12 text-purple-500 opacity-20" />
             </div>
-          </div>
+          )}
         </div>
 
         {/* Guests Table with Total Price */}
@@ -948,10 +1070,10 @@ export default function EventDetailPage() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Noci</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Příjezd / Odjezd</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">HW</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">HW (Kč)</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Jídlo (Kč)</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-pink-500 uppercase">💖 Dýško</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase text-red-600 font-bold">Celkem</th>
+                  {showFinances && <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">HW (Kč)</th>}
+                  {showFinances && <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Jídlo (Kč)</th>}
+                  {showFinances && <th className="px-4 py-3 text-left text-xs font-medium text-pink-500 uppercase">💖 Dýško</th>}
+                  {showFinances && <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase text-red-600 font-bold">Celkem</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -1001,22 +1123,24 @@ export default function EventDetailPage() {
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">{hwPrice} Kč</td>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">{foodPrice} Kč</td>
-                        <td className="px-4 py-3 text-sm font-medium">
-                          {getTipByGuest(guest.id) > 0 ? (
-                            <span className="inline-flex items-center gap-1 text-pink-600 font-semibold">
-                              <Heart className="w-3.5 h-3.5 fill-pink-500" />
-                              {getTipByGuest(guest.id)} Kč
-                              {tips[guest.id]?.percentage && (
-                                <span className="text-xs text-pink-400">({tips[guest.id].percentage}%)</span>
-                              )}
-                            </span>
-                          ) : (
-                            <span className="text-gray-300">—</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 font-bold text-red-600">{totalPrice} Kč</td>
+                        {showFinances && <td className="px-4 py-3 text-sm font-medium text-gray-900">{hwPrice} Kč</td>}
+                        {showFinances && <td className="px-4 py-3 text-sm font-medium text-gray-900">{foodPrice} Kč</td>}
+                        {showFinances && (
+                          <td className="px-4 py-3 text-sm font-medium">
+                            {getTipByGuest(guest.id) > 0 ? (
+                              <span className="inline-flex items-center gap-1 text-pink-600 font-semibold">
+                                <Heart className="w-3.5 h-3.5 fill-pink-500" />
+                                {getTipByGuest(guest.id)} Kč
+                                {tips[guest.id]?.percentage && (
+                                  <span className="text-xs text-pink-400">({tips[guest.id].percentage}%)</span>
+                                )}
+                              </span>
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
+                          </td>
+                        )}
+                        {showFinances && <td className="px-4 py-3 font-bold text-red-600">{totalPrice} Kč</td>}
                       </tr>
                     )
                   })
@@ -1099,7 +1223,7 @@ export default function EventDetailPage() {
                           </span>
                         ))}
                       </div>
-                      <span className="flex-shrink-0 font-bold text-gray-900 text-sm">{guestTotal} Kč</span>
+                      {showFinances && <span className="flex-shrink-0 font-bold text-gray-900 text-sm">{guestTotal} Kč</span>}
                     </div>
                   )
                 })}
@@ -1358,11 +1482,11 @@ export default function EventDetailPage() {
                       {guest.itemList.map((item, i) => (
                         <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(251, 191, 36, 0.12)', color: '#fbbf24', border: '1px solid rgba(251, 191, 36, 0.25)' }}>
                           {item.qty > 1 ? `${item.qty}× ` : ''}{item.product}
-                          <span style={{ color: 'rgba(251, 191, 36, 0.6)' }} className="font-normal">({item.price} Kč)</span>
+                          {showFinances && <span style={{ color: 'rgba(251, 191, 36, 0.6)' }} className="font-normal">({item.price} Kč)</span>}
                         </span>
                       ))}
                     </div>
-                    <span className="flex-shrink-0 font-bold text-gray-900 text-sm">{guest.total} Kč</span>
+                    {showFinances && <span className="flex-shrink-0 font-bold text-gray-900 text-sm">{guest.total} Kč</span>}
                   </div>
                 ))}
               </div>

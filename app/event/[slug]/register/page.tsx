@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
-import { Users, Loader2 } from 'lucide-react'
+import { Users, Loader2, Info } from 'lucide-react'
 import { Session } from '@/types/database.types'
 import { formatEventRange } from '@/lib/utils'
 import DateRangeCalendar from '@/components/DateRangeCalendar'
@@ -11,12 +11,16 @@ import { guestStorage } from '@/lib/guest-storage'
 import NestPage from '@/components/NestPage'
 import NestLoading from '@/components/NestLoading'
 
+const MIN_GUESTS_FOR_BASE_PRICE = 10
+const SURCHARGE_PER_MISSING_GUEST = 150
+
 export default function RegisterPage() {
   const params = useParams()
   const router = useRouter()
   const slug = params?.slug as string
 
   const [session, setSession] = useState<Session | null>(null)
+  const [guestCount, setGuestCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [name, setName] = useState('')
@@ -41,6 +45,7 @@ export default function RegisterPage() {
 
       const data = await response.json()
       setSession(data.session)
+      setGuestCount(data.guest_count || 0)
     } catch (error) {
       console.error('Error fetching event:', error)
       setError('Chyba při načítání eventu')
@@ -55,6 +60,25 @@ export default function RegisterPage() {
     const checkOut = new Date(checkedOutDate.getFullYear(), checkedOutDate.getMonth(), checkedOutDate.getDate())
     const diffTime = checkOut.getTime() - checkIn.getTime()
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  }
+
+  /**
+   * Calculate the effective price per night.
+   * Base price (set in admin) applies at ≥10 guests.
+   * For each missing guest below 10, price increases by 150 Kč.
+   * We count the new registrant as +1 (optimistic).
+   */
+  const calculateEffectivePrice = (): { basePrice: number; effectivePrice: number; surcharge: number; effectiveGuestCount: number } => {
+    const basePrice = (session as any)?.price_per_night || 0
+    const isSurchargeEnabled = (session as any)?.surcharge_enabled === true
+    // Count the current registrant as +1
+    const effectiveGuestCount = guestCount + 1
+    if (!isSurchargeEnabled || effectiveGuestCount >= MIN_GUESTS_FOR_BASE_PRICE) {
+      return { basePrice, effectivePrice: basePrice, surcharge: 0, effectiveGuestCount }
+    }
+    const missingGuests = MIN_GUESTS_FOR_BASE_PRICE - effectiveGuestCount
+    const surcharge = missingGuests * SURCHARGE_PER_MISSING_GUEST
+    return { basePrice, effectivePrice: basePrice + surcharge, surcharge, effectiveGuestCount }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -140,6 +164,9 @@ export default function RegisterPage() {
     )
   }
 
+  const { basePrice, effectivePrice, surcharge, effectiveGuestCount } = calculateEffectivePrice()
+  const nights = calculateNights()
+
   return (
     <NestPage
       sessionSlug={slug}
@@ -164,6 +191,72 @@ export default function RegisterPage() {
             {formatEventRange(session.start_date, session.end_date, session.start_time, session.end_time)}
           </p>
         </div>
+
+        {/* Price per night info */}
+        {basePrice > 0 && (
+          <div className="mb-5 p-3 rounded-xl border" style={{
+            backgroundColor: surcharge > 0 ? 'rgba(251, 191, 36, 0.08)' : 'rgba(34, 197, 94, 0.08)',
+            borderColor: surcharge > 0 ? 'rgba(251, 191, 36, 0.25)' : 'rgba(34, 197, 94, 0.25)',
+          }}>
+            <div className="flex items-start gap-2">
+              <Info className="w-4 h-4 mt-0.5 flex-shrink-0" style={{
+                color: surcharge > 0 ? '#fbbf24' : '#22c55e'
+              }} />
+              <div className="flex-1">
+                <div className="flex items-baseline justify-between mb-1">
+                  <p className="text-xs font-medium" style={{
+                    color: surcharge > 0 ? '#fbbf24' : '#22c55e'
+                  }}>
+                    Cena za noc
+                  </p>
+                  <p className="text-lg font-bold" style={{
+                    color: surcharge > 0 ? '#fbbf24' : '#22c55e'
+                  }}>
+                    {effectivePrice} Kč
+                  </p>
+                </div>
+
+                {surcharge > 0 ? (
+                  <div className="space-y-1">
+                    <p className="text-xs text-[var(--nest-white-60)]">
+                      Základní cena: <span className="font-medium text-[var(--nest-white-80)]">{basePrice} Kč</span> (platí od {MIN_GUESTS_FOR_BASE_PRICE} lidí)
+                    </p>
+                    <p className="text-xs text-[var(--nest-white-60)]">
+                      Aktuálně zaregistrováno: <span className="font-medium text-[var(--nest-white-80)]">{effectiveGuestCount} / {MIN_GUESTS_FOR_BASE_PRICE}</span>
+                    </p>
+                    <p className="text-xs" style={{ color: '#fbbf24' }}>
+                      Příplatek +{surcharge} Kč ({MIN_GUESTS_FOR_BASE_PRICE - effectiveGuestCount}× {SURCHARGE_PER_MISSING_GUEST} Kč za chybějící účastníky)
+                    </p>
+                    <p className="text-[10px] text-[var(--nest-white-40)] mt-1">
+                      💡 Čím více lidí se přihlásí, tím nižší bude cena za noc
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-[var(--nest-white-60)]">
+                    Registrováno {effectiveGuestCount} lidí — základní cena platí ✓
+                  </p>
+                )}
+
+                {nights > 0 && (
+                  <div className="mt-2 pt-2 border-t" style={{
+                    borderColor: surcharge > 0 ? 'rgba(251, 191, 36, 0.2)' : 'rgba(34, 197, 94, 0.2)'
+                  }}>
+                    <div className="flex items-baseline justify-between">
+                      <p className="text-xs text-[var(--nest-white-60)]">
+                        {nights} {nights === 1 ? 'noc' : nights < 5 ? 'noci' : 'nocí'} × {effectivePrice} Kč
+                      </p>
+                      <p className="text-sm font-bold" style={{
+                        color: surcharge > 0 ? '#fbbf24' : '#22c55e'
+                      }}>
+                        = {nights * effectivePrice} Kč
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
           <div className="mb-5">

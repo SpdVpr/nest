@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { name, start_date, end_date, start_time, end_time, description, status, menu_enabled, hardware_pricing_enabled, hardware_overrides } = await request.json()
+    const { name, start_date, end_date, start_time, end_time, description, status, menu_enabled, hardware_pricing_enabled, hardware_overrides, surcharge_enabled } = await request.json()
 
     if (!name) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 })
@@ -107,6 +107,11 @@ export async function POST(request: NextRequest) {
     }
     if (hardware_overrides !== undefined) {
       sessionData.hardware_overrides = hardware_overrides || {}
+    }
+    if (surcharge_enabled !== undefined) {
+      sessionData.surcharge_enabled = Boolean(surcharge_enabled)
+    } else {
+      sessionData.surcharge_enabled = false  // default: surcharge disabled
     }
 
     const docRef = await db.collection('sessions').add(sessionData)

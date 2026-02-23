@@ -46,6 +46,7 @@ export async function GET(
         return NextResponse.json({
             config: {
                 price_per_night: session?.price_per_night || 0,
+                surcharge_enabled: session?.surcharge_enabled || false,
                 description: session?.description || '',
                 hardware_pricing_enabled: session?.hardware_pricing_enabled !== false,
                 hardware_overrides: session?.hardware_overrides || {},

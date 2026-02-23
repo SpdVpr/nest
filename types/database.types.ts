@@ -17,6 +17,7 @@ export interface Session {
   start_time?: string | null  // Format: "HH:MM" (e.g., "18:00")
   end_time?: string | null    // Format: "HH:MM" (e.g., "22:00")
   price_per_night: number
+  surcharge_enabled?: boolean  // if true, price increases by 150 Kč per missing guest below 10 (default false)
   is_active: boolean
   menu_enabled?: boolean
   hardware_pricing_enabled?: boolean  // if false, HW prices are hidden from guests (default true)

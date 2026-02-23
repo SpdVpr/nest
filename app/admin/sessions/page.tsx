@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { ArrowLeft, Plus, Loader2, PlayCircle, StopCircle, Edit, Eye, Trash2, UtensilsCrossed, X, Monitor, Cpu, Gamepad2, ChevronDown, ChevronUp, Copy } from 'lucide-react'
 import { Session, MealType, HardwareOverride } from '@/types/database.types'
 import { formatDate, formatDateOnly } from '@/lib/utils'
+import { useAdminAuth } from '@/lib/admin-auth-context'
+import { canEditSettings, canCreateEvents } from '@/lib/admin-roles'
 
 interface MealTemplate {
   id: string
@@ -34,6 +36,9 @@ interface AdminHardwareItem {
 
 function AdminSessionsPageInner() {
   const router = useRouter()
+  const { role } = useAdminAuth()
+  const showEdit = role ? canEditSettings(role) : false
+  const showCreate = role ? canCreateEvents(role) : false
   const [sessions, setSessions] = useState<Session[]>([])
   const [loading, setLoading] = useState(true)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -46,6 +51,7 @@ function AdminSessionsPageInner() {
   const [newSessionEndTime, setNewSessionEndTime] = useState('')
   const [newSessionDescription, setNewSessionDescription] = useState('')
   const [newPricePerNight, setNewPricePerNight] = useState('')
+  const [surchargeEnabled, setSurchargeEnabled] = useState(false)
 
   // Menu state
   const [menuEnabled, setMenuEnabled] = useState(false)
@@ -292,6 +298,7 @@ function AdminSessionsPageInner() {
 
       // Apply settings
       setNewPricePerNight(config.price_per_night?.toString() || '0')
+      setSurchargeEnabled(config.surcharge_enabled || false)
       setHardwarePricingEnabled(config.hardware_pricing_enabled !== false)
       setHardwareOverrides(config.hardware_overrides || {})
       setMenuEnabled(config.menu_enabled || false)
@@ -369,6 +376,7 @@ function AdminSessionsPageInner() {
       sessionData.menu_enabled = menuEnabled
       sessionData.hardware_pricing_enabled = hardwarePricingEnabled
       sessionData.hardware_overrides = hardwareOverrides
+      sessionData.surcharge_enabled = surchargeEnabled
 
       const priceVal = parseFloat(newPricePerNight)
       sessionData.price_per_night = !isNaN(priceVal) && priceVal >= 0 ? priceVal : 0
@@ -473,6 +481,7 @@ function AdminSessionsPageInner() {
 
       const priceVal = parseFloat(newPricePerNight)
       sessionData.price_per_night = !isNaN(priceVal) && priceVal >= 0 ? priceVal : 0
+      sessionData.surcharge_enabled = surchargeEnabled
 
       sessionData.hardware_pricing_enabled = hardwarePricingEnabled
       sessionData.hardware_overrides = hardwareOverrides
@@ -508,6 +517,7 @@ function AdminSessionsPageInner() {
     setNewSessionEndTime(session.end_time || '')
     setNewSessionDescription(session.description || '')
     setNewPricePerNight((session as any).price_per_night?.toString() || '0')
+    setSurchargeEnabled((session as any).surcharge_enabled || false)
     setHardwarePricingEnabled((session as any).hardware_pricing_enabled !== false)
     setHardwareOverrides((session as any).hardware_overrides || {})
     setShowHardwareConfig(false)
@@ -529,6 +539,7 @@ function AdminSessionsPageInner() {
     setNewSessionEndTime('')
     setNewSessionDescription('')
     setNewPricePerNight('')
+    setSurchargeEnabled(false)
     setMenuEnabled(false)
     setMenuItems([])
     setHardwarePricingEnabled(true)
@@ -578,80 +589,134 @@ function AdminSessionsPageInner() {
     return (
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Název eventu *</label>
+          <label className="block text-sm font-medium mb-2" style={{ color: 'var(--nest-text-secondary)' }}>Název eventu *</label>
           <input
             type="text"
             value={newSessionName}
             onChange={(e) => setNewSessionName(e.target.value)}
             placeholder="např. LAN Party - Listopad 2025"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+            className="w-full px-4 py-2 rounded-lg"
+            style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
           />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Datum začátku</label>
+            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--nest-text-secondary)' }}>Datum začátku</label>
             <input
               type="date"
               value={newSessionStartDate}
               onChange={(e) => handleDateChange('start', e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+              className="w-full px-4 py-2 rounded-lg"
+              style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Datum konce</label>
+            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--nest-text-secondary)' }}>Datum konce</label>
             <input
               type="date"
               value={newSessionEndDate || ''}
               onChange={(e) => handleDateChange('end', e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+              className="w-full px-4 py-2 rounded-lg"
+              style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
             />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Čas začátku</label>
+            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--nest-text-secondary)' }}>Čas začátku</label>
             <input
               type="time"
               value={newSessionStartTime}
               onChange={(e) => setNewSessionStartTime(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+              className="w-full px-4 py-2 rounded-lg"
+              style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Čas konce</label>
+            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--nest-text-secondary)' }}>Čas konce</label>
             <input
               type="time"
               value={newSessionEndTime}
               onChange={(e) => setNewSessionEndTime(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+              className="w-full px-4 py-2 rounded-lg"
+              style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Popis eventu</label>
+          <label className="block text-sm font-medium mb-2" style={{ color: 'var(--nest-text-secondary)' }}>Popis eventu</label>
           <textarea
             value={newSessionDescription}
             onChange={(e) => setNewSessionDescription(e.target.value)}
             placeholder="Popis eventu..."
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+            className="w-full px-4 py-2 rounded-lg"
+            style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
             rows={3}
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Cena za noc (Kč)</label>
+          <label className="block text-sm font-medium mb-2" style={{ color: 'var(--nest-text-secondary)' }}>Cena za noc (Kč)</label>
           <input
             type="number"
             value={newPricePerNight}
             onChange={(e) => setNewPricePerNight(e.target.value)}
             placeholder="např. 300"
             min="0"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+            className="w-full px-4 py-2 rounded-lg"
+            style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
           />
         </div>
+
+        {/* Surcharge toggle */}
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-3 cursor-pointer">
+            <div className="relative">
+              <input
+                type="checkbox"
+                checked={surchargeEnabled}
+                onChange={(e) => setSurchargeEnabled(e.target.checked)}
+                className="sr-only"
+              />
+              <div
+                className="block w-12 h-7 rounded-full transition-colors"
+                style={{ backgroundColor: surchargeEnabled ? '#f59e0b' : 'var(--nest-border)' }}
+              ></div>
+              <div
+                className={`absolute left-0.5 top-0.5 w-6 h-6 rounded-full transition-transform ${surchargeEnabled ? 'translate-x-5' : ''}`}
+                style={{ backgroundColor: 'var(--nest-text-primary)' }}
+              ></div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold" style={{ color: 'var(--nest-text-primary)' }}>Příplatek pod 10 lidí</span>
+            </div>
+          </label>
+          {surchargeEnabled && (
+            <span
+              className="text-xs px-2 py-1 rounded-full font-medium"
+              style={{ color: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.15)' }}
+            >
+              +150 Kč/noc za každého chybějícího
+            </span>
+          )}
+        </div>
+
+        {surchargeEnabled && (
+          <div
+            className="rounded-lg p-3 text-sm"
+            style={{
+              backgroundColor: 'rgba(245, 158, 11, 0.1)',
+              border: '1px solid rgba(245, 158, 11, 0.25)',
+              color: '#f59e0b',
+            }}
+          >
+            💡 Při méně než 10 účastnících se cena za noc zvýší o 150 Kč za každého chybějícího.
+            Např. při 7 lidech: {newPricePerNight ? `${parseInt(newPricePerNight) + 3 * 150} Kč` : '—'} /noc.
+          </div>
+        )}
 
         {/* Hardware Configuration Section */}
         <hr style={{ borderColor: 'var(--nest-border)' }} />
@@ -1083,30 +1148,33 @@ function AdminSessionsPageInner() {
               <h1 className="text-2xl font-bold text-gray-900">Správa eventů</h1>
             </div>
 
-            <button
-              onClick={() => {
-                resetForm()
-                setShowCreateForm(true)
-              }}
-              className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center"
-            >
-              <Plus className="w-5 h-5 mr-2" />
-              Nový event
-            </button>
+            {showCreate && (
+              <button
+                onClick={() => {
+                  resetForm()
+                  setShowCreateForm(true)
+                }}
+                className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center"
+              >
+                <Plus className="w-5 h-5 mr-2" />
+                Nový event
+              </button>
+            )}
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Edit form */}
-        {editingSession && (
-          <div className="bg-blue-50 border-2 border-blue-300 rounded-xl shadow p-6 mb-6">
-            <h3 className="font-semibold text-gray-900 mb-4">✏️ Upravit event</h3>
+        {editingSession && showEdit && (
+          <div className="rounded-xl shadow p-6 mb-6" style={{ backgroundColor: 'var(--nest-surface)', border: '2px solid var(--nest-border)' }}>
+            <h3 className="font-semibold mb-4" style={{ color: 'var(--nest-text-primary)' }}>✏️ Upravit event</h3>
             {renderFormFields()}
             <div className="flex gap-4 justify-end mt-4">
               <button
                 onClick={cancelEdit}
-                className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-900"
+                className="px-6 py-2 rounded-lg font-medium transition-colors"
+                style={{ border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)', backgroundColor: 'var(--nest-bg)' }}
               >
                 Zrušit
               </button>
@@ -1120,9 +1188,9 @@ function AdminSessionsPageInner() {
           </div>
         )}
 
-        {showCreateForm && (
-          <div className="bg-[#efefef] rounded-xl shadow p-6 mb-6">
-            <h3 className="font-semibold text-gray-900 mb-4">Vytvořit nový event</h3>
+        {showCreateForm && showCreate && (
+          <div className="rounded-xl shadow p-6 mb-6" style={{ backgroundColor: 'var(--nest-surface)', border: '1px solid var(--nest-border)' }}>
+            <h3 className="font-semibold mb-4" style={{ color: 'var(--nest-text-primary)' }}>Vytvořit nový event</h3>
             {copiedGames.length > 0 && (
               <p className="text-xs text-green-600 mb-3 font-medium">✅ Zkopírováno nastavení + {copiedGames.length} her z předchozí akce</p>
             )}
@@ -1133,7 +1201,8 @@ function AdminSessionsPageInner() {
                   setShowCreateForm(false)
                   resetForm()
                 }}
-                className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-900"
+                className="px-6 py-2 rounded-lg font-medium transition-colors"
+                style={{ border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)', backgroundColor: 'var(--nest-bg)' }}
               >
                 Zrušit
               </button>
@@ -1212,47 +1281,53 @@ function AdminSessionsPageInner() {
                         <Eye className="w-4 h-4 mr-1" />
                         Detail
                       </Link>
-                      <button
-                        onClick={() => startEditSession(session)}
-                        className="flex items-center text-blue-600 hover:text-blue-700"
-                        title="Upravit"
-                      >
-                        <Edit className="w-4 h-4 mr-1" />
-                        Upravit
-                      </button>
-                      <button
-                        onClick={() => toggleSessionActive(session.id, session.is_active)}
-                        className={`flex items-center ${session.is_active
-                          ? 'text-red-600 hover:text-red-700'
-                          : 'text-green-600 hover:text-green-700'
-                          }`}
-                      >
-                        {session.is_active ? (
-                          <>
-                            <StopCircle className="w-4 h-4 mr-1" />
-                            Ukončit
-                          </>
-                        ) : (
-                          <>
-                            <PlayCircle className="w-4 h-4 mr-1" />
-                            Aktivovat
-                          </>
-                        )}
-                      </button>
-                      <button
-                        onClick={() => {
-                          resetForm()
-                          copyFromSession(session.id)
-                          setShowCreateForm(true)
-                          setEditingSession(null)
-                          window.scrollTo({ top: 0, behavior: 'smooth' })
-                        }}
-                        className="flex items-center text-gray-500 hover:text-gray-700"
-                        title="Vytvořit nový event s nastavením tohoto"
-                      >
-                        <Copy className="w-4 h-4 mr-1" />
-                        Kopírovat
-                      </button>
+                      {showEdit && (
+                        <button
+                          onClick={() => startEditSession(session)}
+                          className="flex items-center text-blue-600 hover:text-blue-700"
+                          title="Upravit"
+                        >
+                          <Edit className="w-4 h-4 mr-1" />
+                          Upravit
+                        </button>
+                      )}
+                      {showEdit && (
+                        <button
+                          onClick={() => toggleSessionActive(session.id, session.is_active)}
+                          className={`flex items-center ${session.is_active
+                            ? 'text-red-600 hover:text-red-700'
+                            : 'text-green-600 hover:text-green-700'
+                            }`}
+                        >
+                          {session.is_active ? (
+                            <>
+                              <StopCircle className="w-4 h-4 mr-1" />
+                              Ukončit
+                            </>
+                          ) : (
+                            <>
+                              <PlayCircle className="w-4 h-4 mr-1" />
+                              Aktivovat
+                            </>
+                          )}
+                        </button>
+                      )}
+                      {showCreate && (
+                        <button
+                          onClick={() => {
+                            resetForm()
+                            copyFromSession(session.id)
+                            setShowCreateForm(true)
+                            setEditingSession(null)
+                            window.scrollTo({ top: 0, behavior: 'smooth' })
+                          }}
+                          className="flex items-center text-gray-500 hover:text-gray-700"
+                          title="Vytvořit nový event s nastavením tohoto"
+                        >
+                          <Copy className="w-4 h-4 mr-1" />
+                          Kopírovat
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

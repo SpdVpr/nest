@@ -1,5 +1,8 @@
+'use client'
+
 import { ReactNode } from 'react'
+import { AdminAuthProvider } from '@/lib/admin-auth-context'
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
-  return <>{children}</>
+  return <AdminAuthProvider>{children}</AdminAuthProvider>
 }

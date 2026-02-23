@@ -399,6 +399,7 @@ export default function EventHardwarePage() {
           setNightsCount(guest.nights_count || 1)
           setShowGuestSelection(false)
         }}
+        onClose={() => setShowGuestSelection(false)}
         onRegisterNew={() => {
           router.push(`/event/${slug}/register`)
         }}
@@ -419,11 +420,31 @@ export default function EventHardwarePage() {
               )}
             </div>
           </div>
-          {selectedGuest && (
-            <div className="flex items-center gap-2 bg-[var(--nest-yellow)]/10 border border-[var(--nest-yellow)]/20 px-3 py-1.5 rounded-xl">
-              <span className="text-xs text-[var(--nest-white-60)]">Přihlášen/a:</span>
-              <span className="font-bold text-[var(--nest-yellow)] text-sm">{selectedGuest.name}</span>
+          {selectedGuest ? (
+            <div className="flex items-center gap-2">
+              <div className="bg-[var(--nest-yellow)]/10 border border-[var(--nest-yellow)]/20 px-3 py-1.5 rounded-xl flex items-center gap-2">
+                <span className="text-xs text-[var(--nest-white-60)]">Přihlášen/a:</span>
+                <span className="font-bold text-[var(--nest-yellow)] text-sm">{selectedGuest.name}</span>
+              </div>
+              <button
+                onClick={() => {
+                  guestStorage.clearCurrentGuest()
+                  setSelectedGuest(null)
+                  setSelectedQuantities({})
+                  setShowGuestSelection(true)
+                }}
+                className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--nest-border)] text-[var(--nest-text-secondary)] hover:text-[var(--nest-yellow)] hover:border-[var(--nest-yellow)]/40 transition-colors"
+              >
+                Změnit
+              </button>
             </div>
+          ) : (
+            <button
+              onClick={() => setShowGuestSelection(true)}
+              className="text-xs px-3 py-1.5 rounded-lg bg-[var(--nest-yellow)]/10 border border-[var(--nest-yellow)]/20 text-[var(--nest-yellow)] font-medium hover:bg-[var(--nest-yellow)]/20 transition-colors"
+            >
+              Vybrat osobu
+            </button>
           )}
         </div>
       </div>
@@ -706,12 +727,17 @@ export default function EventHardwarePage() {
         </div>
       )}
 
-      {/* All Reservations - grouped by guest */}
-      {reservations.filter(r => r.status !== 'cancelled').length > 0 && (() => {
+      {/* All Reservations + Guest Switcher */}
+      {guests.length > 0 && (() => {
         const activeReservations = reservations.filter(r => r.status !== 'cancelled')
-        // Group by guest
         const typeOrder = (t?: string) => t === 'pc' ? 0 : t === 'monitor' ? 1 : 2
+        // Build a map of ALL guests (not just those with reservations)
         const guestMap: Record<string, { guestId: string; name: string; items: { id: string; name: string; type: string; qty: number; nights: number; price: number }[] }> = {}
+        // First add ALL registered guests
+        guests.forEach(g => {
+          guestMap[g.id] = { guestId: g.id, name: g.name, items: [] }
+        })
+        // Then add reservation items to their respective guests
         activeReservations.forEach(r => {
           const gid = r.guest_id
           if (!guestMap[gid]) {
@@ -751,12 +777,13 @@ export default function EventHardwarePage() {
               Kdo si co zarezervoval
             </h2>
             <p className="text-sm text-[var(--nest-text-secondary)] mb-4">
-              {activeReservations.length} rezervací od {sortedGuests.length} hostů • klikni na jméno pro editaci
+              {activeReservations.length} rezervací od {sortedGuests.filter(g => g.items.length > 0).length} hostů • klikni na jméno pro editaci
             </p>
 
             <div className="divide-y divide-[var(--nest-border)]">
               {sortedGuests.map((guest, idx) => {
                 const isMe = selectedGuest?.id === guest.guestId
+                const hasReservations = guest.items.length > 0
                 return (
                   <div key={idx} className={`py-3 ${isMe ? 'bg-[var(--nest-yellow)]/10 -mx-2 px-2 rounded-lg' : ''}`}>
                     <div className="flex items-start gap-4">
@@ -778,14 +805,18 @@ export default function EventHardwarePage() {
                         )}
                       </button>
                       <div className="flex-1 flex flex-wrap gap-2">
-                        {guest.items.map((item, i) => (
-                          <div key={item.id} className="inline-flex items-center gap-1">
-                            <span className="text-sm text-[var(--nest-text-primary)]">
-                              {item.qty > 1 ? `${item.qty}× ` : ''}{item.name}
-                            </span>
-                            {i < guest.items.length - 1 && <span className="text-[var(--nest-text-tertiary)] ml-0.5">,</span>}
-                          </div>
-                        ))}
+                        {hasReservations ? (
+                          guest.items.map((item, i) => (
+                            <div key={item.id} className="inline-flex items-center gap-1">
+                              <span className="text-sm text-[var(--nest-text-primary)]">
+                                {item.qty > 1 ? `${item.qty}× ` : ''}{item.name}
+                              </span>
+                              {i < guest.items.length - 1 && <span className="text-[var(--nest-text-tertiary)] ml-0.5">,</span>}
+                            </div>
+                          ))
+                        ) : (
+                          <span className="text-sm text-[var(--nest-text-tertiary)] italic">Bez rezervací</span>
+                        )}
                       </div>
                     </div>
                   </div>

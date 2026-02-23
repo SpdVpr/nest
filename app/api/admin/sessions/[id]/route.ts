@@ -98,6 +98,9 @@ export async function PATCH(
     if (body.hardware_overrides !== undefined) {
       updateData.hardware_overrides = body.hardware_overrides || {}
     }
+    if (body.surcharge_enabled !== undefined) {
+      updateData.surcharge_enabled = Boolean(body.surcharge_enabled)
+    }
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json(

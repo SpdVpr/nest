@@ -16,13 +16,18 @@ import {
   Trash2,
   UtensilsCrossed,
   Gamepad2,
-  Copy
+  Copy,
+  Shield,
+  UserCog
 } from 'lucide-react'
 import { Session } from '@/types/database.types'
 import { formatDate } from '@/lib/utils'
+import { useAdminAuth } from '@/lib/admin-auth-context'
+import { canViewFinances, canManageUsers, canCreateEvents, canDeleteEvents, canEditSettings } from '@/lib/admin-roles'
 
 export default function AdminDashboard() {
   const router = useRouter()
+  const { adminUser, role, loading: authLoading, isApproved, logout, isLegacyAuth } = useAdminAuth()
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [sessions, setSessions] = useState<Session[]>([])
   const [guestsCount, setGuestsCount] = useState(0)
@@ -30,15 +35,32 @@ export default function AdminDashboard() {
   const [totalRevenue, setTotalRevenue] = useState(0)
   const [todayConsumption, setTodayConsumption] = useState(0)
 
+  const showFinances = role ? canViewFinances(role) : false
+  const showUsers = role ? canManageUsers(role) : false
+  const showCreate = role ? canCreateEvents(role) : false
+  const showDelete = role ? canDeleteEvents(role) : false
+  const showEdit = role ? canEditSettings(role) : false
+
   useEffect(() => {
-    const token = localStorage.getItem('admin_token')
-    if (!token) {
-      router.push('/admin/login')
-    } else {
-      setIsAuthenticated(true)
-      fetchDashboardData()
+    if (authLoading) return
+
+    if (!adminUser) {
+      // Check legacy token
+      const token = localStorage.getItem('admin_token')
+      if (!token) {
+        router.push('/admin/login')
+        return
+      }
     }
-  }, [router])
+
+    if (adminUser && !isApproved) {
+      router.push('/admin/login')
+      return
+    }
+
+    setIsAuthenticated(true)
+    fetchDashboardData()
+  }, [adminUser, authLoading, isApproved, router])
 
   const fetchDashboardData = async () => {
     try {
@@ -161,7 +183,8 @@ export default function AdminDashboard() {
     )
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await logout()
     localStorage.removeItem('admin_token')
     router.push('/admin/login')
   }
@@ -200,9 +223,16 @@ export default function AdminDashboard() {
       {/* Header */}
       <div className="bg-[#efefef] shadow">
         <div className="max-w-7xl mx-auto px-4 py-6 flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-gray-900">
-            The Nest - Admin
-          </h1>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">
+              The Nest - Admin
+            </h1>
+            {adminUser && (
+              <p className="text-sm text-gray-500 mt-1">
+                {adminUser.name} • <span className="font-medium">{role === 'admin' ? 'Admin' : role === 'master_brigadnik' ? 'Master Brigádník' : 'Brigádník'}</span>
+              </p>
+            )}
+          </div>
           <button
             onClick={handleLogout}
             className="flex items-center text-gray-600 hover:text-gray-900"
@@ -222,12 +252,14 @@ export default function AdminDashboard() {
               <h2 className="text-2xl font-bold text-gray-900">🎯 Vyber Event</h2>
               <p className="text-sm text-gray-600 mt-1">Klikni na event pro zobrazení detailů a statistik</p>
             </div>
-            <Link
-              href="/admin/sessions?create=true"
-              className="text-blue-600 hover:text-blue-700 font-medium text-sm bg-blue-50 px-3 py-2 rounded-lg hover:bg-blue-100 transition-colors"
-            >
-              + Nový event
-            </Link>
+            {showCreate && (
+              <Link
+                href="/admin/sessions?create=true"
+                className="text-blue-600 hover:text-blue-700 font-medium text-sm bg-blue-50 px-3 py-2 rounded-lg hover:bg-blue-100 transition-colors"
+              >
+                + Nový event
+              </Link>
+            )}
           </div>
 
           {sessions.length > 0 ? (
@@ -260,27 +292,33 @@ export default function AdminDashboard() {
                           >
                             📊 Detail
                           </Link>
-                          <Link
-                            href={`/admin/sessions/${session.id}?edit=true`}
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
-                            title="Upravit event"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Link>
-                          <button
-                            onClick={() => handleDeleteEvent(session.id, session.name)}
-                            className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
-                            title="Smazat event"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                          <Link
-                            href={`/admin/sessions?copyFrom=${session.id}`}
-                            className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
-                            title="Vytvořit nový event s nastavením tohoto"
-                          >
-                            <Copy className="w-4 h-4" />
-                          </Link>
+                          {showCreate && (
+                            <Link
+                              href={`/admin/sessions/${session.id}?edit=true`}
+                              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
+                              title="Upravit event"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Link>
+                          )}
+                          {showDelete && (
+                            <button
+                              onClick={() => handleDeleteEvent(session.id, session.name)}
+                              className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
+                              title="Smazat event"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                          {showCreate && (
+                            <Link
+                              href={`/admin/sessions?copyFrom=${session.id}`}
+                              className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
+                              title="Vytvořit nový event s nastavením tohoto"
+                            >
+                              <Copy className="w-4 h-4" />
+                            </Link>
+                          )}
                           <Link
                             href={`/event/${session.slug}`}
                             target="_blank"
@@ -309,8 +347,8 @@ export default function AdminDashboard() {
           )}
         </div>
 
-        {/* Stats Cards - Placeholder */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        {/* Stats Cards */}
+        <div className={`grid grid-cols-1 ${showFinances ? 'md:grid-cols-4' : 'md:grid-cols-2'} gap-6 mb-8`}>
           <div className="bg-[#efefef] rounded-xl shadow p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -331,25 +369,29 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          <div className="bg-[#efefef] rounded-xl shadow p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Celkový obrat</p>
-                <p className="text-2xl font-bold text-gray-900">{totalRevenue.toFixed(0)} Kč</p>
+          {showFinances && (
+            <div className="bg-[#efefef] rounded-xl shadow p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Celkový obrat</p>
+                  <p className="text-2xl font-bold text-gray-900">{totalRevenue.toFixed(0)} Kč</p>
+                </div>
+                <DollarSign className="w-10 h-10 text-purple-500" />
               </div>
-              <DollarSign className="w-10 h-10 text-purple-500" />
             </div>
-          </div>
+          )}
 
-          <div className="bg-[#efefef] rounded-xl shadow p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Spotřeba dnes</p>
-                <p className="text-2xl font-bold text-gray-900">{todayConsumption.toFixed(0)} Kč</p>
+          {showFinances && (
+            <div className="bg-[#efefef] rounded-xl shadow p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Spotřeba dnes</p>
+                  <p className="text-2xl font-bold text-gray-900">{todayConsumption.toFixed(0)} Kč</p>
+                </div>
+                <TrendingUp className="w-10 h-10 text-orange-500" />
               </div>
-              <TrendingUp className="w-10 h-10 text-orange-500" />
             </div>
-          </div>
+          )}
         </div>
 
         {/* Quick Actions */}
@@ -366,27 +408,31 @@ export default function AdminDashboard() {
             <p className="text-sm text-gray-600">Vytvořit nebo ukončit LAN party</p>
           </Link>
 
-          <Link
-            href="/admin/products"
-            className="bg-[#efefef] rounded-xl shadow hover:shadow-lg transition-shadow p-6 flex flex-col items-center text-center"
-          >
-            <div className="bg-purple-100 p-4 rounded-full mb-4">
-              <Package className="w-8 h-8 text-purple-600" />
-            </div>
-            <h3 className="font-semibold text-gray-900 mb-2">🍕 Správa produktů</h3>
-            <p className="text-sm text-gray-600">Centrální seznam občerstvení pro všechny LAN</p>
-          </Link>
+          {showEdit && (
+            <Link
+              href="/admin/products"
+              className="bg-[#efefef] rounded-xl shadow hover:shadow-lg transition-shadow p-6 flex flex-col items-center text-center"
+            >
+              <div className="bg-purple-100 p-4 rounded-full mb-4">
+                <Package className="w-8 h-8 text-purple-600" />
+              </div>
+              <h3 className="font-semibold text-gray-900 mb-2">🍕 Správa produktů</h3>
+              <p className="text-sm text-gray-600">Centrální seznam občerstvení pro všechny LAN</p>
+            </Link>
+          )}
 
-          <Link
-            href="/admin/hardware"
-            className="bg-[#efefef] rounded-xl shadow hover:shadow-lg transition-shadow p-6 flex flex-col items-center text-center"
-          >
-            <div className="bg-orange-100 p-4 rounded-full mb-4">
-              <MonitorSmartphone className="w-8 h-8 text-orange-600" />
-            </div>
-            <h3 className="font-semibold text-gray-900 mb-2">💻 Správa Hardware</h3>
-            <p className="text-sm text-gray-600">Centrální seznam HW pro všechny LAN</p>
-          </Link>
+          {showEdit && (
+            <Link
+              href="/admin/hardware"
+              className="bg-[#efefef] rounded-xl shadow hover:shadow-lg transition-shadow p-6 flex flex-col items-center text-center"
+            >
+              <div className="bg-orange-100 p-4 rounded-full mb-4">
+                <MonitorSmartphone className="w-8 h-8 text-orange-600" />
+              </div>
+              <h3 className="font-semibold text-gray-900 mb-2">💻 Správa Hardware</h3>
+              <p className="text-sm text-gray-600">Centrální seznam HW pro všechny LAN</p>
+            </Link>
+          )}
 
           <Link
             href="/admin/games"
@@ -399,16 +445,18 @@ export default function AdminDashboard() {
             <p className="text-sm text-gray-600">Databáze her k instalaci na PC</p>
           </Link>
 
-          <Link
-            href="/admin/meals"
-            className="bg-[#efefef] rounded-xl shadow hover:shadow-lg transition-shadow p-6 flex flex-col items-center text-center"
-          >
-            <div className="bg-amber-100 p-4 rounded-full mb-4">
-              <UtensilsCrossed className="w-8 h-8 text-amber-600" />
-            </div>
-            <h3 className="font-semibold text-gray-900 mb-2">🍽️ Správa jídelníčku</h3>
-            <p className="text-sm text-gray-600">Databáze jídel pro jídelníček</p>
-          </Link>
+          {showEdit && (
+            <Link
+              href="/admin/meals"
+              className="bg-[#efefef] rounded-xl shadow hover:shadow-lg transition-shadow p-6 flex flex-col items-center text-center"
+            >
+              <div className="bg-amber-100 p-4 rounded-full mb-4">
+                <UtensilsCrossed className="w-8 h-8 text-amber-600" />
+              </div>
+              <h3 className="font-semibold text-gray-900 mb-2">🍽️ Správa jídelníčku</h3>
+              <p className="text-sm text-gray-600">Databáze jídel pro jídelníček</p>
+            </Link>
+          )}
 
           <Link
             href="/admin/guests"
@@ -421,16 +469,31 @@ export default function AdminDashboard() {
             <p className="text-sm text-gray-600">Přidat nebo upravit hosty</p>
           </Link>
 
-          <Link
-            href="/admin/consumption"
-            className="bg-[#efefef] rounded-xl shadow hover:shadow-lg transition-shadow p-6 flex flex-col items-center text-center"
-          >
-            <div className="bg-purple-100 p-4 rounded-full mb-4">
-              <History className="w-8 h-8 text-purple-600" />
-            </div>
-            <h3 className="font-semibold text-gray-900 mb-2">Historie spotřeby</h3>
-            <p className="text-sm text-gray-600">Zobrazit všechny záznamy</p>
-          </Link>
+          {showEdit && (
+            <Link
+              href="/admin/consumption"
+              className="bg-[#efefef] rounded-xl shadow hover:shadow-lg transition-shadow p-6 flex flex-col items-center text-center"
+            >
+              <div className="bg-purple-100 p-4 rounded-full mb-4">
+                <History className="w-8 h-8 text-purple-600" />
+              </div>
+              <h3 className="font-semibold text-gray-900 mb-2">Historie spotřeby</h3>
+              <p className="text-sm text-gray-600">Zobrazit všechny záznamy</p>
+            </Link>
+          )}
+
+          {showUsers && (
+            <Link
+              href="/admin/users"
+              className="bg-[#efefef] rounded-xl shadow hover:shadow-lg transition-shadow p-6 flex flex-col items-center text-center"
+            >
+              <div className="bg-red-100 p-4 rounded-full mb-4">
+                <UserCog className="w-8 h-8 text-red-600" />
+              </div>
+              <h3 className="font-semibold text-gray-900 mb-2">Správa uživatelů</h3>
+              <p className="text-sm text-gray-600">Role a oprávnění brigádníků</p>
+            </Link>
+          )}
         </div>
       </div>
     </div>

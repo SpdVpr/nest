@@ -145,9 +145,15 @@ export async function GET(
                 // Tip
                 const tip = tipsMap[guestId] || { amount: 0, percentage: null }
 
-                // Accommodation cost
+                // Accommodation cost with dynamic pricing
                 const nightsCount = guestData.nights_count || 1
-                const pricePerNight = (session as any).price_per_night || 0
+                const basePricePerNight = (session as any).price_per_night || 0
+                const isSurchargeEnabled = (session as any).surcharge_enabled === true
+                const totalGuests = guestsSnapshot.size
+                const missingGuests = isSurchargeEnabled ? Math.max(0, 10 - totalGuests) : 0
+                const surchargePerNight = missingGuests * 150
+                const effectivePricePerNight = basePricePerNight + surchargePerNight
+                const pricePerNight = effectivePricePerNight
                 const nightsTotal = nightsCount * pricePerNight
 
                 // Settlement data for this guest
@@ -216,10 +222,20 @@ export async function GET(
         // Check if any guest has settlement data
         const hasAnySettlement = guestCosts.some(g => g.settlement !== null)
 
+        // Calculate effective price for the response
+        const basePPN = (session as any).price_per_night || 0
+        const surchargeOn = (session as any).surcharge_enabled === true
+        const totalGuestsCount = guestsSnapshot.size
+        const missingGuestsCount = surchargeOn ? Math.max(0, 10 - totalGuestsCount) : 0
+        const effectivePPN = basePPN + missingGuestsCount * 150
+
         return NextResponse.json({
             guests: guestCosts,
             sessionName: session.name,
-            pricePerNight: (session as any).price_per_night || 0,
+            pricePerNight: basePPN,
+            effectivePricePerNight: effectivePPN,
+            surchargeEnabled: surchargeOn,
+            guestCount: totalGuestsCount,
             hardwarePricingEnabled: (session as any).hardware_pricing_enabled !== false,
             isPreliminary: !hasAnySettlement,
             bankSettings: hasAnySettlement ? bankSettings : null,
