@@ -796,6 +796,77 @@ export default function EventDetailPage() {
               {/* Hardware Configuration */}
               <hr style={{ borderColor: 'var(--nest-border)' }} />
 
+              {/* Guest sections toggles */}
+              <h4 className="font-semibold flex items-center gap-2" style={{ color: 'var(--nest-text-primary)' }}>
+                🎛️ Sekce pro hosty
+              </h4>
+
+              <div className="flex flex-col gap-3">
+                {/* Hardware enabled toggle */}
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <div className="relative">
+                      <input
+                        type="checkbox"
+                        checked={editHwEnabled}
+                        onChange={(e) => setEditHwEnabled(e.target.checked)}
+                        className="sr-only"
+                      />
+                      <div
+                        className="block w-12 h-7 rounded-full transition-colors"
+                        style={{ backgroundColor: editHwEnabled ? '#3b82f6' : 'var(--nest-border)' }}
+                      ></div>
+                      <div
+                        className={`absolute left-0.5 top-0.5 w-6 h-6 rounded-full transition-transform ${editHwEnabled ? 'translate-x-5' : ''}`}
+                        style={{ backgroundColor: 'var(--nest-text-primary)' }}
+                      ></div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Monitor className="w-5 h-5" style={{ color: '#60a5fa' }} />
+                      <span className="font-semibold" style={{ color: 'var(--nest-text-primary)' }}>Rezervace techniky</span>
+                    </div>
+                  </label>
+                  {!editHwEnabled && (
+                    <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ color: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.12)' }}>
+                      🚫 Vypnuto
+                    </span>
+                  )}
+                </div>
+
+                {/* Seats enabled toggle */}
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <div className="relative">
+                      <input
+                        type="checkbox"
+                        checked={editSeatsEnabled}
+                        onChange={(e) => setEditSeatsEnabled(e.target.checked)}
+                        className="sr-only"
+                      />
+                      <div
+                        className="block w-12 h-7 rounded-full transition-colors"
+                        style={{ backgroundColor: editSeatsEnabled ? '#22c55e' : 'var(--nest-border)' }}
+                      ></div>
+                      <div
+                        className={`absolute left-0.5 top-0.5 w-6 h-6 rounded-full transition-transform ${editSeatsEnabled ? 'translate-x-5' : ''}`}
+                        style={{ backgroundColor: 'var(--nest-text-primary)' }}
+                      ></div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span style={{ fontSize: '1.2rem' }}>💺</span>
+                      <span className="font-semibold" style={{ color: 'var(--nest-text-primary)' }}>Rezervace míst k sezení</span>
+                    </div>
+                  </label>
+                  {!editSeatsEnabled && (
+                    <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ color: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.12)' }}>
+                      🚫 Vypnuto
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <hr style={{ borderColor: 'var(--nest-border)' }} />
+
               <div className="space-y-4">
                 {/* HW pricing toggle */}
                 <div className="flex items-center gap-4">

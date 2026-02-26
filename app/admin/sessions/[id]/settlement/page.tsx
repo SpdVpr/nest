@@ -1055,9 +1055,28 @@ export default function SettlementPage() {
                                             )}
                                         </div>
 
+                                        {/* Deposit */}
+                                        {(guest.deposit || 0) > 0 && (
+                                            <div className="mt-3 space-y-1">
+                                                <div className="flex items-center justify-between text-sm py-1.5 px-2 -mx-2 rounded-lg bg-emerald-50">
+                                                    <span className="text-emerald-700 font-medium flex items-center gap-1.5">
+                                                        💰 Zaplacená záloha
+                                                    </span>
+                                                    <span className="font-bold text-emerald-600">
+                                                        −{(guest.deposit || 0).toLocaleString('cs-CZ')} Kč
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        )}
+
                                         {/* FINAL TOTAL */}
                                         <div className="mt-4 bg-gray-900 text-white rounded-xl px-4 py-3 flex items-center justify-between">
-                                            <span className="font-bold text-lg">CELKEM K PLATBĚ</span>
+                                            <div>
+                                                <span className="font-bold text-lg">CELKEM K PLATBĚ</span>
+                                                {(guest.deposit || 0) > 0 && (
+                                                    <span className="text-xs text-gray-400 ml-2">(po odečtení zálohy)</span>
+                                                )}
+                                            </div>
                                             <span className="text-2xl font-black">{finalTotal.toLocaleString('cs-CZ')} Kč</span>
                                         </div>
 

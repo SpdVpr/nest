@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Plus, Trash2, Trophy, Beer, Zap, Candy, GlassWater, Users, Loader2 } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Trophy, Beer, Zap, Candy, GlassWater, Users, Loader2, RefreshCw } from 'lucide-react'
 import { useAdminAuth } from '@/lib/admin-auth-context'
 import { canEditSettings } from '@/lib/admin-roles'
 
@@ -13,6 +13,7 @@ interface NestRecord {
     group_name: string
     date: string | null
     count: number
+    source?: string
     created_at: string
 }
 
@@ -37,6 +38,7 @@ export default function AdminRecordsPage() {
     const [newDate, setNewDate] = useState('')
     const [newCount, setNewCount] = useState('')
     const [saving, setSaving] = useState(false)
+    const [syncing, setSyncing] = useState(false)
 
     const showEdit = role ? canEditSettings(role) : false
 
@@ -132,6 +134,33 @@ export default function AdminRecordsPage() {
         }
     }
 
+    const syncRecords = async () => {
+        setSyncing(true)
+        try {
+            const token = localStorage.getItem('admin_token')
+            const response = await fetch('/api/admin/records/sync', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            if (response.ok) {
+                const data = await response.json()
+                fetchRecords()
+                if (data.added > 0) {
+                    alert(`Synchronizováno ${data.added} nových záznamů z ${data.message.match(/\d+ completed/)?.[0] || 'proběhlých'} eventů`)
+                } else {
+                    alert('Žádné nové záznamy k synchronizaci')
+                }
+            } else {
+                alert('Chyba při synchronizaci')
+            }
+        } catch (error) {
+            console.error('Error syncing records:', error)
+            alert('Chyba při synchronizaci')
+        } finally {
+            setSyncing(false)
+        }
+    }
+
     const getCategoryInfo = (cat: string) => CATEGORIES.find(c => c.value === cat) || CATEGORIES[0]
 
     if (!isAuthenticated || loading) {
@@ -170,6 +199,16 @@ export default function AdminRecordsPage() {
                                 Rekordy Nestu
                             </h1>
                         </div>
+                        {showEdit && (
+                            <button
+                                onClick={syncRecords}
+                                disabled={syncing}
+                                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50 transition-colors"
+                            >
+                                <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+                                {syncing ? 'Synchronizuji...' : '🔄 Načíst z eventů'}
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -277,6 +316,12 @@ export default function AdminRecordsPage() {
                                                         <p className="text-xs text-gray-500">
                                                             {new Date(record.date).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' })}
                                                         </p>
+                                                    )}
+                                                    {record.source === 'auto' && (
+                                                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 font-medium">🤖 auto</span>
+                                                    )}
+                                                    {!record.source && (
+                                                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">✍️ manuální</span>
                                                     )}
                                                 </div>
                                                 <span
