@@ -58,6 +58,7 @@ export default function EventHardwarePage() {
   const [guests, setGuests] = useState<Guest[]>([])
   const [hardwareItems, setHardwareItems] = useState<HardwareItem[]>([])
   const [reservations, setReservations] = useState<any[]>([])
+  const [allGameInstalls, setAllGameInstalls] = useState<Record<string, string[]>>({})
   const [loading, setLoading] = useState(true)
   const [selectedGuest, setSelectedGuest] = useState<Guest | null>(null)
   const [selectedCategory, setSelectedCategory] = useState<string>('')
@@ -136,20 +137,24 @@ export default function EventHardwarePage() {
         setLibraryGames(gameLibData.games || [])
       }
 
-      // Fetch existing game install requests
+      // Fetch ALL game install requests for this session
       if (sessionRes.ok) {
         const sessionData = await (await fetch(`/api/event/${slug}`)).json()
         const installRes = await fetch(`/api/game-installs?session_id=${sessionData.session.id}`)
         if (installRes.ok) {
           const installData = await installRes.json()
-          // Find this guest's installs
+          // Build map: guest_id -> game_names[]
+          const installMap: Record<string, string[]> = {}
+            ; (installData.requests || []).forEach((r: any) => {
+              installMap[r.guest_id] = r.game_names || []
+            })
+          setAllGameInstalls(installMap)
+
+          // Set current guest's installs
           const currentGuest = guestStorage.getCurrentGuest(slug)
-          if (currentGuest) {
-            const myInstalls = (installData.requests || []).find((r: any) => r.guest_id === currentGuest.id)
-            if (myInstalls) {
-              setExistingGameInstalls(myInstalls.game_names || [])
-              setSelectedGameInstalls(new Set(myInstalls.game_names || []))
-            }
+          if (currentGuest && installMap[currentGuest.id]) {
+            setExistingGameInstalls(installMap[currentGuest.id])
+            setSelectedGameInstalls(new Set(installMap[currentGuest.id]))
           }
         }
       }
@@ -372,14 +377,29 @@ export default function EventHardwarePage() {
         }),
       })
 
-      setExistingGameInstalls(Array.from(selectedGameInstalls))
+      const newInstalls = Array.from(selectedGameInstalls)
+      setExistingGameInstalls(newInstalls)
+      setAllGameInstalls(prev => ({ ...prev, [selectedGuest.id]: newInstalls }))
       setShowGameInstallPicker(false)
-      alert('Rezervace proběhla a hry byly vybrány! 🎮')
+      alert('Hry byly uloženy! 🎮')
     } catch (error) {
       console.error('Error saving game installs:', error)
       alert('Chyba při ukládání her')
     } finally {
       setSavingGameInstalls(false)
+    }
+  }
+
+  // Open game picker for a specific guest (from reservation list)
+  const openGamePickerForGuest = (guestId: string) => {
+    const guest = guests.find(g => g.id === guestId)
+    if (guest) {
+      setSelectedGuest(guest)
+      guestStorage.setCurrentGuest({ id: guest.id, name: guest.name, session_slug: slug })
+      const guestInstalls = allGameInstalls[guestId] || []
+      setSelectedGameInstalls(new Set(guestInstalls))
+      setExistingGameInstalls(guestInstalls)
+      setShowGameInstallPicker(true)
     }
   }
 
@@ -804,16 +824,48 @@ export default function EventHardwarePage() {
                           <Edit2 className="w-3 h-3 text-[var(--nest-text-tertiary)] group-hover:text-[var(--nest-yellow)] transition-colors" />
                         )}
                       </button>
-                      <div className="flex-1 flex flex-wrap gap-2">
+                      <div className="flex-1 min-w-0">
                         {hasReservations ? (
-                          guest.items.map((item, i) => (
-                            <div key={item.id} className="inline-flex items-center gap-1">
-                              <span className="text-sm text-[var(--nest-text-primary)]">
-                                {item.qty > 1 ? `${item.qty}× ` : ''}{item.name}
-                              </span>
-                              {i < guest.items.length - 1 && <span className="text-[var(--nest-text-tertiary)] ml-0.5">,</span>}
+                          <div>
+                            <div className="flex flex-wrap gap-2">
+                              {guest.items.map((item, i) => (
+                                <div key={item.id} className="inline-flex items-center gap-1">
+                                  <span className="text-sm text-[var(--nest-text-primary)]">
+                                    {item.qty > 1 ? `${item.qty}× ` : ''}{item.name}
+                                  </span>
+                                  {i < guest.items.length - 1 && <span className="text-[var(--nest-text-tertiary)] ml-0.5">,</span>}
+                                </div>
+                              ))}
                             </div>
-                          ))
+                            {/* Show game installs if this guest has a PC */}
+                            {(() => {
+                              const hasPc = guest.items.some(item => item.type === 'pc')
+                              const guestGames = allGameInstalls[guest.guestId] || []
+                              if (!hasPc) return null
+                              return (
+                                <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                                  {guestGames.length > 0 ? (
+                                    <>
+                                      <span className="text-xs text-[var(--nest-text-tertiary)]">🎮</span>
+                                      {guestGames.map((name, i) => (
+                                        <span key={i} className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--nest-yellow)]/10 text-[var(--nest-yellow)]/80 border border-[var(--nest-yellow)]/15">
+                                          {name}
+                                        </span>
+                                      ))}
+                                    </>
+                                  ) : (
+                                    <span className="text-[10px] text-[var(--nest-text-tertiary)] italic">🎮 Žádné hry</span>
+                                  )}
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); openGamePickerForGuest(guest.guestId) }}
+                                    className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--nest-dark-4)] text-[var(--nest-text-secondary)] hover:text-[var(--nest-yellow)] hover:bg-[var(--nest-yellow)]/10 transition-colors"
+                                  >
+                                    {guestGames.length > 0 ? 'Upravit' : '+ Přidat hry'}
+                                  </button>
+                                </div>
+                              )
+                            })()}
+                          </div>
                         ) : (
                           <span className="text-sm text-[var(--nest-text-tertiary)] italic">Bez rezervací</span>
                         )}
