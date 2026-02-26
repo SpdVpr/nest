@@ -3,32 +3,32 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Calendar, Shield, ArrowRight, Trophy, Beer, Zap, Candy, Users } from 'lucide-react'
+import { Calendar, Shield, ArrowRight, Trophy, Beer, Zap, Candy, Users, GlassWater, Flame, Crown, Medal } from 'lucide-react'
 import { Session } from '@/types/database.types'
 import { formatEventRange } from '@/lib/utils'
 import NestLoading from '@/components/NestLoading'
+
+const RECORD_CATEGORIES = [
+  { value: 'attendance', label: 'Účast', emoji: '👥', color: '#3b82f6' },
+  { value: 'pivo', label: 'Pivo', emoji: '🍺', color: '#f59e0b' },
+  { value: 'redbull', label: 'Red Bull', emoji: '⚡', color: '#ef4444' },
+  { value: 'bueno', label: 'Kinder Bueno', emoji: '🍫', color: '#a855f7' },
+  { value: 'jagermeister', label: 'Jägermeister', emoji: '🦌', color: '#22c55e' },
+]
 
 export default function HomePage() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [records, setRecords] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   const router = useRouter()
 
   useEffect(() => {
     setMounted(true)
-    const token = localStorage.getItem('admin_token')
-    if (!token) {
-      setIsAuthenticated(false)
-      setLoading(false)
-      return
-    }
-    setIsAuthenticated(true)
     fetchUpcomingEvents()
     fetchRecords()
-  }, [router])
+  }, [])
 
   const fetchUpcomingEvents = async () => {
     try {
@@ -85,23 +85,17 @@ export default function HomePage() {
   if (!mounted) return null
 
   if (loading) {
-    return <NestLoading message="Načítám eventy..." />
+    return <NestLoading message="Načítám..." />
   }
 
-  // Not authenticated — show only branding
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-[var(--nest-dark)] flex items-center justify-center p-4">
-        <div className="text-center">
-          <h1 className="text-5xl md:text-7xl font-bold text-[var(--nest-white)] tracking-tight">
-            The Nest
-          </h1>
-        </div>
-      </div>
-    )
-  }
+  // Group records by category, sorted desc by count
+  const groupedRecords: Record<string, any[]> = {}
+  records.forEach(r => {
+    if (!groupedRecords[r.category]) groupedRecords[r.category] = []
+    groupedRecords[r.category].push(r)
+  })
+  Object.values(groupedRecords).forEach(arr => arr.sort((a: any, b: any) => b.count - a.count))
 
-  // Authenticated — events list
   return (
     <div className="min-h-screen bg-[var(--nest-dark)] text-[var(--nest-white)]">
       {/* Header */}
@@ -114,9 +108,11 @@ export default function HomePage() {
         </p>
       </div>
 
-      {/* Events container */}
-      <div className="max-w-2xl mx-auto px-4 pb-12">
-        <div className="nest-card-elevated p-6">
+      {/* Main content */}
+      <div className="max-w-2xl mx-auto px-4 pb-12 space-y-6">
+
+        {/* Events Section */}
+        <div className="nest-card-elevated p-4 sm:p-6">
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-2">
               <Calendar className="w-5 h-5 text-[var(--nest-yellow)]" />
@@ -159,10 +155,10 @@ export default function HomePage() {
                       ? 'border-[var(--nest-success)]/30 bg-[var(--nest-success)]/5'
                       : 'border-[var(--nest-dark-4)] bg-[var(--nest-dark-3)] hover:bg-[var(--nest-dark-3)]'
                       }`}>
-                      <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1.5">
-                            <h3 className="text-base font-bold truncate">
+                          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                            <h3 className="text-base font-bold">
                               {session.name}
                             </h3>
                             <span className={`${getStatusStyles(eventStatus.status)} px-2 py-0.5 rounded-full text-xs font-semibold border whitespace-nowrap`}>
@@ -171,7 +167,7 @@ export default function HomePage() {
                           </div>
 
                           <div className="flex items-center gap-1.5 text-[var(--nest-white-60)] text-xs">
-                            <Calendar className="w-3.5 h-3.5" />
+                            <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
                             <span>
                               {formatEventRange(session.start_date, session.end_date, session.start_time, session.end_time)}
                             </span>
@@ -184,7 +180,9 @@ export default function HomePage() {
                           )}
                         </div>
 
-                        <ArrowRight className="w-4 h-4 text-[var(--nest-white-40)] group-hover:text-[var(--nest-yellow)] group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+                        <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-[var(--nest-dark-4)] flex items-center justify-center group-hover:bg-[var(--nest-yellow)]/15 transition-colors">
+                          <ArrowRight className="w-4 h-4 text-[var(--nest-white-40)] group-hover:text-[var(--nest-yellow)] transition-colors" />
+                        </div>
                       </div>
                     </div>
                   </Link>
@@ -194,72 +192,124 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* Nest Records Section */}
-        {records.length > 0 && (() => {
-          const RECORD_CATEGORIES = [
-            { value: 'attendance', label: 'Účast', emoji: '👥', color: '#3b82f6' },
-            { value: 'pivo', label: 'Pivo', emoji: '🍺', color: '#f59e0b' },
-            { value: 'redbull', label: 'Red Bull', emoji: '⚡', color: '#ef4444' },
-            { value: 'bueno', label: 'Kinder Bueno', emoji: '🍫', color: '#a855f7' },
-            { value: 'jagermeister', label: 'Jägermeister', emoji: '🦌', color: '#22c55e' },
-          ]
-
-          // Group and find the top record per category
-          const grouped: Record<string, any[]> = {}
-          records.forEach(r => {
-            if (!grouped[r.category]) grouped[r.category] = []
-            grouped[r.category].push(r)
-          })
-          Object.values(grouped).forEach(arr => arr.sort((a: any, b: any) => b.count - a.count))
-
-          return (
-            <div className="nest-card-elevated p-6 mt-6">
-              <div className="flex items-center gap-2 mb-5">
-                <Trophy className="w-5 h-5 text-[var(--nest-yellow)]" />
-                <h2 className="text-lg font-bold">Rekordy Nestu</h2>
+        {/* ═══════════════════════════════════════════ */}
+        {/* RECORDS — Hall of Fame                     */}
+        {/* ═══════════════════════════════════════════ */}
+        {records.length > 0 && (
+          <div className="nest-card-elevated overflow-hidden">
+            {/* Records Header — dramatic */}
+            <div
+              className="px-6 py-5 text-center"
+              style={{
+                background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(239, 68, 68, 0.08) 50%, rgba(168, 85, 247, 0.08) 100%)',
+                borderBottom: '1px solid rgba(245, 158, 11, 0.15)',
+              }}
+            >
+              <div className="flex items-center justify-center gap-2 mb-1">
+                <Trophy className="w-6 h-6 text-[var(--nest-yellow)]" />
+                <h2 className="text-xl font-bold tracking-tight">Rekordy Nestu</h2>
               </div>
+              <p className="text-xs text-[var(--nest-white-40)]">
+                Překonej rekordy a zapiš se do síně slávy 🔥
+              </p>
+            </div>
 
-              <div className="space-y-3">
-                {RECORD_CATEGORIES.map(cat => {
-                  const catRecords = grouped[cat.value] || []
-                  if (catRecords.length === 0) return null
+            {/* Records Grid */}
+            <div className="p-4 sm:p-6 space-y-4">
+              {RECORD_CATEGORIES.map(cat => {
+                const catRecords = groupedRecords[cat.value] || []
+                if (catRecords.length === 0) return null
 
-                  const top = catRecords[0]
-
-                  return (
+                return (
+                  <div
+                    key={cat.value}
+                    className="rounded-xl overflow-hidden"
+                    style={{
+                      border: `1px solid ${cat.color}20`,
+                      background: `linear-gradient(135deg, ${cat.color}06, transparent)`,
+                    }}
+                  >
+                    {/* Category Header */}
                     <div
-                      key={cat.value}
-                      className="flex items-center gap-3 p-3 rounded-xl transition-colors"
+                      className="px-4 py-3 flex items-center gap-2"
                       style={{
+                        borderBottom: `1px solid ${cat.color}15`,
                         backgroundColor: `${cat.color}08`,
-                        border: `1px solid ${cat.color}20`,
                       }}
                     >
-                      <span className="text-2xl flex-shrink-0">{cat.emoji}</span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium" style={{ color: `${cat.color}cc` }}>{cat.label}</p>
-                        <p className="text-sm font-bold text-[var(--nest-white)] truncate">
-                          {top.group_name}
-                        </p>
-                        {top.date && (
-                          <p className="text-xs text-[var(--nest-white-40)]">
-                            {new Date(top.date).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'short', year: 'numeric' })}
-                          </p>
-                        )}
-                      </div>
-                      <div
-                        className="text-lg font-bold px-3 py-1 rounded-lg flex-shrink-0"
-                        style={{ color: cat.color, backgroundColor: `${cat.color}15` }}
-                      >
-                        {top.count}
-                      </div>
+                      <span className="text-xl">{cat.emoji}</span>
+                      <span className="text-sm font-bold" style={{ color: cat.color }}>{cat.label}</span>
+                      <span className="text-xs text-[var(--nest-white-40)] ml-auto">{catRecords.length} {catRecords.length === 1 ? 'záznam' : catRecords.length < 5 ? 'záznamy' : 'záznamů'}</span>
                     </div>
-                  )
-                })}
-              </div>
+
+                    {/* Records List */}
+                    <div className="divide-y" style={{ borderColor: `${cat.color}10` }}>
+                      {catRecords.map((record: any, idx: number) => (
+                        <div
+                          key={record.id}
+                          className="px-4 py-2.5 flex items-center gap-3"
+                          style={{
+                            backgroundColor: idx === 0 ? `${cat.color}08` : 'transparent',
+                          }}
+                        >
+                          {/* Medal / Position */}
+                          <div className="w-8 text-center flex-shrink-0">
+                            {idx === 0 ? (
+                              <span className="text-xl">🥇</span>
+                            ) : idx === 1 ? (
+                              <span className="text-xl">🥈</span>
+                            ) : idx === 2 ? (
+                              <span className="text-xl">🥉</span>
+                            ) : (
+                              <span className="text-sm font-bold text-[var(--nest-white-40)]">{idx + 1}.</span>
+                            )}
+                          </div>
+
+                          {/* Name & Date */}
+                          <div className="flex-1 min-w-0">
+                            <p className={`font-semibold text-sm ${idx === 0 ? 'text-[var(--nest-white)]' : 'text-[var(--nest-white-60)]'}`}>
+                              {record.group_name}
+                            </p>
+                            {record.date && (
+                              <p className="text-xs text-[var(--nest-white-40)]">
+                                {new Date(record.date).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' })}
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Count */}
+                          <div
+                            className="font-bold px-2.5 py-0.5 rounded-lg flex-shrink-0"
+                            style={{
+                              color: cat.color,
+                              backgroundColor: `${cat.color}15`,
+                              fontSize: idx === 0 ? '1.1rem' : '0.875rem',
+                            }}
+                          >
+                            {record.count}×
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
-          )
-        })()}
+
+            {/* Footer CTA */}
+            <div
+              className="px-6 py-4 text-center"
+              style={{
+                borderTop: '1px solid rgba(245, 158, 11, 0.1)',
+                backgroundColor: 'rgba(245, 158, 11, 0.03)',
+              }}
+            >
+              <p className="text-xs text-[var(--nest-white-40)]">
+                💪 Máš na to překonat rekordy? Přihlas se na další akci!
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
