@@ -109,7 +109,8 @@ export async function GET(
                         const consData = consDoc.data()
                         const product = await getProductById(consData.product_id)
                         const qty = consData.quantity || 0
-                        const unitPrice = product?.price || 0
+                        // Use snapshotted price if available, otherwise fallback to current product price
+                        const unitPrice = consData.unit_price !== undefined ? consData.unit_price : (product?.price || 0)
                         const total = qty * unitPrice
 
                         consumptionItems.push({

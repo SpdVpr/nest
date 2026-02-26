@@ -12,13 +12,13 @@ export default function EditProductPage() {
   const params = useParams()
   const router = useRouter()
   const productId = params.id as string
-  
+
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [product, setProduct] = useState<Product | null>(null)
-  
+
   const [formData, setFormData] = useState({
     name: '',
     price: '',
@@ -26,7 +26,7 @@ export default function EditProductPage() {
     category: '',
     is_available: true,
   })
-  
+
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string>('')
   const [keepOldImage, setKeepOldImage] = useState(true)
@@ -102,7 +102,7 @@ export default function EditProductPage() {
 
     try {
       const token = localStorage.getItem('admin_token')
-      
+
       let imageUrl = keepOldImage ? product?.image_url : null
 
       // Upload new image if exists
@@ -119,7 +119,7 @@ export default function EditProductPage() {
         })
 
         if (!uploadRes.ok) throw new Error('Failed to upload image')
-        
+
         const uploadData = await uploadRes.json()
         imageUrl = uploadData.url
       }
@@ -192,6 +192,18 @@ export default function EditProductPage() {
 
       {/* Form */}
       <div className="max-w-3xl mx-auto px-4 py-8">
+        {/* Price immutability info */}
+        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-6 flex items-start gap-3">
+          <span className="text-lg mt-0.5">🔒</span>
+          <div>
+            <p className="text-sm font-semibold text-blue-900">Změna ceny neovlivní minulé akce</p>
+            <p className="text-xs text-blue-700 mt-0.5">
+              Ceny jsou automaticky uloženy v okamžiku nákupu. Pokud změníš cenu, projeví se to
+              jen u nových nákupů. Všechny dosavadní záznamy spotřeby zůstanou s původní cenou.
+            </p>
+          </div>
+        </div>
+
         <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow p-6 space-y-6">
           {/* Name */}
           <div>
@@ -266,7 +278,7 @@ export default function EditProductPage() {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Obrázek produktu
             </label>
-            
+
             {imagePreview ? (
               <div className="relative w-full h-64 bg-gray-100 rounded-lg overflow-hidden">
                 <Image
@@ -335,7 +347,7 @@ export default function EditProductPage() {
                 'Uložit změny'
               )}
             </button>
-            
+
             <Link
               href="/admin/products"
               className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-semibold"

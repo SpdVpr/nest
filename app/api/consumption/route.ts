@@ -32,12 +32,17 @@ export async function POST(request: NextRequest) {
     const db = getFirebaseAdminDb()
     const consumptionRef = db.collection('consumption')
 
+    // Snapshot the current product price for immutability
+    const product = await getProductById(product_id)
+    const unitPrice = product?.price || 0
+
     const now = Timestamp.now()
     const consumptionData = {
       guest_id,
       product_id,
       quantity: quantity || 1,
       session_id: sessionToUse,
+      unit_price: unitPrice,
       consumed_at: now,
     }
 

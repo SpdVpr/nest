@@ -125,6 +125,7 @@ export interface Consumption {
   product_id: string
   session_id: string
   quantity: number
+  unit_price?: number  // snapshotted price at time of consumption (for price immutability)
   consumed_at: string
 }
 
