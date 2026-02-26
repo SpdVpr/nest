@@ -223,34 +223,21 @@ export default function HomePage() {
                 return (
                   <div
                     key={cat.value}
-                    className="rounded-xl overflow-hidden"
-                    style={{
-                      border: `1px solid ${cat.color}20`,
-                      background: `linear-gradient(135deg, ${cat.color}06, transparent)`,
-                    }}
+                    className="rounded-xl overflow-hidden border border-[var(--nest-dark-4)] bg-[var(--nest-dark-3)]"
                   >
-                    {/* Category Header */}
                     <div
-                      className="px-4 py-3 flex items-center gap-2"
-                      style={{
-                        borderBottom: `1px solid ${cat.color}15`,
-                        backgroundColor: `${cat.color}08`,
-                      }}
+                      className="px-4 py-4 flex items-center justify-center gap-2.5"
+                      style={{ borderBottom: '1px solid var(--nest-dark-4)' }}
                     >
-                      <span className="text-xl">{cat.emoji}</span>
-                      <span className="text-sm font-bold" style={{ color: cat.color }}>{cat.label}</span>
-                      <span className="text-xs text-[var(--nest-white-40)] ml-auto">{catRecords.length} {catRecords.length === 1 ? 'záznam' : catRecords.length < 5 ? 'záznamy' : 'záznamů'}</span>
+                      <span className="text-2xl">{cat.emoji}</span>
+                      <span className="text-base font-bold text-[var(--nest-white)]">{cat.label}</span>
                     </div>
 
-                    {/* Records List */}
-                    <div className="divide-y" style={{ borderColor: `${cat.color}10` }}>
-                      {catRecords.map((record: any, idx: number) => (
+                    <div className="divide-y divide-[var(--nest-dark-4)]">
+                      {catRecords.slice(0, 3).map((record: any, idx: number) => (
                         <div
                           key={record.id}
-                          className="px-4 py-2.5 flex items-center gap-3"
-                          style={{
-                            backgroundColor: idx === 0 ? `${cat.color}08` : 'transparent',
-                          }}
+                          className={`px-4 py-2.5 flex items-center gap-3 ${idx === 0 ? 'bg-[var(--nest-yellow)]/5' : ''}`}
                         >
                           {/* Medal / Position */}
                           <div className="w-8 text-center flex-shrink-0">
@@ -279,12 +266,7 @@ export default function HomePage() {
 
                           {/* Count */}
                           <div
-                            className="font-bold px-2.5 py-0.5 rounded-lg flex-shrink-0"
-                            style={{
-                              color: cat.color,
-                              backgroundColor: `${cat.color}15`,
-                              fontSize: idx === 0 ? '1.1rem' : '0.875rem',
-                            }}
+                            className={`font-bold px-2.5 py-0.5 rounded-lg flex-shrink-0 ${idx === 0 ? 'text-[var(--nest-yellow)] bg-[var(--nest-yellow)]/10 text-lg' : 'text-[var(--nest-white-60)] bg-[var(--nest-dark-4)] text-sm'}`}
                           >
                             {record.count}×
                           </div>

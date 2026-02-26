@@ -126,7 +126,7 @@ export default function EventPage() {
       desc: 'Hlasování o hrách',
     },
     {
-      href: '/#records',
+      href: '/records',
       icon: Trophy,
       label: 'Rekordy',
       desc: 'Síň slávy',
