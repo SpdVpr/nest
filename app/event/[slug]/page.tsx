@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import {
   Calendar, Pizza, MonitorSmartphone, Users, AlertCircle,
-  Armchair, UtensilsCrossed, Gamepad2, Wallet, UserPlus, ChevronRight
+  Armchair, UtensilsCrossed, Gamepad2, Wallet, UserPlus, ChevronRight, Trophy
 } from 'lucide-react'
 import { Session } from '@/types/database.types'
 import { formatEventRange } from '@/lib/utils'
@@ -124,6 +124,12 @@ export default function EventPage() {
       icon: Gamepad2,
       label: 'Hry',
       desc: 'Hlasování o hrách',
+    },
+    {
+      href: '/#records',
+      icon: Trophy,
+      label: 'Rekordy',
+      desc: 'Síň slávy',
     },
   ]
 

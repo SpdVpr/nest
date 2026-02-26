@@ -196,7 +196,7 @@ export default function HomePage() {
         {/* RECORDS — Hall of Fame                     */}
         {/* ═══════════════════════════════════════════ */}
         {records.length > 0 && (
-          <div className="nest-card-elevated overflow-hidden">
+          <div id="records" className="nest-card-elevated overflow-hidden">
             {/* Records Header — dramatic */}
             <div
               className="px-6 py-5 text-center"
