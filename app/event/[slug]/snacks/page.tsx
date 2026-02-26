@@ -226,8 +226,8 @@ export default function EventSnacksPage() {
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-1">
-                  {/* TOP 3 Leaderboard */}
-                  {guests.length > 0 && (
+                  {/* TOP 3 Leaderboard - only shown when no custom TOP Challenge products are set */}
+                  {guests.length > 0 && !(session?.top_products && session.top_products.length > 0) && (
                     <div className="grid grid-cols-2 gap-3 mb-6">
                       {/* Top Eaters */}
                       <div className="nest-card p-3">
@@ -314,9 +314,8 @@ export default function EventSnacksPage() {
                                 border: '1px solid rgba(245, 158, 11, 0.2)',
                               }}
                             >
-                              <div className="px-3 py-2 flex items-center gap-2" style={{ borderBottom: '1px solid rgba(245, 158, 11, 0.1)' }}>
-                                <span className="text-base">🏆</span>
-                                <span className="text-xs font-bold text-[var(--nest-yellow)]">{product.name}</span>
+                              <div className="px-3 py-2.5 text-center" style={{ borderBottom: '1px solid rgba(245, 158, 11, 0.1)' }}>
+                                <span className="text-sm font-bold text-[var(--nest-yellow)]">{product.name}</span>
                               </div>
                               <div className="px-3 py-2 space-y-1">
                                 {guestTotals.length > 0 ? (
