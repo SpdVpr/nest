@@ -95,24 +95,24 @@ export default function EventPage() {
       label: 'Občerstvení',
       desc: 'Jídlo a pití',
     },
-    {
+    ...(session.hardware_enabled !== false ? [{
       href: `/event/${slug}/hardware`,
       icon: MonitorSmartphone,
       label: 'Hardware',
       desc: 'Rezervace HW',
-    },
+    }] : []),
     {
       href: `/event/${slug}/costs`,
       icon: Wallet,
       label: 'Náklady',
       desc: 'Přehled cen',
     },
-    {
+    ...(session.seats_enabled !== false ? [{
       href: `/event/${slug}/seats`,
       icon: Armchair,
       label: 'Místa',
       desc: 'Zasedací pořádek',
-    },
+    }] : []),
     ...(session.menu_enabled ? [{
       href: `/event/${slug}/menu`,
       icon: UtensilsCrossed,

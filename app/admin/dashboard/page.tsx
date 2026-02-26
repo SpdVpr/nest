@@ -18,7 +18,8 @@ import {
   Gamepad2,
   Copy,
   Shield,
-  UserCog
+  UserCog,
+  Trophy
 } from 'lucide-react'
 import { Session } from '@/types/database.types'
 import { formatDate } from '@/lib/utils'
@@ -30,6 +31,7 @@ export default function AdminDashboard() {
   const { adminUser, role, loading: authLoading, isApproved, logout, isLegacyAuth } = useAdminAuth()
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [sessions, setSessions] = useState<Session[]>([])
+  const [guestCountMap, setGuestCountMap] = useState<Record<string, number>>({})
   const [guestsCount, setGuestsCount] = useState(0)
   const [productsCount, setProductsCount] = useState(0)
   const [totalRevenue, setTotalRevenue] = useState(0)
@@ -75,6 +77,7 @@ export default function AdminDashboard() {
       if (sessionResponse.ok) {
         const sessionData = await sessionResponse.json()
         setSessions(sessionData.sessions || [])
+        setGuestCountMap(sessionData.guest_counts || {})
       }
 
       // Fetch guests count
@@ -276,7 +279,15 @@ export default function AdminDashboard() {
                 <tbody className="divide-y divide-gray-200">
                   {sessions.map((session) => (
                     <tr key={session.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 font-semibold text-gray-900">{session.name}</td>
+                      <td className="px-6 py-4 font-semibold text-gray-900">
+                        <div className="flex items-center gap-2">
+                          {session.name}
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                            <Users className="w-3 h-3" />
+                            {guestCountMap[session.id] || 0}
+                          </span>
+                        </div>
+                      </td>
                       <td className="px-6 py-4 text-sm text-gray-600">
                         {formatDate(session.start_date)}
                         {session.end_date && ` - ${formatDate(session.end_date)}`}
@@ -467,6 +478,17 @@ export default function AdminDashboard() {
             </div>
             <h3 className="font-semibold text-gray-900 mb-2">Správa hostů</h3>
             <p className="text-sm text-gray-600">Přidat nebo upravit hosty</p>
+          </Link>
+
+          <Link
+            href="/admin/records"
+            className="bg-[#efefef] rounded-xl shadow hover:shadow-lg transition-shadow p-6 flex flex-col items-center text-center"
+          >
+            <div className="bg-yellow-100 p-4 rounded-full mb-4">
+              <Trophy className="w-8 h-8 text-yellow-600" />
+            </div>
+            <h3 className="font-semibold text-gray-900 mb-2">🏆 Rekordy Nestu</h3>
+            <p className="text-sm text-gray-600">Historické rekordy a statistiky</p>
           </Link>
 
           {showEdit && (

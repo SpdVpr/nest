@@ -81,6 +81,8 @@ export default function EventDetailPage() {
   const [savingEvent, setSavingEvent] = useState(false)
   // Hardware edit state
   const [editHwPricingEnabled, setEditHwPricingEnabled] = useState(true)
+  const [editHwEnabled, setEditHwEnabled] = useState(true)
+  const [editSeatsEnabled, setEditSeatsEnabled] = useState(true)
   const [editHwOverrides, setEditHwOverrides] = useState<Record<string, HardwareOverride>>({})
   const [allHardwareItemsForEdit, setAllHardwareItemsForEdit] = useState<AdminHardwareItemDetail[]>([])
   const [showHwConfigEdit, setShowHwConfigEdit] = useState(false)
@@ -127,6 +129,8 @@ export default function EventDetailPage() {
     setEditSurchargeEnabled((sessionToEdit as any).surcharge_enabled || false)
     // Load HW settings
     setEditHwPricingEnabled(sessionToEdit.hardware_pricing_enabled !== false)
+    setEditHwEnabled((sessionToEdit as any).hardware_enabled !== false)
+    setEditSeatsEnabled((sessionToEdit as any).seats_enabled !== false)
     setEditHwOverrides(sessionToEdit.hardware_overrides || {})
     setShowHwConfigEdit(false)
     // Fetch HW items for override UI
@@ -195,6 +199,8 @@ export default function EventDetailPage() {
 
       // Hardware settings
       eventData.hardware_pricing_enabled = editHwPricingEnabled
+      eventData.hardware_enabled = editHwEnabled
+      eventData.seats_enabled = editSeatsEnabled
       eventData.hardware_overrides = editHwOverrides
 
       const response = await fetch(`/api/admin/sessions/${sessionId}`, {
@@ -1074,6 +1080,8 @@ export default function EventDetailPage() {
                   {showFinances && <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Jídlo (Kč)</th>}
                   {showFinances && <th className="px-4 py-3 text-left text-xs font-medium text-pink-500 uppercase">💖 Dýško</th>}
                   {showFinances && <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase text-red-600 font-bold">Celkem</th>}
+                  {showFinances && <th className="px-4 py-3 text-left text-xs font-medium text-emerald-600 uppercase">💰 Záloha</th>}
+                  {showFinances && <th className="px-4 py-3 text-left text-xs font-medium text-orange-600 uppercase">Zbývá</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -1141,6 +1149,44 @@ export default function EventDetailPage() {
                           </td>
                         )}
                         {showFinances && <td className="px-4 py-3 font-bold text-red-600">{totalPrice} Kč</td>}
+                        {showFinances && (
+                          <td className="px-4 py-3">
+                            <input
+                              type="number"
+                              min="0"
+                              defaultValue={(guest as any).deposit || 0}
+                              onBlur={async (e) => {
+                                const val = parseFloat(e.target.value) || 0
+                                if (val !== ((guest as any).deposit || 0)) {
+                                  try {
+                                    const token = localStorage.getItem('admin_token')
+                                    await fetch(`/api/admin/sessions/${sessionId}/deposits`, {
+                                      method: 'PATCH',
+                                      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                      body: JSON.stringify({ guest_id: guest.id, deposit: val })
+                                    })
+                                      ; (guest as any).deposit = val
+                                  } catch (err) {
+                                    console.error('Error saving deposit:', err)
+                                  }
+                                }
+                              }}
+                              className="w-20 px-2 py-1 rounded text-sm text-center font-medium border border-emerald-200 bg-emerald-50 text-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                            />
+                          </td>
+                        )}
+                        {showFinances && (
+                          <td className="px-4 py-3 font-bold">
+                            {(() => {
+                              const remaining = totalPrice - ((guest as any).deposit || 0)
+                              return (
+                                <span className={remaining <= 0 ? 'text-green-600' : 'text-orange-600'}>
+                                  {remaining <= 0 ? '✅ 0' : remaining} Kč
+                                </span>
+                              )
+                            })()}
+                          </td>
+                        )}
                       </tr>
                     )
                   })
@@ -1491,6 +1537,55 @@ export default function EventDetailPage() {
                     {showFinances && <span className="flex-shrink-0 font-bold text-gray-900 text-sm">{guest.total} Kč</span>}
                   </div>
                 ))}
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* TOP Consumption per Product */}
+        {consumption.length > 0 && (() => {
+          // Build per-product-per-guest consumption map
+          const productGuestMap: Record<string, Record<string, { name: string; qty: number }>> = {}
+          consumption.forEach(rec => {
+            const productName = (rec as any).products?.name || 'Neznámý'
+            const gid = rec.guest_id
+            if (!productGuestMap[productName]) productGuestMap[productName] = {}
+            if (!productGuestMap[productName][gid]) {
+              productGuestMap[productName][gid] = { name: getGuestName(gid), qty: 0 }
+            }
+            productGuestMap[productName][gid].qty += rec.quantity
+          })
+
+          // Find the winner for each product (only if more than 1 consumed)
+          const tops: { product: string; winner: string; count: number }[] = []
+          Object.entries(productGuestMap).forEach(([product, guests]) => {
+            const sorted = Object.values(guests).sort((a, b) => b.qty - a.qty)
+            if (sorted.length > 0 && sorted[0].qty > 1) {
+              tops.push({ product, winner: sorted[0].name, count: sorted[0].qty })
+            }
+          })
+          tops.sort((a, b) => b.count - a.count)
+
+          if (tops.length === 0) return null
+
+          return (
+            <div className="bg-white rounded-xl shadow mb-8 overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h2 className="text-xl font-bold text-gray-900">🏆 TOP Konzumenti</h2>
+              </div>
+              <div className="p-6">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {tops.map((top, idx) => (
+                    <div key={idx} className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: idx === 0 ? 'rgba(251, 191, 36, 0.1)' : 'rgba(107, 114, 128, 0.06)', border: `1px solid ${idx === 0 ? 'rgba(251, 191, 36, 0.25)' : 'rgba(107, 114, 128, 0.12)'}` }}>
+                      <span className="text-2xl flex-shrink-0">{idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '🏅'}</span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-gray-400 truncate">{top.product}</p>
+                        <p className="text-sm font-bold text-gray-900 truncate">{top.winner}</p>
+                        <p className="text-xs font-semibold" style={{ color: '#f59e0b' }}>{top.count}×</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )

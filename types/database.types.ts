@@ -21,6 +21,8 @@ export interface Session {
   is_active: boolean
   menu_enabled?: boolean
   hardware_pricing_enabled?: boolean  // if false, HW prices are hidden from guests (default true)
+  hardware_enabled?: boolean   // if false, hardware reservation section is completely hidden (default true)
+  seats_enabled?: boolean      // if false, seat reservation section is completely hidden (default true)
   hardware_overrides?: Record<string, HardwareOverride>  // per-item quantity overrides for this session
   status?: 'draft' | 'upcoming' | 'active' | 'completed' | 'cancelled'
   description?: string | null
@@ -73,6 +75,7 @@ export interface Guest {
   check_out_date?: string | null
   dietary_restrictions?: string[]  // ['vegan', 'vegetarian', 'gluten-free', 'lactose-free']
   dietary_note?: string | null     // free text for custom allergies
+  deposit?: number             // amount of deposit already paid (Kč)
   is_active: boolean
   created_at: string
 }

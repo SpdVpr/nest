@@ -3,13 +3,14 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Calendar, Shield, ArrowRight } from 'lucide-react'
+import { Calendar, Shield, ArrowRight, Trophy, Beer, Zap, Candy, Users } from 'lucide-react'
 import { Session } from '@/types/database.types'
 import { formatEventRange } from '@/lib/utils'
 import NestLoading from '@/components/NestLoading'
 
 export default function HomePage() {
   const [sessions, setSessions] = useState<Session[]>([])
+  const [records, setRecords] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -26,6 +27,7 @@ export default function HomePage() {
     }
     setIsAuthenticated(true)
     fetchUpcomingEvents()
+    fetchRecords()
   }, [router])
 
   const fetchUpcomingEvents = async () => {
@@ -39,6 +41,18 @@ export default function HomePage() {
       console.error('Error fetching events:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchRecords = async () => {
+    try {
+      const response = await fetch('/api/records')
+      if (response.ok) {
+        const data = await response.json()
+        setRecords(data.records || [])
+      }
+    } catch (error) {
+      console.error('Error fetching records:', error)
     }
   }
 
@@ -179,6 +193,73 @@ export default function HomePage() {
             </div>
           )}
         </div>
+
+        {/* Nest Records Section */}
+        {records.length > 0 && (() => {
+          const RECORD_CATEGORIES = [
+            { value: 'attendance', label: 'Účast', emoji: '👥', color: '#3b82f6' },
+            { value: 'pivo', label: 'Pivo', emoji: '🍺', color: '#f59e0b' },
+            { value: 'redbull', label: 'Red Bull', emoji: '⚡', color: '#ef4444' },
+            { value: 'bueno', label: 'Kinder Bueno', emoji: '🍫', color: '#a855f7' },
+            { value: 'jagermeister', label: 'Jägermeister', emoji: '🦌', color: '#22c55e' },
+          ]
+
+          // Group and find the top record per category
+          const grouped: Record<string, any[]> = {}
+          records.forEach(r => {
+            if (!grouped[r.category]) grouped[r.category] = []
+            grouped[r.category].push(r)
+          })
+          Object.values(grouped).forEach(arr => arr.sort((a: any, b: any) => b.count - a.count))
+
+          return (
+            <div className="nest-card-elevated p-6 mt-6">
+              <div className="flex items-center gap-2 mb-5">
+                <Trophy className="w-5 h-5 text-[var(--nest-yellow)]" />
+                <h2 className="text-lg font-bold">Rekordy Nestu</h2>
+              </div>
+
+              <div className="space-y-3">
+                {RECORD_CATEGORIES.map(cat => {
+                  const catRecords = grouped[cat.value] || []
+                  if (catRecords.length === 0) return null
+
+                  const top = catRecords[0]
+
+                  return (
+                    <div
+                      key={cat.value}
+                      className="flex items-center gap-3 p-3 rounded-xl transition-colors"
+                      style={{
+                        backgroundColor: `${cat.color}08`,
+                        border: `1px solid ${cat.color}20`,
+                      }}
+                    >
+                      <span className="text-2xl flex-shrink-0">{cat.emoji}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium" style={{ color: `${cat.color}cc` }}>{cat.label}</p>
+                        <p className="text-sm font-bold text-[var(--nest-white)] truncate">
+                          {top.group_name}
+                        </p>
+                        {top.date && (
+                          <p className="text-xs text-[var(--nest-white-40)]">
+                            {new Date(top.date).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </p>
+                        )}
+                      </div>
+                      <div
+                        className="text-lg font-bold px-3 py-1 rounded-lg flex-shrink-0"
+                        style={{ color: cat.color, backgroundColor: `${cat.color}15` }}
+                      >
+                        {top.count}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })()}
       </div>
     </div>
   )

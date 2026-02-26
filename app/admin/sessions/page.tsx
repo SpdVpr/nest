@@ -53,6 +53,10 @@ function AdminSessionsPageInner() {
   const [newPricePerNight, setNewPricePerNight] = useState('')
   const [surchargeEnabled, setSurchargeEnabled] = useState(false)
 
+  // Reservation toggles
+  const [hardwareEnabled, setHardwareEnabled] = useState(true)
+  const [seatsEnabled, setSeatsEnabled] = useState(true)
+
   // Menu state
   const [menuEnabled, setMenuEnabled] = useState(false)
   const [menuItems, setMenuItems] = useState<InlineMenuItem[]>([])
@@ -85,6 +89,7 @@ function AdminSessionsPageInner() {
       // Auto-open create form if redirected from dashboard
       if (searchParams.get('create') === 'true') {
         resetForm()
+        setNewSessionStartTime('16:00')  // default start time
         setShowCreateForm(true)
       }
 
@@ -92,6 +97,7 @@ function AdminSessionsPageInner() {
       const copyFromId = searchParams.get('copyFrom')
       if (copyFromId) {
         resetForm()
+        setNewSessionStartTime('16:00')  // default start time
         setShowCreateForm(true)
         // Small delay to ensure state is initialized
         setTimeout(() => copyFromSession(copyFromId), 300)
@@ -300,6 +306,8 @@ function AdminSessionsPageInner() {
       setNewPricePerNight(config.price_per_night?.toString() || '0')
       setSurchargeEnabled(config.surcharge_enabled || false)
       setHardwarePricingEnabled(config.hardware_pricing_enabled !== false)
+      setHardwareEnabled(config.hardware_enabled !== false)
+      setSeatsEnabled(config.seats_enabled !== false)
       setHardwareOverrides(config.hardware_overrides || {})
       setMenuEnabled(config.menu_enabled || false)
 
@@ -375,6 +383,8 @@ function AdminSessionsPageInner() {
 
       sessionData.menu_enabled = menuEnabled
       sessionData.hardware_pricing_enabled = hardwarePricingEnabled
+      sessionData.hardware_enabled = hardwareEnabled
+      sessionData.seats_enabled = seatsEnabled
       sessionData.hardware_overrides = hardwareOverrides
       sessionData.surcharge_enabled = surchargeEnabled
 
@@ -484,6 +494,8 @@ function AdminSessionsPageInner() {
       sessionData.surcharge_enabled = surchargeEnabled
 
       sessionData.hardware_pricing_enabled = hardwarePricingEnabled
+      sessionData.hardware_enabled = hardwareEnabled
+      sessionData.seats_enabled = seatsEnabled
       sessionData.hardware_overrides = hardwareOverrides
 
       const response = await fetch(`/api/admin/sessions/${editingSession.id}`, {
@@ -519,6 +531,8 @@ function AdminSessionsPageInner() {
     setNewPricePerNight((session as any).price_per_night?.toString() || '0')
     setSurchargeEnabled((session as any).surcharge_enabled || false)
     setHardwarePricingEnabled((session as any).hardware_pricing_enabled !== false)
+    setHardwareEnabled((session as any).hardware_enabled !== false)
+    setSeatsEnabled((session as any).seats_enabled !== false)
     setHardwareOverrides((session as any).hardware_overrides || {})
     setShowHardwareConfig(false)
     setShowCreateForm(false)
@@ -543,6 +557,8 @@ function AdminSessionsPageInner() {
     setMenuEnabled(false)
     setMenuItems([])
     setHardwarePricingEnabled(true)
+    setHardwareEnabled(true)
+    setSeatsEnabled(true)
     setHardwareOverrides({})
     setShowHardwareConfig(false)
     setCopiedGames([])
@@ -717,6 +733,77 @@ function AdminSessionsPageInner() {
             Např. při 7 lidech: {newPricePerNight ? `${parseInt(newPricePerNight) + 3 * 150} Kč` : '—'} /noc.
           </div>
         )}
+
+        {/* Reservation toggles */}
+        <hr style={{ borderColor: 'var(--nest-border)' }} />
+
+        <div className="space-y-3">
+          <h4 className="font-semibold text-sm flex items-center gap-2" style={{ color: 'var(--nest-text-primary)' }}>
+            🎛️ Sekce pro hosty
+          </h4>
+
+          {/* Hardware reservation toggle */}
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  checked={hardwareEnabled}
+                  onChange={(e) => setHardwareEnabled(e.target.checked)}
+                  className="sr-only"
+                />
+                <div
+                  className="block w-12 h-7 rounded-full transition-colors"
+                  style={{ backgroundColor: hardwareEnabled ? '#3b82f6' : 'var(--nest-border)' }}
+                ></div>
+                <div
+                  className={`absolute left-0.5 top-0.5 w-6 h-6 rounded-full transition-transform ${hardwareEnabled ? 'translate-x-5' : ''}`}
+                  style={{ backgroundColor: 'var(--nest-text-primary)' }}
+                ></div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Monitor className="w-4 h-4" style={{ color: '#60a5fa' }} />
+                <span className="font-medium text-sm" style={{ color: 'var(--nest-text-primary)' }}>Rezervace techniky</span>
+              </div>
+            </label>
+            {!hardwareEnabled && (
+              <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ color: '#f87171', backgroundColor: 'rgba(239, 68, 68, 0.12)' }}>
+                Hosté neuvidí sekci Hardware
+              </span>
+            )}
+          </div>
+
+          {/* Seat reservation toggle */}
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  checked={seatsEnabled}
+                  onChange={(e) => setSeatsEnabled(e.target.checked)}
+                  className="sr-only"
+                />
+                <div
+                  className="block w-12 h-7 rounded-full transition-colors"
+                  style={{ backgroundColor: seatsEnabled ? '#3b82f6' : 'var(--nest-border)' }}
+                ></div>
+                <div
+                  className={`absolute left-0.5 top-0.5 w-6 h-6 rounded-full transition-transform ${seatsEnabled ? 'translate-x-5' : ''}`}
+                  style={{ backgroundColor: 'var(--nest-text-primary)' }}
+                ></div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span style={{ color: '#a78bfa' }}>💺</span>
+                <span className="font-medium text-sm" style={{ color: 'var(--nest-text-primary)' }}>Rezervace míst k sezení</span>
+              </div>
+            </label>
+            {!seatsEnabled && (
+              <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ color: '#f87171', backgroundColor: 'rgba(239, 68, 68, 0.12)' }}>
+                Hosté neuvidí sekci Místa
+              </span>
+            )}
+          </div>
+        </div>
 
         {/* Hardware Configuration Section */}
         <hr style={{ borderColor: 'var(--nest-border)' }} />

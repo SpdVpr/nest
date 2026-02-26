@@ -101,6 +101,12 @@ export async function PATCH(
     if (body.surcharge_enabled !== undefined) {
       updateData.surcharge_enabled = Boolean(body.surcharge_enabled)
     }
+    if (body.hardware_enabled !== undefined) {
+      updateData.hardware_enabled = Boolean(body.hardware_enabled)
+    }
+    if (body.seats_enabled !== undefined) {
+      updateData.seats_enabled = Boolean(body.seats_enabled)
+    }
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json(

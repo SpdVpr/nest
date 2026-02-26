@@ -29,7 +29,17 @@ export async function GET(request: NextRequest) {
       end_date: doc.data().end_date?.toDate().toISOString() || null,
     } as Session))
 
-    return NextResponse.json({ sessions })
+    // Fetch guest counts for each session
+    const guestCounts: Record<string, number> = {}
+    await Promise.all(sessions.map(async (s) => {
+      const guestsSnap = await db.collection('guests')
+        .where('session_id', '==', s.id)
+        .where('is_active', '==', true)
+        .get()
+      guestCounts[s.id] = guestsSnap.size
+    }))
+
+    return NextResponse.json({ sessions, guest_counts: guestCounts })
   } catch (error) {
     console.error('Error fetching sessions:', error)
     return NextResponse.json(
@@ -46,7 +56,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { name, start_date, end_date, start_time, end_time, description, status, menu_enabled, hardware_pricing_enabled, hardware_overrides, surcharge_enabled } = await request.json()
+    const { name, start_date, end_date, start_time, end_time, description, status, menu_enabled, hardware_pricing_enabled, hardware_enabled, seats_enabled, hardware_overrides, surcharge_enabled } = await request.json()
 
     if (!name) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 })
@@ -112,6 +122,16 @@ export async function POST(request: NextRequest) {
       sessionData.surcharge_enabled = Boolean(surcharge_enabled)
     } else {
       sessionData.surcharge_enabled = false  // default: surcharge disabled
+    }
+    if (hardware_enabled !== undefined) {
+      sessionData.hardware_enabled = Boolean(hardware_enabled)
+    } else {
+      sessionData.hardware_enabled = true  // default: HW reservation enabled
+    }
+    if (seats_enabled !== undefined) {
+      sessionData.seats_enabled = Boolean(seats_enabled)
+    } else {
+      sessionData.seats_enabled = true  // default: seat reservation enabled
     }
 
     const docRef = await db.collection('sessions').add(sessionData)

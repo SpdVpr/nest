@@ -32,6 +32,7 @@ interface GuestCost {
     hwTotal: number
     tip: number
     tipPercentage: number | null
+    deposit: number
     grandTotal: number
 }
 
@@ -208,7 +209,9 @@ export default function SettlementPage() {
     }
 
     const getFinalTotal = (guest: GuestCost): number => {
-        return Math.max(0, getOverriddenGrandTotal(guest) + getAdjustmentsTotal(guest.id))
+        const subtotal = getOverriddenGrandTotal(guest) + getAdjustmentsTotal(guest.id)
+        const afterDeposit = subtotal - (guest.deposit || 0)
+        return Math.max(0, afterDeposit)
     }
 
     // Start editing a line item

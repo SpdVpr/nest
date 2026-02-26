@@ -1,0 +1,307 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { ArrowLeft, Plus, Trash2, Trophy, Beer, Zap, Candy, GlassWater, Users, Loader2 } from 'lucide-react'
+import { useAdminAuth } from '@/lib/admin-auth-context'
+import { canEditSettings } from '@/lib/admin-roles'
+
+interface NestRecord {
+    id: string
+    category: string
+    group_name: string
+    date: string | null
+    count: number
+    created_at: string
+}
+
+const CATEGORIES = [
+    { value: 'attendance', label: '👥 Účast', icon: Users, color: '#3b82f6' },
+    { value: 'pivo', label: '🍺 Pivo', icon: Beer, color: '#f59e0b' },
+    { value: 'redbull', label: '⚡ Red Bull', icon: Zap, color: '#ef4444' },
+    { value: 'bueno', label: '🍫 Kinder Bueno', icon: Candy, color: '#a855f7' },
+    { value: 'jagermeister', label: '🦌 Jägermeister', icon: GlassWater, color: '#22c55e' },
+]
+
+export default function AdminRecordsPage() {
+    const router = useRouter()
+    const { adminUser, role, loading: authLoading, isApproved } = useAdminAuth()
+    const [isAuthenticated, setIsAuthenticated] = useState(false)
+    const [records, setRecords] = useState<NestRecord[]>([])
+    const [loading, setLoading] = useState(true)
+
+    // Form state
+    const [newCategory, setNewCategory] = useState('attendance')
+    const [newGroupName, setNewGroupName] = useState('')
+    const [newDate, setNewDate] = useState('')
+    const [newCount, setNewCount] = useState('')
+    const [saving, setSaving] = useState(false)
+
+    const showEdit = role ? canEditSettings(role) : false
+
+    useEffect(() => {
+        if (authLoading) return
+
+        if (!adminUser) {
+            const token = localStorage.getItem('admin_token')
+            if (!token) {
+                router.push('/admin/login')
+                return
+            }
+        }
+
+        if (adminUser && !isApproved) {
+            router.push('/admin/login')
+            return
+        }
+
+        setIsAuthenticated(true)
+        fetchRecords()
+    }, [adminUser, authLoading, isApproved, router])
+
+    const fetchRecords = async () => {
+        try {
+            const token = localStorage.getItem('admin_token')
+            const response = await fetch('/api/admin/records', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            if (response.ok) {
+                const data = await response.json()
+                setRecords(data.records || [])
+            }
+        } catch (error) {
+            console.error('Error fetching records:', error)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const addRecord = async () => {
+        if (!newGroupName.trim() || !newCount) return
+
+        setSaving(true)
+        try {
+            const token = localStorage.getItem('admin_token')
+            const response = await fetch('/api/admin/records', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    category: newCategory,
+                    group_name: newGroupName.trim(),
+                    date: newDate || null,
+                    count: parseInt(newCount),
+                })
+            })
+
+            if (response.ok) {
+                setNewGroupName('')
+                setNewDate('')
+                setNewCount('')
+                fetchRecords()
+            } else {
+                alert('Nepodařilo se přidat záznam')
+            }
+        } catch (error) {
+            console.error('Error adding record:', error)
+            alert('Chyba při přidávání záznamu')
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    const deleteRecord = async (id: string) => {
+        if (!confirm('Smazat tento rekord?')) return
+
+        try {
+            const token = localStorage.getItem('admin_token')
+            await fetch('/api/admin/records', {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ id })
+            })
+            fetchRecords()
+        } catch (error) {
+            console.error('Error deleting record:', error)
+        }
+    }
+
+    const getCategoryInfo = (cat: string) => CATEGORIES.find(c => c.value === cat) || CATEGORIES[0]
+
+    if (!isAuthenticated || loading) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            </div>
+        )
+    }
+
+    // Group records by category
+    const grouped: Record<string, NestRecord[]> = {}
+    CATEGORIES.forEach(c => { grouped[c.value] = [] })
+    records.forEach(r => {
+        if (!grouped[r.category]) grouped[r.category] = []
+        grouped[r.category].push(r)
+    })
+    // Sort within each category by count descending
+    Object.values(grouped).forEach(arr => arr.sort((a, b) => b.count - a.count))
+
+    return (
+        <div className="min-h-screen bg-gray-50">
+            <div className="bg-[#efefef] shadow">
+                <div className="max-w-7xl mx-auto px-4 py-6">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                            <Link
+                                href="/admin/dashboard"
+                                className="flex items-center text-gray-600 hover:text-gray-900 mr-6"
+                            >
+                                <ArrowLeft className="w-5 h-5 mr-2" />
+                                Dashboard
+                            </Link>
+                            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                                <Trophy className="w-6 h-6 text-yellow-500" />
+                                Rekordy Nestu
+                            </h1>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="max-w-7xl mx-auto px-4 py-8">
+                {/* Add new record form */}
+                {showEdit && (
+                    <div className="bg-white rounded-xl shadow p-6 mb-8">
+                        <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                            <Plus className="w-5 h-5 text-green-600" />
+                            Přidat nový rekord
+                        </h3>
+
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Kategorie</label>
+                                <select
+                                    value={newCategory}
+                                    onChange={(e) => setNewCategory(e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
+                                >
+                                    {CATEGORIES.map(cat => (
+                                        <option key={cat.value} value={cat.value}>{cat.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Skupina / Jméno</label>
+                                <input
+                                    type="text"
+                                    value={newGroupName}
+                                    onChange={(e) => setNewGroupName(e.target.value)}
+                                    placeholder="např. Borci z Prahy"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Datum</label>
+                                <input
+                                    type="date"
+                                    value={newDate}
+                                    onChange={(e) => setNewDate(e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Počet</label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    value={newCount}
+                                    onChange={(e) => setNewCount(e.target.value)}
+                                    placeholder="např. 42"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
+                                />
+                            </div>
+
+                            <button
+                                onClick={addRecord}
+                                disabled={saving || !newGroupName.trim() || !newCount}
+                                className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-6 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                                {saving ? 'Ukládám...' : '+ Přidat'}
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Records by category */}
+                <div className="space-y-6">
+                    {CATEGORIES.map(cat => {
+                        const catRecords = grouped[cat.value] || []
+                        const Icon = cat.icon
+
+                        return (
+                            <div key={cat.value} className="bg-white rounded-xl shadow overflow-hidden">
+                                <div
+                                    className="px-6 py-4 border-b flex items-center gap-3"
+                                    style={{ borderColor: `${cat.color}30`, backgroundColor: `${cat.color}08` }}
+                                >
+                                    <Icon className="w-5 h-5" style={{ color: cat.color }} />
+                                    <h2 className="text-lg font-bold text-gray-900">{cat.label}</h2>
+                                    <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: `${cat.color}15`, color: cat.color }}>
+                                        {catRecords.length} záznamů
+                                    </span>
+                                </div>
+
+                                {catRecords.length === 0 ? (
+                                    <div className="px-6 py-8 text-center text-gray-400 text-sm">
+                                        Zatím žádné rekordy
+                                    </div>
+                                ) : (
+                                    <div className="divide-y divide-gray-100">
+                                        {catRecords.map((record, idx) => (
+                                            <div key={record.id} className="px-6 py-3 flex items-center gap-4 hover:bg-gray-50">
+                                                <span className="text-xl flex-shrink-0 w-8 text-center">
+                                                    {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`}
+                                                </span>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="font-semibold text-gray-900">{record.group_name}</p>
+                                                    {record.date && (
+                                                        <p className="text-xs text-gray-500">
+                                                            {new Date(record.date).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <span
+                                                    className="text-lg font-bold px-3 py-1 rounded-lg"
+                                                    style={{ color: cat.color, backgroundColor: `${cat.color}12` }}
+                                                >
+                                                    {record.count}×
+                                                </span>
+                                                {showEdit && (
+                                                    <button
+                                                        onClick={() => deleteRecord(record.id)}
+                                                        className="text-gray-300 hover:text-red-500 transition-colors"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )
+                    })}
+                </div>
+            </div>
+        </div>
+    )
+}
