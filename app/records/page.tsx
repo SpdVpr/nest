@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Trophy, ArrowLeft } from 'lucide-react'
 import NestLoading from '@/components/NestLoading'
 
@@ -14,6 +14,7 @@ const RECORD_CATEGORIES = [
 ]
 
 export default function RecordsPage() {
+    const router = useRouter()
     const [records, setRecords] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
 
@@ -51,13 +52,13 @@ export default function RecordsPage() {
         <div className="min-h-screen bg-[var(--nest-dark)] text-[var(--nest-white)]">
             <div className="max-w-2xl mx-auto px-4 pt-6 pb-12">
                 {/* Back link */}
-                <Link
-                    href="/"
+                <button
+                    onClick={() => router.back()}
                     className="inline-flex items-center gap-1.5 text-[var(--nest-white-40)] hover:text-[var(--nest-yellow)] transition-colors text-sm mb-6"
                 >
                     <ArrowLeft className="w-4 h-4" />
                     Zpět
-                </Link>
+                </button>
 
                 {/* Records Card */}
                 <div className="nest-card-elevated overflow-hidden">
