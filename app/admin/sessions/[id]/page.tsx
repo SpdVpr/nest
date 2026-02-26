@@ -1341,8 +1341,6 @@ export default function EventDetailPage() {
             })
           }
 
-          const mealTypes: MealType[] = ['lunch', 'dinner']
-
           return (
             <div className="bg-white rounded-xl shadow mb-8 overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
@@ -1359,6 +1357,10 @@ export default function EventDetailPage() {
                   {days.map(day => {
                     const presentGuests = getGuestsOnDay(day.date)
                     const dayMeals = getMealsForDay(day.dayIndex)
+                    // Only show meal types that actually exist in menu for this day
+                    const dayMealTypes = (['breakfast', 'lunch', 'dinner'] as MealType[]).filter(
+                      type => dayMeals.some(m => m.meal_type === type)
+                    )
                     return (
                       <div key={day.dayIndex} className="border border-gray-200 rounded-xl overflow-hidden">
                         {/* Day header */}
@@ -1371,7 +1373,7 @@ export default function EventDetailPage() {
 
                         {/* Meals */}
                         <div className="divide-y divide-gray-100">
-                          {mealTypes.map(mealType => {
+                          {dayMealTypes.map(mealType => {
                             const mealInfo = dayMeals.find(m => m.meal_type === mealType)
                             const label = getMealTypeLabel(mealType)
                             return (
