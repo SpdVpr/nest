@@ -273,6 +273,86 @@ export default function EventSnacksPage() {
                     </div>
                   )}
 
+                  {/* TOP Challenge Leaderboards */}
+                  {session?.top_products && session.top_products.length > 0 && (() => {
+                    // Build per-product leaderboards from all guests' consumption
+                    const topProductIds = session.top_products
+                    const topLeaderboards = topProductIds.map(productId => {
+                      const product = products.find(p => p.id === productId)
+                      if (!product) return null
+
+                      // Calculate total consumption per guest for this product
+                      const guestTotals = guests
+                        .map(guest => {
+                          const qty = guest.consumption
+                            .filter(c => c.products.id === productId)
+                            .reduce((sum, c) => sum + c.quantity, 0)
+                          return { guest, qty }
+                        })
+                        .filter(g => g.qty > 0)
+                        .sort((a, b) => b.qty - a.qty)
+                        .slice(0, 5)
+
+                      return { product, guestTotals }
+                    }).filter(Boolean) as Array<{ product: Product; guestTotals: Array<{ guest: GuestWithConsumption; qty: number }> }>
+
+                    if (topLeaderboards.length === 0) return null
+
+                    return (
+                      <div className="mb-6">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Trophy className="w-4 h-4 text-[var(--nest-yellow)]" />
+                          <h3 className="text-sm font-bold">🔥 TOP Challenge</h3>
+                        </div>
+                        <div className="space-y-3">
+                          {topLeaderboards.map(({ product, guestTotals }) => (
+                            <div
+                              key={product.id}
+                              className="rounded-xl overflow-hidden"
+                              style={{
+                                background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(239, 68, 68, 0.05))',
+                                border: '1px solid rgba(245, 158, 11, 0.2)',
+                              }}
+                            >
+                              <div className="px-3 py-2 flex items-center gap-2" style={{ borderBottom: '1px solid rgba(245, 158, 11, 0.1)' }}>
+                                <span className="text-base">🏆</span>
+                                <span className="text-xs font-bold text-[var(--nest-yellow)]">{product.name}</span>
+                              </div>
+                              <div className="px-3 py-2 space-y-1">
+                                {guestTotals.length > 0 ? (
+                                  guestTotals.map((entry, idx) => (
+                                    <div
+                                      key={entry.guest.id}
+                                      className="flex items-center justify-between py-1 text-xs"
+                                      style={{
+                                        borderLeft: idx === 0 ? '2px solid #f59e0b' : 'none',
+                                        paddingLeft: idx === 0 ? '8px' : '10px',
+                                      }}
+                                    >
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="text-sm">
+                                          {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`}
+                                        </span>
+                                        <span className={`font-semibold ${idx === 0 ? 'text-[var(--nest-yellow)]' : ''}`}>
+                                          {entry.guest.name}
+                                        </span>
+                                      </div>
+                                      <span className={`font-bold ${idx === 0 ? 'text-[var(--nest-yellow)]' : 'text-[var(--nest-white-60)]'}`}>
+                                        {entry.qty}×
+                                      </span>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <p className="text-[var(--nest-white-40)] text-center py-1 text-xs">Zatím nikdo 🤷</p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })()}
+
                   <h2 className="text-base font-bold mb-3">Hosté</h2>
                   <div className="space-y-2">
                     {guests.map((guest) => (

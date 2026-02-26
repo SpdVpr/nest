@@ -228,10 +228,10 @@ export default function AdminRecordsPage() {
                                 <select
                                     value={newCategory}
                                     onChange={(e) => setNewCategory(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white"
                                 >
                                     {CATEGORIES.map(cat => (
-                                        <option key={cat.value} value={cat.value}>{cat.label}</option>
+                                        <option key={cat.value} value={cat.value} className="text-gray-900 bg-white">{cat.label}</option>
                                     ))}
                                 </select>
                             </div>

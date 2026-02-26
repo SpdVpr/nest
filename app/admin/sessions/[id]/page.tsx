@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Users, Monitor, Utensils, TrendingUp, Loader2, Edit2, Check, X, Edit, UtensilsCrossed, Heart, Cpu, ChevronDown, ChevronUp, CheckCircle2, Circle } from 'lucide-react'
-import { Session, Guest, MenuItem, MealType, Game, GameLibraryItem, HardwareOverride } from '@/types/database.types'
+import { ArrowLeft, Users, Monitor, Utensils, TrendingUp, Loader2, Edit2, Check, X, Edit, UtensilsCrossed, Heart, Cpu, ChevronDown, ChevronUp, CheckCircle2, Circle, Trophy } from 'lucide-react'
+import { Session, Guest, MenuItem, MealType, Game, GameLibraryItem, HardwareOverride, Product } from '@/types/database.types'
 import { HardwareItem } from '@/types/hardware.types'
 import { formatDate, formatDateOnly } from '@/lib/utils'
 import { useAdminAuth } from '@/lib/admin-auth-context'
@@ -86,6 +86,9 @@ export default function EventDetailPage() {
   const [editHwOverrides, setEditHwOverrides] = useState<Record<string, HardwareOverride>>({})
   const [allHardwareItemsForEdit, setAllHardwareItemsForEdit] = useState<AdminHardwareItemDetail[]>([])
   const [showHwConfigEdit, setShowHwConfigEdit] = useState(false)
+  // Top products state
+  const [editTopProducts, setEditTopProducts] = useState<string[]>([])
+  const [allProducts, setAllProducts] = useState<Product[]>([])
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
   const [menuEnabled, setMenuEnabled] = useState(false)
   const [guestSelections, setGuestSelections] = useState<Record<string, any>>({})
@@ -133,8 +136,10 @@ export default function EventDetailPage() {
     setEditSeatsEnabled((sessionToEdit as any).seats_enabled !== false)
     setEditHwOverrides(sessionToEdit.hardware_overrides || {})
     setShowHwConfigEdit(false)
+    setEditTopProducts((sessionToEdit as any).top_products || [])
     // Fetch HW items for override UI
     fetchHardwareItemsForEdit()
+    fetchAllProducts()
   }
 
   const fetchHardwareItemsForEdit = async () => {
@@ -149,6 +154,18 @@ export default function EventDetailPage() {
       }
     } catch (e) {
       console.error('Error fetching HW items for edit:', e)
+    }
+  }
+
+  const fetchAllProducts = async () => {
+    try {
+      const res = await fetch('/api/products')
+      if (res.ok) {
+        const data = await res.json()
+        setAllProducts(data.products || [])
+      }
+    } catch (e) {
+      console.error('Error fetching products:', e)
     }
   }
 
@@ -202,6 +219,7 @@ export default function EventDetailPage() {
       eventData.hardware_enabled = editHwEnabled
       eventData.seats_enabled = editSeatsEnabled
       eventData.hardware_overrides = editHwOverrides
+      eventData.top_products = editTopProducts
 
       const response = await fetch(`/api/admin/sessions/${sessionId}`, {
         method: 'PATCH',
@@ -863,6 +881,55 @@ export default function EventDetailPage() {
                     </span>
                   )}
                 </div>
+              </div>
+
+              {/* TOP Products Challenge */}
+              <hr style={{ borderColor: 'var(--nest-border)' }} />
+
+              <div className="space-y-3">
+                <h4 className="font-semibold flex items-center gap-2" style={{ color: 'var(--nest-text-primary)' }}>
+                  <Trophy className="w-5 h-5" style={{ color: '#f59e0b' }} />
+                  TOP Challenge
+                  {editTopProducts.length > 0 && (
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' }}>
+                      {editTopProducts.length} {editTopProducts.length === 1 ? 'položka' : editTopProducts.length < 5 ? 'položky' : 'položek'}
+                    </span>
+                  )}
+                </h4>
+                <p className="text-xs" style={{ color: 'var(--nest-text-tertiary)' }}>
+                  Vyber produkty, u kterých se bude zobrazovat TOP žebříček spotřeby na stránce občerstvení.
+                </p>
+
+                {allProducts.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {allProducts.map(product => {
+                      const isSelected = editTopProducts.includes(product.id)
+                      return (
+                        <button
+                          key={product.id}
+                          type="button"
+                          onClick={() => {
+                            if (isSelected) {
+                              setEditTopProducts(editTopProducts.filter(id => id !== product.id))
+                            } else {
+                              setEditTopProducts([...editTopProducts, product.id])
+                            }
+                          }}
+                          className="px-3 py-1.5 rounded-full text-sm font-medium transition-all border"
+                          style={{
+                            backgroundColor: isSelected ? 'rgba(245, 158, 11, 0.15)' : 'var(--nest-bg)',
+                            borderColor: isSelected ? '#f59e0b' : 'var(--nest-border)',
+                            color: isSelected ? '#f59e0b' : 'var(--nest-text-secondary)',
+                          }}
+                        >
+                          {isSelected ? '🏆 ' : ''}{product.name}
+                        </button>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-sm" style={{ color: 'var(--nest-text-tertiary)' }}>Načítám produkty...</p>
+                )}
               </div>
 
               <hr style={{ borderColor: 'var(--nest-border)' }} />
