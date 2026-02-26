@@ -95,3 +95,41 @@ export async function DELETE(request: NextRequest) {
         return NextResponse.json({ error: 'Failed to delete record' }, { status: 500 })
     }
 }
+
+// PATCH /api/admin/records - Update a record
+export async function PATCH(request: NextRequest) {
+    try {
+        if (!verifyAuth(request)) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
+        const { id, group_name, count, date, category } = await request.json()
+        if (!id) {
+            return NextResponse.json({ error: 'id is required' }, { status: 400 })
+        }
+
+        const db = getFirebaseAdminDb()
+        const updateData: any = {}
+
+        if (group_name !== undefined) updateData.group_name = group_name.trim()
+        if (count !== undefined) updateData.count = parseInt(count)
+        if (date !== undefined) updateData.date = date || null
+        if (category !== undefined) {
+            const validCategories = ['attendance', 'pivo', 'redbull', 'bueno', 'jagermeister']
+            if (validCategories.includes(category)) {
+                updateData.category = category
+            }
+        }
+
+        if (Object.keys(updateData).length === 0) {
+            return NextResponse.json({ error: 'No data to update' }, { status: 400 })
+        }
+
+        await db.collection('nest_records').doc(id).update(updateData)
+
+        return NextResponse.json({ success: true })
+    } catch (error) {
+        console.error('Error updating record:', error)
+        return NextResponse.json({ error: 'Failed to update record' }, { status: 500 })
+    }
+}

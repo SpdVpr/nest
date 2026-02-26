@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Plus, Trash2, Trophy, Beer, Zap, Candy, GlassWater, Users, Loader2, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Trophy, Beer, Zap, Candy, GlassWater, Users, Loader2, RefreshCw, Edit2, Check, X } from 'lucide-react'
 import { useAdminAuth } from '@/lib/admin-auth-context'
 import { canEditSettings } from '@/lib/admin-roles'
 
@@ -39,6 +39,14 @@ export default function AdminRecordsPage() {
     const [newCount, setNewCount] = useState('')
     const [saving, setSaving] = useState(false)
     const [syncing, setSyncing] = useState(false)
+
+    // Edit state
+    const [editingId, setEditingId] = useState<string | null>(null)
+    const [editName, setEditName] = useState('')
+    const [editDate, setEditDate] = useState('')
+    const [editCount, setEditCount] = useState('')
+    const [editCategory, setEditCategory] = useState('')
+    const [editSaving, setEditSaving] = useState(false)
 
     const showEdit = role ? canEditSettings(role) : false
 
@@ -158,6 +166,55 @@ export default function AdminRecordsPage() {
             alert('Chyba při synchronizaci')
         } finally {
             setSyncing(false)
+        }
+    }
+
+    const startEdit = (record: NestRecord) => {
+        setEditingId(record.id)
+        setEditName(record.group_name)
+        setEditDate(record.date || '')
+        setEditCount(record.count.toString())
+        setEditCategory(record.category)
+    }
+
+    const cancelEdit = () => {
+        setEditingId(null)
+        setEditName('')
+        setEditDate('')
+        setEditCount('')
+        setEditCategory('')
+    }
+
+    const saveEdit = async () => {
+        if (!editingId || !editName.trim() || !editCount) return
+        setEditSaving(true)
+        try {
+            const token = localStorage.getItem('admin_token')
+            const response = await fetch('/api/admin/records', {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    id: editingId,
+                    group_name: editName.trim(),
+                    count: parseInt(editCount),
+                    date: editDate || null,
+                    category: editCategory,
+                })
+            })
+            if (response.ok) {
+                cancelEdit()
+                fetchRecords()
+            } else {
+                alert('Nepodařilo se uložit změny')
+            }
+        } catch (error) {
+            console.error('Error updating record:', error)
+            alert('Chyba při ukládání')
+        } finally {
+            setEditSaving(false)
         }
     }
 
@@ -306,37 +363,105 @@ export default function AdminRecordsPage() {
                                 ) : (
                                     <div className="divide-y divide-gray-100">
                                         {catRecords.map((record, idx) => (
-                                            <div key={record.id} className="px-6 py-3 flex items-center gap-4 hover:bg-gray-50">
-                                                <span className="text-xl flex-shrink-0 w-8 text-center">
-                                                    {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`}
-                                                </span>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="font-semibold text-gray-900">{record.group_name}</p>
-                                                    {record.date && (
-                                                        <p className="text-xs text-gray-500">
-                                                            {new Date(record.date).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' })}
-                                                        </p>
-                                                    )}
-                                                    {record.source === 'auto' && (
-                                                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 font-medium">🤖 auto</span>
-                                                    )}
-                                                    {!record.source && (
-                                                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">✍️ manuální</span>
-                                                    )}
-                                                </div>
-                                                <span
-                                                    className="text-lg font-bold px-3 py-1 rounded-lg"
-                                                    style={{ color: cat.color, backgroundColor: `${cat.color}12` }}
-                                                >
-                                                    {record.count}×
-                                                </span>
-                                                {showEdit && (
-                                                    <button
-                                                        onClick={() => deleteRecord(record.id)}
-                                                        className="text-gray-300 hover:text-red-500 transition-colors"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
+                                            <div key={record.id} className="px-6 py-3 hover:bg-gray-50">
+                                                {editingId === record.id ? (
+                                                    /* Edit mode */
+                                                    <div className="flex flex-col gap-2">
+                                                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                                                            <input
+                                                                type="text"
+                                                                value={editName}
+                                                                onChange={(e) => setEditName(e.target.value)}
+                                                                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900"
+                                                                placeholder="Název"
+                                                                autoFocus
+                                                            />
+                                                            <input
+                                                                type="date"
+                                                                value={editDate}
+                                                                onChange={(e) => setEditDate(e.target.value)}
+                                                                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900"
+                                                            />
+                                                            <input
+                                                                type="number"
+                                                                min="1"
+                                                                value={editCount}
+                                                                onChange={(e) => setEditCount(e.target.value)}
+                                                                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900"
+                                                                placeholder="Počet"
+                                                            />
+                                                            <select
+                                                                value={editCategory}
+                                                                onChange={(e) => setEditCategory(e.target.value)}
+                                                                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white"
+                                                            >
+                                                                {CATEGORIES.map(c => (
+                                                                    <option key={c.value} value={c.value} className="text-gray-900 bg-white">{c.label}</option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+                                                        <div className="flex gap-2 justify-end">
+                                                            <button
+                                                                onClick={saveEdit}
+                                                                disabled={editSaving || !editName.trim() || !editCount}
+                                                                className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg text-sm font-medium disabled:opacity-50 flex items-center gap-1"
+                                                            >
+                                                                <Check className="w-3.5 h-3.5" />
+                                                                {editSaving ? 'Ukládám...' : 'Uložit'}
+                                                            </button>
+                                                            <button
+                                                                onClick={cancelEdit}
+                                                                className="text-gray-500 hover:text-gray-700 px-3 py-1 rounded-lg text-sm font-medium border border-gray-300"
+                                                            >
+                                                                <X className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    /* View mode */
+                                                    <div className="flex items-center gap-4">
+                                                        <span className="text-xl flex-shrink-0 w-8 text-center">
+                                                            {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`}
+                                                        </span>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="font-semibold text-gray-900">{record.group_name}</p>
+                                                            {record.date && (
+                                                                <p className="text-xs text-gray-500">
+                                                                    {new Date(record.date).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                                                </p>
+                                                            )}
+                                                            {record.source === 'auto' && (
+                                                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 font-medium">🤖 auto</span>
+                                                            )}
+                                                            {!record.source && (
+                                                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">✍️ manuální</span>
+                                                            )}
+                                                        </div>
+                                                        <span
+                                                            className="text-lg font-bold px-3 py-1 rounded-lg"
+                                                            style={{ color: cat.color, backgroundColor: `${cat.color}12` }}
+                                                        >
+                                                            {record.count}×
+                                                        </span>
+                                                        {showEdit && (
+                                                            <div className="flex items-center gap-1">
+                                                                <button
+                                                                    onClick={() => startEdit(record)}
+                                                                    className="text-gray-300 hover:text-blue-500 transition-colors"
+                                                                    title="Upravit"
+                                                                >
+                                                                    <Edit2 className="w-4 h-4" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => deleteRecord(record.id)}
+                                                                    className="text-gray-300 hover:text-red-500 transition-colors"
+                                                                    title="Smazat"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 )}
                                             </div>
                                         ))}
