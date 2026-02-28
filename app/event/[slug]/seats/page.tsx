@@ -158,9 +158,10 @@ export default function EventSeatsPage() {
 
   const getSeatStatus = (seatId: string) => {
     const r = reservations.find(r => r.seat_id === seatId) as any
-    if (!r) return { status: 'available' as const, guestName: null, isOwn: false, autoReserved: false }
+    if (!r) return { status: 'available' as const, guestName: null, isOwn: false, autoReserved: false, isCoffee: false }
     const isOwn = !!(selectedGuest && r.guest_id === selectedGuest.id)
-    return { status: 'reserved' as const, guestName: r.guest_name, isOwn, autoReserved: !!r.auto_reserved }
+    const isCoffee = r.guest_id === '__coffee__'
+    return { status: 'reserved' as const, guestName: r.guest_name, isOwn, autoReserved: !!r.auto_reserved, isCoffee }
   }
 
   // ─── Seat cell ───
@@ -169,38 +170,47 @@ export default function EventSeatsPage() {
   const GAP = 6
 
   const SeatCell = ({ id }: { id: string }) => {
-    const { status, guestName, isOwn, autoReserved } = getSeatStatus(id)
+    const { status, guestName, isOwn, autoReserved, isCoffee } = getSeatStatus(id)
     const isAutoReservedByOther = status === 'reserved' && autoReserved && !isOwn
 
     return (
       <button
-        onClick={() => handleSeatClick(id)}
+        onClick={() => !isCoffee && handleSeatClick(id)}
         onMouseEnter={() => setHoveredSeat(id)}
         onMouseLeave={() => setHoveredSeat(null)}
-        disabled={!selectedGuest}
+        disabled={!selectedGuest || isCoffee}
         className={`
           relative flex flex-col items-center justify-center rounded-md font-bold transition-all duration-150
-          ${status === 'available'
-            ? 'bg-emerald-700/60 hover:bg-emerald-600/70 text-white border-2 border-solid border-emerald-600/80 hover:border-emerald-400 hover:shadow-lg hover:scale-105'
-            : isOwn
-              ? autoReserved
-                ? 'bg-[var(--nest-yellow)]/15 text-white/70 border-2 border-dashed border-[var(--nest-yellow)]/40'
-                : 'bg-[var(--nest-yellow)]/30 hover:bg-[var(--nest-yellow)]/40 text-white border-2 border-solid border-[var(--nest-yellow)]/60 hover:shadow-lg hover:scale-105'
-              : isAutoReservedByOther
-                ? 'bg-amber-900/25 text-white/60 border-2 border-dashed border-amber-500/30 hover:border-amber-400/60 hover:bg-amber-800/30 hover:scale-105 cursor-pointer'
-                : 'bg-red-900/50 text-white/80 border-2 border-solid border-red-700/60 cursor-not-allowed'
+          ${isCoffee
+            ? 'bg-amber-800/40 text-amber-200/80 border-2 border-solid border-amber-600/50 cursor-not-allowed'
+            : status === 'available'
+              ? 'bg-emerald-700/60 hover:bg-emerald-600/70 text-white border-2 border-solid border-emerald-600/80 hover:border-emerald-400 hover:shadow-lg hover:scale-105'
+              : isOwn
+                ? autoReserved
+                  ? 'bg-[var(--nest-yellow)]/15 text-white/70 border-2 border-dashed border-[var(--nest-yellow)]/40'
+                  : 'bg-[var(--nest-yellow)]/30 hover:bg-[var(--nest-yellow)]/40 text-white border-2 border-solid border-[var(--nest-yellow)]/60 hover:shadow-lg hover:scale-105'
+                : isAutoReservedByOther
+                  ? 'bg-amber-900/25 text-white/60 border-2 border-dashed border-amber-500/30 hover:border-amber-400/60 hover:bg-amber-800/30 hover:scale-105 cursor-pointer'
+                  : 'bg-red-900/50 text-white/80 border-2 border-solid border-red-700/60 cursor-not-allowed'
           }
-          ${!selectedGuest ? 'opacity-50 cursor-not-allowed' : ''}
+          ${!selectedGuest && !isCoffee ? 'opacity-50 cursor-not-allowed' : ''}
         `}
         style={{ width: CELL_W, height: CELL_H }}
         title={
-          isAutoReservedByOther
-            ? `${id}: Autorezervace (${guestName}) — klikni pro přerezervování`
-            : guestName ? `${id}: ${guestName}` : `${id}: Volné`
+          isCoffee
+            ? `${id}: ☕ Kafe (rezervováno)`
+            : isAutoReservedByOther
+              ? `${id}: Autorezervace (${guestName}) — klikni pro přerezervování`
+              : guestName ? `${id}: ${guestName}` : `${id}: Volné`
         }
       >
         <span className="text-xs font-extrabold leading-none opacity-70">{id}</span>
-        {guestName ? (
+        {isCoffee ? (
+          <>
+            <span className="text-lg mt-0.5">☕</span>
+            <span className="text-[9px] font-bold opacity-70">Kafe</span>
+          </>
+        ) : guestName ? (
           <>
             <span className="text-[11px] font-bold max-w-[90px] leading-tight mt-1 text-center" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{guestName}</span>
             {autoReserved && (
@@ -352,12 +362,19 @@ export default function EventSeatsPage() {
             <div className="w-6 h-5 rounded bg-[var(--nest-yellow)]/30 border-2 border-[var(--nest-yellow)]/60"></div>
             <span className="text-[var(--nest-text-secondary)]">Tvoje rezervace</span>
           </div>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-5 rounded bg-amber-800/40 border-2 border-amber-600/50 flex items-center justify-center text-[8px]">☕</div>
+            <span className="text-[var(--nest-text-secondary)]">Kafe (rezervováno)</span>
+          </div>
         </div>
       </div>
 
       {/* ═══════════════ FLOOR PLAN ═══════════════ */}
       <div className="bg-[var(--nest-surface)] rounded-2xl shadow-xl p-4 md:p-6 overflow-hidden" ref={planContainerRef}>
-        <h2 className="text-xl font-bold text-[var(--nest-text-primary)] mb-1">Plán místnosti</h2>
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-xl font-bold text-[var(--nest-text-primary)]">Plán místnosti</h2>
+          <span className="text-xs font-semibold text-[var(--nest-white-60)] bg-[var(--nest-dark-3)] px-3 py-1 rounded-full">📏 1 místo = 80 cm</span>
+        </div>
         <p className="text-xs text-[var(--nest-text-tertiary)] mb-3">Klikni na zelené místo pro rezervaci</p>
 
         <div

@@ -1304,123 +1304,125 @@ function AdminSessionsPageInner() {
         )}
 
         <div className="bg-[#efefef] rounded-xl shadow overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Název</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Event Link</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Začátek</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Konec</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Akce</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {sessions.map((session) => (
-                <tr key={session.id}>
-                  <td className="px-6 py-4 font-medium text-gray-900">
-                    {session.name}
-                    {session.menu_enabled && (
-                      <span className="ml-2 text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">🍽️ Menu</span>
-                    )}
-                    {session.hardware_pricing_enabled === false && (
-                      <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">🚫 HW cena</span>
-                    )}
-                    {session.hardware_overrides && Object.keys(session.hardware_overrides).length > 0 && (
-                      <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">🖥️ HW úpravy</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-sm">
-                    {session.slug ? (
-                      <Link
-                        href={`/event/${session.slug}`}
-                        target="_blank"
-                        className="text-blue-600 hover:text-blue-700 hover:underline"
-                      >
-                        /event/{session.slug}
-                      </Link>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{formatDate(session.start_date)}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    {session.end_date ? formatDate(session.end_date) : '-'}
-                  </td>
-                  <td className="px-6 py-4">
-                    {session.is_active ? (
-                      <span className="px-2 py-1 text-xs font-semibold bg-green-100 text-green-800 rounded">
-                        Aktivní
-                      </span>
-                    ) : (
-                      <span className="px-2 py-1 text-xs font-semibold bg-gray-100 text-gray-800 rounded">
-                        Neaktivní
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <Link
-                        href={`/admin/sessions/${session.id}`}
-                        className="flex items-center text-purple-600 hover:text-purple-700 font-medium"
-                        title="Detail"
-                      >
-                        <Eye className="w-4 h-4 mr-1" />
-                        Detail
-                      </Link>
-                      {showEdit && (
-                        <button
-                          onClick={() => startEditSession(session)}
-                          className="flex items-center text-blue-600 hover:text-blue-700"
-                          title="Upravit"
-                        >
-                          <Edit className="w-4 h-4 mr-1" />
-                          Upravit
-                        </button>
-                      )}
-                      {showEdit && (
-                        <button
-                          onClick={() => toggleSessionActive(session.id, session.is_active)}
-                          className={`flex items-center ${session.is_active
-                            ? 'text-red-600 hover:text-red-700'
-                            : 'text-green-600 hover:text-green-700'
-                            }`}
-                        >
-                          {session.is_active ? (
-                            <>
-                              <StopCircle className="w-4 h-4 mr-1" />
-                              Ukončit
-                            </>
-                          ) : (
-                            <>
-                              <PlayCircle className="w-4 h-4 mr-1" />
-                              Aktivovat
-                            </>
-                          )}
-                        </button>
-                      )}
-                      {showCreate && (
-                        <button
-                          onClick={() => {
-                            resetForm()
-                            copyFromSession(session.id)
-                            setShowCreateForm(true)
-                            setEditingSession(null)
-                            window.scrollTo({ top: 0, behavior: 'smooth' })
-                          }}
-                          className="flex items-center text-gray-500 hover:text-gray-700"
-                          title="Vytvořit nový event s nastavením tohoto"
-                        >
-                          <Copy className="w-4 h-4 mr-1" />
-                          Kopírovat
-                        </button>
-                      )}
-                    </div>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[800px]">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Název</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Event Link</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Začátek</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Konec</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Akce</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {sessions.map((session) => (
+                  <tr key={session.id}>
+                    <td className="px-6 py-4 font-medium text-gray-900">
+                      {session.name}
+                      {session.menu_enabled && (
+                        <span className="ml-2 text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">🍽️ Menu</span>
+                      )}
+                      {session.hardware_pricing_enabled === false && (
+                        <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">🚫 HW cena</span>
+                      )}
+                      {session.hardware_overrides && Object.keys(session.hardware_overrides).length > 0 && (
+                        <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">🖥️ HW úpravy</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-sm">
+                      {session.slug ? (
+                        <Link
+                          href={`/event/${session.slug}`}
+                          target="_blank"
+                          className="text-blue-600 hover:text-blue-700 hover:underline"
+                        >
+                          /event/{session.slug}
+                        </Link>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{formatDate(session.start_date)}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">
+                      {session.end_date ? formatDate(session.end_date) : '-'}
+                    </td>
+                    <td className="px-6 py-4">
+                      {session.is_active ? (
+                        <span className="px-2 py-1 text-xs font-semibold bg-green-100 text-green-800 rounded">
+                          Aktivní
+                        </span>
+                      ) : (
+                        <span className="px-2 py-1 text-xs font-semibold bg-gray-100 text-gray-800 rounded">
+                          Neaktivní
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <Link
+                          href={`/admin/sessions/${session.id}`}
+                          className="flex items-center text-purple-600 hover:text-purple-700 font-medium"
+                          title="Detail"
+                        >
+                          <Eye className="w-4 h-4 mr-1" />
+                          Detail
+                        </Link>
+                        {showEdit && (
+                          <button
+                            onClick={() => startEditSession(session)}
+                            className="flex items-center text-blue-600 hover:text-blue-700"
+                            title="Upravit"
+                          >
+                            <Edit className="w-4 h-4 mr-1" />
+                            Upravit
+                          </button>
+                        )}
+                        {showEdit && (
+                          <button
+                            onClick={() => toggleSessionActive(session.id, session.is_active)}
+                            className={`flex items-center ${session.is_active
+                              ? 'text-red-600 hover:text-red-700'
+                              : 'text-green-600 hover:text-green-700'
+                              }`}
+                          >
+                            {session.is_active ? (
+                              <>
+                                <StopCircle className="w-4 h-4 mr-1" />
+                                Ukončit
+                              </>
+                            ) : (
+                              <>
+                                <PlayCircle className="w-4 h-4 mr-1" />
+                                Aktivovat
+                              </>
+                            )}
+                          </button>
+                        )}
+                        {showCreate && (
+                          <button
+                            onClick={() => {
+                              resetForm()
+                              copyFromSession(session.id)
+                              setShowCreateForm(true)
+                              setEditingSession(null)
+                              window.scrollTo({ top: 0, behavior: 'smooth' })
+                            }}
+                            className="flex items-center text-gray-500 hover:text-gray-700"
+                            title="Vytvořit nový event s nastavením tohoto"
+                          >
+                            <Copy className="w-4 h-4 mr-1" />
+                            Kopírovat
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

@@ -135,6 +135,21 @@ export async function POST(request: NextRequest) {
     }
 
     const docRef = await db.collection('sessions').add(sessionData)
+
+    // Auto-reserve A5 and A6 for coffee station
+    const coffeeSeats = ['A5', 'A6']
+    for (const seatId of coffeeSeats) {
+      await db.collection('seat_reservations').add({
+        seat_id: seatId,
+        guest_id: '__coffee__',
+        session_id: docRef.id,
+        guest_name: '☕ Kafe',
+        auto_reserved: false,
+        created_at: now,
+        updated_at: now,
+      })
+    }
+
     const session: Session = {
       id: docRef.id,
       ...sessionData,

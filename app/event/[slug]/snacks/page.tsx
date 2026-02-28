@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Plus, Minus, Trophy, Beer } from 'lucide-react'
+import { Plus, Minus, Trophy, Beer, Filter } from 'lucide-react'
 import { Session, Guest, Product } from '@/types/database.types'
 import { formatDate } from '@/lib/utils'
 import NestPage from '@/components/NestPage'
@@ -33,6 +33,11 @@ export default function EventSnacksPage() {
 
   const [mounted, setMounted] = useState(false)
   const [justAdded, setJustAdded] = useState<string | null>(null)
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+
+  // Debounced fetch to prevent rapid-click flickering
+  const syncTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const fetchCounterRef = useRef(0)
 
   useEffect(() => {
     setMounted(true)
@@ -44,19 +49,33 @@ export default function EventSnacksPage() {
     }
   }, [slug])
 
+  // Debounced server sync - only runs after 800ms of no new clicks
+  const debouncedFetchData = useCallback(() => {
+    if (syncTimerRef.current) {
+      clearTimeout(syncTimerRef.current)
+    }
+    syncTimerRef.current = setTimeout(() => {
+      fetchData(false)
+    }, 800)
+  }, [slug])
 
 
   const fetchData = async (isInitial = false) => {
+    const currentFetchId = ++fetchCounterRef.current
     try {
       if (isInitial) setLoading(true)
 
       const sessionRes = await fetch(`/api/event/${slug}`)
+      // Ignore stale responses
+      if (currentFetchId !== fetchCounterRef.current) return
       if (sessionRes.ok) {
         const sessionData = await sessionRes.json()
         setSession(sessionData.session)
       }
 
       const guestsRes = await fetch(`/api/event/${slug}/guests`)
+      // Ignore stale responses
+      if (currentFetchId !== fetchCounterRef.current) return
       if (guestsRes.ok) {
         const guestsData = await guestsRes.json()
         setGuests(guestsData.guests)
@@ -69,6 +88,8 @@ export default function EventSnacksPage() {
       }
 
       const productsRes = await fetch(`/api/event/${slug}/products`)
+      // Ignore stale responses
+      if (currentFetchId !== fetchCounterRef.current) return
       if (productsRes.ok) {
         const productsData = await productsRes.json()
         setProducts(productsData.products)
@@ -138,13 +159,13 @@ export default function EventSnacksPage() {
       })
 
       if (response.ok) {
-        // Silently sync real data from server in background
-        fetchData()
+        // Debounced sync - prevents flickering on rapid clicks
+        debouncedFetchData()
       }
     } catch (error) {
       console.error('Error adding product:', error)
       // On error, re-fetch to restore correct state
-      fetchData()
+      debouncedFetchData()
     }
   }
 
@@ -183,12 +204,12 @@ export default function EventSnacksPage() {
       })
 
       if (response.ok) {
-        // Silently sync real data from server in background
-        fetchData()
+        // Debounced sync - prevents flickering on rapid clicks
+        debouncedFetchData()
       }
     } catch (error) {
       console.error('Error deleting product:', error)
-      fetchData()
+      debouncedFetchData()
     }
   }
 
@@ -453,6 +474,28 @@ export default function EventSnacksPage() {
                         )
                         const favoriteProducts = products.filter(p => consumedProductIds.has(p.id))
 
+                        // Build category list for filter
+                        const categories = Array.from(
+                          products.reduce((acc, product) => {
+                            const category = product.category || 'Ostatní'
+                            if (!acc.has(category)) {
+                              acc.set(category, 0)
+                            }
+                            acc.set(category, acc.get(category)! + 1)
+                            return acc
+                          }, new Map<string, number>()).entries()
+                        ).sort(([catA], [catB]) => {
+                          const order = ['Pivo', 'Nealko', 'Sladkosti', 'Jídlo', 'Alkoholické nápoje']
+                          const iA = order.findIndex(o => catA.toLowerCase().startsWith(o.toLowerCase()))
+                          const iB = order.findIndex(o => catB.toLowerCase().startsWith(o.toLowerCase()))
+                          return (iA === -1 ? 99 : iA) - (iB === -1 ? 99 : iB)
+                        })
+
+                        // Filter products based on selected category
+                        const filteredProducts = selectedCategory
+                          ? products.filter(p => (p.category || 'Ostatní') === selectedCategory)
+                          : products
+
                         const renderProductCard = (product: Product) => (
                           <button
                             key={product.id}
@@ -489,10 +532,52 @@ export default function EventSnacksPage() {
                           </button>
                         )
 
+                        // Emoji map for categories
+                        const categoryEmoji: Record<string, string> = {
+                          'Pivo': '🍺',
+                          'Alkoholické nápoje': '🥃',
+                          'Nealkoholické nápoje': '🥤',
+                          'Nealko': '🥤',
+                          'Jídlo': '🍕',
+                          'Sladkosti': '🍬',
+                          'Ostatní': '📦',
+                        }
+
                         return (
-                          <div className="space-y-6">
-                            {/* Oblíbené - already consumed products */}
-                            {favoriteProducts.length > 0 && (
+                          <div className="space-y-4">
+                            {/* Category filter - square tile buttons for tablet */}
+                            <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(100px, 1fr))` }}>
+                              <button
+                                onClick={() => setSelectedCategory(null)}
+                                className={`flex flex-col items-center justify-center rounded-xl transition-all active:scale-95 ${selectedCategory === null
+                                  ? 'bg-[var(--nest-yellow)] text-[var(--nest-dark)] shadow-lg shadow-[var(--nest-yellow)]/20'
+                                  : 'bg-[var(--nest-dark-3)] text-[var(--nest-white-60)] hover:bg-[var(--nest-dark-4)]'
+                                  }`}
+                                style={{ aspectRatio: '1', minHeight: 100 }}
+                              >
+                                <span className="text-4xl mb-1">🍽️</span>
+                                <span className="text-xs font-bold leading-tight">Vše</span>
+                                <span className="text-[10px] opacity-70">{products.length}</span>
+                              </button>
+                              {categories.map(([category, count]) => (
+                                <button
+                                  key={category}
+                                  onClick={() => setSelectedCategory(selectedCategory === category ? null : category)}
+                                  className={`flex flex-col items-center justify-center rounded-xl transition-all active:scale-95 ${selectedCategory === category
+                                    ? 'bg-[var(--nest-yellow)] text-[var(--nest-dark)] shadow-lg shadow-[var(--nest-yellow)]/20'
+                                    : 'bg-[var(--nest-dark-3)] text-[var(--nest-white-60)] hover:bg-[var(--nest-dark-4)]'
+                                    }`}
+                                  style={{ aspectRatio: '1', minHeight: 100 }}
+                                >
+                                  <span className="text-4xl mb-1">{categoryEmoji[category] || '📦'}</span>
+                                  <span className="text-xs font-bold leading-tight text-center px-1 truncate w-full">{category}</span>
+                                  <span className="text-[10px] opacity-70">{count}</span>
+                                </button>
+                              ))}
+                            </div>
+
+                            {/* Oblíbené - already consumed products (only when showing all) */}
+                            {!selectedCategory && favoriteProducts.length > 0 && (
                               <div>
                                 <h3 className="text-sm font-bold mb-3 pb-2 border-b border-[var(--nest-yellow)]/30 flex items-center gap-2">
                                   ⭐ Oblíbené
@@ -503,33 +588,43 @@ export default function EventSnacksPage() {
                               </div>
                             )}
 
-                            {/* All products by category */}
-                            {Array.from(
-                              products.reduce((acc, product) => {
-                                const category = product.category || 'Ostatní'
-                                if (!acc.has(category)) {
-                                  acc.set(category, [])
-                                }
-                                acc.get(category)!.push(product)
-                                return acc
-                              }, new Map<string, typeof products>()).entries()
-                            )
-                              .sort(([catA], [catB]) => {
-                                const order = ['Pivo', 'Nealko', 'Sladkosti', 'Jídlo', 'Alkoholické nápoje']
-                                const iA = order.findIndex(o => catA.toLowerCase().startsWith(o.toLowerCase()))
-                                const iB = order.findIndex(o => catB.toLowerCase().startsWith(o.toLowerCase()))
-                                return (iA === -1 ? 99 : iA) - (iB === -1 ? 99 : iB)
-                              })
-                              .map(([category, categoryProducts]) => (
-                                <div key={category}>
-                                  <h3 className="text-sm font-bold mb-3 pb-2 border-b border-[var(--nest-dark-4)]">
-                                    {category}
-                                  </h3>
-                                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                                    {categoryProducts.map(renderProductCard)}
-                                  </div>
+                            {/* Products - filtered or grouped by category */}
+                            {selectedCategory ? (
+                              // When a category is selected, show flat grid
+                              <div>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                                  {filteredProducts.map(renderProductCard)}
                                 </div>
-                              ))}
+                              </div>
+                            ) : (
+                              // When showing all, group by category
+                              Array.from(
+                                products.reduce((acc, product) => {
+                                  const category = product.category || 'Ostatní'
+                                  if (!acc.has(category)) {
+                                    acc.set(category, [])
+                                  }
+                                  acc.get(category)!.push(product)
+                                  return acc
+                                }, new Map<string, typeof products>()).entries()
+                              )
+                                .sort(([catA], [catB]) => {
+                                  const order = ['Pivo', 'Nealko', 'Sladkosti', 'Jídlo', 'Alkoholické nápoje']
+                                  const iA = order.findIndex(o => catA.toLowerCase().startsWith(o.toLowerCase()))
+                                  const iB = order.findIndex(o => catB.toLowerCase().startsWith(o.toLowerCase()))
+                                  return (iA === -1 ? 99 : iA) - (iB === -1 ? 99 : iB)
+                                })
+                                .map(([category, categoryProducts]) => (
+                                  <div key={category}>
+                                    <h3 className="text-sm font-bold mb-3 pb-2 border-b border-[var(--nest-dark-4)]">
+                                      {category}
+                                    </h3>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                                      {categoryProducts.map(renderProductCard)}
+                                    </div>
+                                  </div>
+                                ))
+                            )}
                           </div>
                         )
                       })()}

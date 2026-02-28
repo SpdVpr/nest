@@ -209,16 +209,22 @@ export default function EventGamesPage() {
                     {/* Info banner */}
                     <div className="bg-gradient-to-r from-[var(--nest-yellow)]/5 to-[var(--nest-yellow)]/10 border border-[var(--nest-yellow)]/20 rounded-xl p-4 mb-4">
                         <p className="text-sm text-[var(--nest-text-secondary)] leading-relaxed">
-                            💡 Pokud si <strong className="text-[var(--nest-text-primary)]">rezervuješ PC</strong>, můžeš mít tyto hry <strong className="text-[var(--nest-text-primary)]">předinstalované a připravené ke hraní</strong> hned po příchodu. Nemusíš nic stahovat!
+                            {session?.hardware_enabled !== false ? (
+                                <>💡 Pokud si <strong className="text-[var(--nest-text-primary)]">rezervuješ PC</strong>, můžeš mít tyto hry <strong className="text-[var(--nest-text-primary)]">předinstalované a připravené ke hraní</strong> hned po příchodu. Nemusíš nic stahovat!</>
+                            ) : (
+                                <>💡 Tyto hry budou <strong className="text-[var(--nest-text-primary)]">předinstalované a připravené ke hraní</strong> na akci.</>
+                            )}
                         </p>
-                        <Link
-                            href={`/event/${slug}/hardware`}
-                            className="mt-3 inline-flex items-center gap-2 bg-[var(--nest-yellow)] hover:bg-[var(--nest-yellow-dark)] text-[var(--nest-bg)] px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-lg shadow-[var(--nest-yellow)]/20"
-                        >
-                            <Monitor className="w-4 h-4" />
-                            Rezervovat PC
-                            <ChevronRight className="w-4 h-4" />
-                        </Link>
+                        {session?.hardware_enabled !== false && (
+                            <Link
+                                href={`/event/${slug}/hardware`}
+                                className="mt-3 inline-flex items-center gap-2 bg-[var(--nest-yellow)] hover:bg-[var(--nest-yellow-dark)] text-[var(--nest-bg)] px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-lg shadow-[var(--nest-yellow)]/20"
+                            >
+                                <Monitor className="w-4 h-4" />
+                                Rezervovat PC
+                                <ChevronRight className="w-4 h-4" />
+                            </Link>
+                        )}
                     </div>
 
                     {/* Games list grouped by category */}

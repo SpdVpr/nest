@@ -138,7 +138,12 @@ export default function RegisterPage() {
         session_slug: slug
       })
 
-      router.replace(`/event/${slug}/hardware`)
+      // Redirect based on whether hardware reservation is enabled
+      if (session?.hardware_enabled !== false) {
+        router.replace(`/event/${slug}/hardware`)
+      } else {
+        router.replace(`/event/${slug}`)
+      }
     } catch (error: any) {
       console.error('Error registering:', error)
       setError(error.message || 'Chyba při registraci')

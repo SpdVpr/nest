@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Calendar, UserPlus, Trophy, Beer, TrendingUp, ArrowLeft, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { Session, Guest, Product } from '@/types/database.types'
@@ -26,16 +26,32 @@ export default function SnacksPage() {
   const [showAddGuest, setShowAddGuest] = useState(false)
   const [newGuestName, setNewGuestName] = useState('')
 
+  // Debounced fetch to prevent rapid-click flickering
+  const syncTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const fetchCounterRef = useRef(0)
+
+  // Debounced server sync - only runs after 800ms of no new clicks
+  const debouncedFetchData = useCallback(() => {
+    if (syncTimerRef.current) {
+      clearTimeout(syncTimerRef.current)
+    }
+    syncTimerRef.current = setTimeout(() => {
+      fetchData(false)
+    }, 800)
+  }, [])
+
   useEffect(() => {
     fetchData(true)
   }, [])
 
   const fetchData = async (isInitial = false) => {
+    const currentFetchId = ++fetchCounterRef.current
     try {
       if (isInitial) setLoading(true)
 
       // Fetch active session
       const sessionRes = await fetch('/api/sessions/active')
+      if (currentFetchId !== fetchCounterRef.current) return
       if (sessionRes.ok) {
         const sessionData = await sessionRes.json()
         setActiveSession(sessionData.session)
@@ -43,6 +59,7 @@ export default function SnacksPage() {
 
       // Fetch guests with consumption
       const guestsRes = await fetch('/api/snacks/guests-with-consumption')
+      if (currentFetchId !== fetchCounterRef.current) return
       if (guestsRes.ok) {
         const guestsData = await guestsRes.json()
         setGuests(guestsData.guests)
@@ -56,6 +73,7 @@ export default function SnacksPage() {
 
       // Fetch products
       const productsRes = await fetch('/api/products')
+      if (currentFetchId !== fetchCounterRef.current) return
       if (productsRes.ok) {
         const productsData = await productsRes.json()
         setProducts(productsData.products)
@@ -139,13 +157,13 @@ export default function SnacksPage() {
       })
 
       if (response.ok) {
-        // Silently sync real data from server in background
-        fetchData()
+        // Debounced sync - prevents flickering on rapid clicks
+        debouncedFetchData()
       }
     } catch (error) {
       console.error('Error adding product:', error)
       // On error, re-fetch to restore correct state
-      fetchData()
+      debouncedFetchData()
     }
   }
 
@@ -184,12 +202,12 @@ export default function SnacksPage() {
       })
 
       if (response.ok) {
-        // Silently sync real data from server in background
-        fetchData()
+        // Debounced sync - prevents flickering on rapid clicks
+        debouncedFetchData()
       }
     } catch (error) {
       console.error('Error deleting product:', error)
-      fetchData()
+      debouncedFetchData()
     }
   }
 

@@ -222,35 +222,38 @@ export default function AdminSeatMapPage() {
         const reservation = getSeatReservation(id) as any
         const isSelected = selectedSeat === id
         const isAutoReserved = reservation?.auto_reserved
-        const guestHw = (reservation && !isAutoReserved) ? getGuestHardware(reservation.guest_id) : []
+        const isCoffee = reservation?.guest_id === '__coffee__'
+        const guestHw = (reservation && !isAutoReserved && !isCoffee) ? getGuestHardware(reservation.guest_id) : []
         const hasPc = guestHw.some(h => h.itemType === 'pc')
         const hasMonitor = guestHw.some(h => h.itemType === 'monitor')
-        const isHwReady = reservation && !isAutoReserved && !!hwPrepared[reservation.guest_id]
-        const isGamesReady = reservation && !isAutoReserved && !!gamesPrepared[reservation.guest_id]
-        const isFullyReady = reservation && !isAutoReserved && (guestHw.length === 0 || isHwReady) && (getGuestGameInstalls(reservation.guest_id).length === 0 || isGamesReady)
+        const isHwReady = reservation && !isAutoReserved && !isCoffee && !!hwPrepared[reservation.guest_id]
+        const isGamesReady = reservation && !isAutoReserved && !isCoffee && !!gamesPrepared[reservation.guest_id]
+        const isFullyReady = reservation && !isAutoReserved && !isCoffee && (guestHw.length === 0 || isHwReady) && (getGuestGameInstalls(reservation.guest_id).length === 0 || isGamesReady)
 
         return (
             <button
                 onClick={() => setSelectedSeat(isSelected ? null : id)}
                 className={`
           relative flex flex-col items-center justify-center rounded-md font-bold transition-all duration-150
-          ${reservation
-                        ? isAutoReserved
-                            ? isSelected
-                                ? 'bg-amber-600/25 border-2 border-dashed border-amber-400/60 shadow-lg scale-105'
-                                : 'bg-amber-900/25 text-white/60 border-2 border-dashed border-amber-500/30 hover:border-amber-400/60'
-                            : isFullyReady
+          ${isCoffee
+                        ? 'bg-amber-800/40 text-amber-200/80 border-2 border-solid border-amber-600/50'
+                        : reservation
+                            ? isAutoReserved
                                 ? isSelected
-                                    ? 'bg-emerald-600/40 border-2 border-solid border-emerald-400 shadow-lg shadow-emerald-500/20 scale-105'
-                                    : 'bg-emerald-900/50 text-white/90 border-2 border-solid border-emerald-600/60 hover:border-emerald-400 hover:bg-emerald-800/60'
-                                : isSelected
-                                    ? 'bg-amber-600/40 border-2 border-solid border-amber-400 shadow-lg shadow-amber-500/20 scale-105'
-                                    : 'bg-red-900/50 text-white/90 border-2 border-solid border-red-700/60 hover:border-amber-400 hover:bg-red-800/60'
-                        : 'bg-emerald-700/40 text-white/60 border-2 border-solid border-emerald-600/50'
+                                    ? 'bg-amber-600/25 border-2 border-dashed border-amber-400/60 shadow-lg scale-105'
+                                    : 'bg-amber-900/25 text-white/60 border-2 border-dashed border-amber-500/30 hover:border-amber-400/60'
+                                : isFullyReady
+                                    ? isSelected
+                                        ? 'bg-emerald-600/40 border-2 border-solid border-emerald-400 shadow-lg shadow-emerald-500/20 scale-105'
+                                        : 'bg-emerald-900/50 text-white/90 border-2 border-solid border-emerald-600/60 hover:border-emerald-400 hover:bg-emerald-800/60'
+                                    : isSelected
+                                        ? 'bg-amber-600/40 border-2 border-solid border-amber-400 shadow-lg shadow-amber-500/20 scale-105'
+                                        : 'bg-red-900/50 text-white/90 border-2 border-solid border-red-700/60 hover:border-amber-400 hover:bg-red-800/60'
+                            : 'bg-emerald-700/40 text-white/60 border-2 border-solid border-emerald-600/50'
                     }
         `}
                 style={{ width: CELL_W, height: CELL_H }}
-                title={reservation ? `${id}: ${reservation.guest_name}${isAutoReserved ? ' (auto)' : ''}${isFullyReady ? ' ✅' : ''}` : `${id}: Volné`}
+                title={isCoffee ? `${id}: ☕ Kafe (rezervováno)` : reservation ? `${id}: ${reservation.guest_name}${isAutoReserved ? ' (auto)' : ''}${isFullyReady ? ' ✅' : ''}` : `${id}: Volné`}
             >
                 {/* Prepared badge */}
                 {isFullyReady && (
@@ -259,7 +262,12 @@ export default function AdminSeatMapPage() {
                     </span>
                 )}
                 <span className="text-[10px] font-extrabold leading-none opacity-60">{id}</span>
-                {reservation ? (
+                {isCoffee ? (
+                    <>
+                        <span className="text-lg mt-0.5">☕</span>
+                        <span className="text-[9px] font-bold opacity-70">Kafe</span>
+                    </>
+                ) : reservation ? (
                     <>
                         <span className="text-[11px] font-bold max-w-[100px] leading-tight mt-0.5 text-center truncate">{reservation.guest_name}</span>
                         {isAutoReserved ? (
