@@ -1318,7 +1318,7 @@ function AdminSessionsPageInner() {
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {sessions.map((session) => (
-                  <tr key={session.id}>
+                  <tr key={session.id} onClick={() => router.push(`/admin/sessions/${session.id}`)} className="cursor-pointer hover:bg-gray-100 transition-colors">
                     <td className="px-6 py-4 font-medium text-gray-900">
                       {session.name}
                       {session.menu_enabled && (
@@ -1331,7 +1331,7 @@ function AdminSessionsPageInner() {
                         <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">🖥️ HW úpravy</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-sm">
+                    <td className="px-6 py-4 text-sm" onClick={(e) => e.stopPropagation()}>
                       {session.slug ? (
                         <Link
                           href={`/event/${session.slug}`}
@@ -1360,7 +1360,7 @@ function AdminSessionsPageInner() {
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
                         <Link
                           href={`/admin/sessions/${session.id}`}
                           className="flex items-center text-purple-600 hover:text-purple-700 font-medium"
