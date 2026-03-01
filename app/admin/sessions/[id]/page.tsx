@@ -608,51 +608,95 @@ export default function EventDetailPage() {
             <ArrowLeft className="w-5 h-5 mr-2" />
             Zpět na dashboard
           </Link>
-          <div className="flex items-start justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">{session.name}</h1>
-              <p className="text-gray-600">
-                {formatDate(session.start_date)}
-                {session.end_date && ` - ${formatDate(session.end_date)}`}
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">{session.name}</h1>
+              <p className="text-gray-600 text-sm">
+                {formatDateOnly(session.start_date)}
+                {session.end_date ? ` – ${formatDateOnly(session.end_date)}` : ''}
               </p>
             </div>
-            <div className="flex gap-3">
-              <Link
-                href={`/admin/sessions/${sessionId}/menu`}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium"
+            {showEdit && (
+              <button
+                onClick={() => {
+                  setEditingEvent(!editingEvent)
+                  if (!editingEvent) {
+                    setEditEventName(session.name)
+                    setEditEventStartDate(session.start_date?.split('T')[0] || '')
+                    setEditEventEndDate(session.end_date?.split('T')[0] || '')
+                    setEditEventStartTime(session.start_time || '')
+                    setEditEventEndTime(session.end_time || '')
+                    setEditEventDescription(session.description || '')
+                    setEditPricePerNight((session.price_per_night || 0).toString())
+                    setEditSurchargeEnabled(session.surcharge_enabled === true)
+                  }
+                }}
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium flex-shrink-0 hidden sm:inline-flex items-center gap-1"
               >
-                <Utensils className="w-5 h-5" />
-                Jídelníček
-              </Link>
+                <Edit className="w-4 h-4" />
+                Upravit
+              </button>
+            )}
+          </div>
+
+          {/* Navigation buttons — wrapping grid */}
+          <div className="flex flex-wrap gap-2 mt-4">
+            <Link
+              href={`/admin/sessions/${sessionId}/menu`}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium text-sm"
+            >
+              <Utensils className="w-4 h-4" />
+              Jídelníček
+            </Link>
+            <Link
+              href={`/admin/sessions/${sessionId}/stock`}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium text-sm"
+            >
+              <Utensils className="w-4 h-4" />
+              Pochutiny
+            </Link>
+            <Link
+              href={`/admin/sessions/${sessionId}/seatmap`}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium text-sm"
+            >
+              🗺️ Mapa míst
+            </Link>
+            {showFinances && (
               <Link
-                href={`/admin/sessions/${sessionId}/stock`}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium"
+                href={`/admin/sessions/${sessionId}/settlement`}
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium text-sm"
               >
-                <Utensils className="w-5 h-5" />
-                Pochutiny
+                💳 Vyúčtování
               </Link>
-              <Link
-                href={`/admin/sessions/${sessionId}/seatmap`}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium"
+            )}
+            <Link
+              href={`/event/${session.slug}`}
+              target="_blank"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-blue-600 hover:text-blue-700 font-medium text-sm"
+            >
+              Otevřít event →
+            </Link>
+            {showEdit && (
+              <button
+                onClick={() => {
+                  setEditingEvent(!editingEvent)
+                  if (!editingEvent) {
+                    setEditEventName(session.name)
+                    setEditEventStartDate(session.start_date?.split('T')[0] || '')
+                    setEditEventEndDate(session.end_date?.split('T')[0] || '')
+                    setEditEventStartTime(session.start_time || '')
+                    setEditEventEndTime(session.end_time || '')
+                    setEditEventDescription(session.description || '')
+                    setEditPricePerNight((session.price_per_night || 0).toString())
+                    setEditSurchargeEnabled(session.surcharge_enabled === true)
+                  }
+                }}
+                className="sm:hidden inline-flex items-center gap-1.5 px-3 py-2 text-blue-600 hover:text-blue-700 font-medium text-sm"
               >
-                🗺️ Mapa míst
-              </Link>
-              {showFinances && (
-                <Link
-                  href={`/admin/sessions/${sessionId}/settlement`}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium"
-                >
-                  💳 Vyúčtování
-                </Link>
-              )}
-              <Link
-                href={`/event/${session.slug}`}
-                target="_blank"
-                className="text-blue-600 hover:text-blue-700 font-medium"
-              >
-                Otevřít event →
-              </Link>
-            </div>
+                <Edit className="w-4 h-4" />
+                Upravit
+              </button>
+            )}
           </div>
         </div>
       </div>
