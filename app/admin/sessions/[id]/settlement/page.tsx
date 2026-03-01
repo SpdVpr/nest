@@ -1178,22 +1178,18 @@ export default function SettlementPage() {
                                                                 </div>
                                                                 {/* Quick round buttons */}
                                                                 <div className="flex gap-1.5 mt-2">
-                                                                    {[50, 100, 500, 1000].map(step => {
-                                                                        const roundedUp = Math.ceil(subtotalNoTip / step) * step
-                                                                        if (roundedUp <= subtotalNoTip) return null
-                                                                        return (
-                                                                            <button
-                                                                                key={step}
-                                                                                onClick={() => setTipFinalAmount(roundedUp.toString())}
-                                                                                className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors border ${tipFinalAmount === roundedUp.toString()
-                                                                                    ? 'bg-pink-500 text-white border-pink-500'
-                                                                                    : 'bg-white text-pink-600 border-pink-200 hover:bg-pink-100'
-                                                                                    }`}
-                                                                            >
-                                                                                {roundedUp.toLocaleString('cs-CZ')} Kč
-                                                                            </button>
-                                                                        )
-                                                                    })}
+                                                                    {[...new Set([50, 100, 500, 1000].map(step => Math.ceil(subtotalNoTip / step) * step).filter(v => v > subtotalNoTip))].map(roundedUp => (
+                                                                        <button
+                                                                            key={roundedUp}
+                                                                            onClick={() => setTipFinalAmount(roundedUp.toString())}
+                                                                            className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors border ${tipFinalAmount === roundedUp.toString()
+                                                                                ? 'bg-pink-500 text-white border-pink-500'
+                                                                                : 'bg-white text-pink-600 border-pink-200 hover:bg-pink-100'
+                                                                                }`}
+                                                                        >
+                                                                            {roundedUp.toLocaleString('cs-CZ')} Kč
+                                                                        </button>
+                                                                    ))}
                                                                 </div>
                                                                 {/* Show calculated tip */}
                                                                 {tipFinalAmount && parseInt(tipFinalAmount) > subtotalNoTip && (

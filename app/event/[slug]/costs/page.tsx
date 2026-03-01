@@ -467,22 +467,18 @@ export default function CostsPage() {
 
                                                         {/* Quick round buttons */}
                                                         <div className="flex gap-1.5 mb-3">
-                                                            {[50, 100, 500, 1000].map(step => {
-                                                                const roundedUp = Math.ceil(baseTotal / step) * step
-                                                                if (roundedUp <= baseTotal) return null
-                                                                return (
-                                                                    <button
-                                                                        key={step}
-                                                                        onClick={() => setTipAmount(roundedUp.toString())}
-                                                                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${tipAmount === roundedUp.toString()
-                                                                            ? 'bg-pink-500 text-white border-pink-500'
-                                                                            : 'bg-pink-900/20 text-pink-300 border-pink-700/40 hover:bg-pink-900/40'
-                                                                            }`}
-                                                                    >
-                                                                        {roundedUp.toLocaleString('cs-CZ')} Kč
-                                                                    </button>
-                                                                )
-                                                            })}
+                                                            {[...new Set([50, 100, 500, 1000].map(step => Math.ceil(baseTotal / step) * step).filter(v => v > baseTotal))].map(roundedUp => (
+                                                                <button
+                                                                    key={roundedUp}
+                                                                    onClick={() => setTipAmount(roundedUp.toString())}
+                                                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${tipAmount === roundedUp.toString()
+                                                                        ? 'bg-pink-500 text-white border-pink-500'
+                                                                        : 'bg-pink-900/20 text-pink-300 border-pink-700/40 hover:bg-pink-900/40'
+                                                                        }`}
+                                                                >
+                                                                    {roundedUp.toLocaleString('cs-CZ')} Kč
+                                                                </button>
+                                                            ))}
                                                         </div>
 
                                                         {/* Custom final amount */}
