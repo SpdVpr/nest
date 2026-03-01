@@ -2,17 +2,18 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Lock, Shield, UserPlus, Mail, User, ArrowLeft } from 'lucide-react'
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth'
+import { Lock, Shield, UserPlus, Mail, User, ArrowLeft, KeyRound } from 'lucide-react'
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth'
 import { getFirebaseAuth } from '@/lib/firebase/client'
 
-type Mode = 'login' | 'register' | 'admin_password'
+type Mode = 'login' | 'register' | 'admin_password' | 'forgot_password'
 
 export default function AdminLoginPage() {
   const [mode, setMode] = useState<Mode>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
+  const [resetEmail, setResetEmail] = useState('')
   const [adminPassword, setAdminPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -117,6 +118,32 @@ export default function AdminLoginPage() {
     }
   }
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+    setSuccess('')
+
+    try {
+      const auth = getFirebaseAuth()
+      await sendPasswordResetEmail(auth, resetEmail)
+      setSuccess('Email pro obnovení hesla byl odeslán! Zkontroluj svou schránku (i spam).')
+      setResetEmail('')
+    } catch (err: any) {
+      if (err.code === 'auth/user-not-found') {
+        setError('Účet s tímto emailem neexistuje.')
+      } else if (err.code === 'auth/invalid-email') {
+        setError('Neplatný email.')
+      } else if (err.code === 'auth/too-many-requests') {
+        setError('Příliš mnoho pokusů. Zkus to později.')
+      } else {
+        setError('Odeslání emailu selhalo. Zkus to znovu.')
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleAdminPasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -197,6 +224,17 @@ export default function AdminLoginPage() {
                       disabled={loading}
                     />
                   </div>
+                </div>
+
+                <div className="text-right">
+                  <button
+                    type="button"
+                    onClick={() => { setMode('forgot_password'); setError(''); setSuccess(''); setResetEmail(email) }}
+                    className="text-xs transition-colors hover:underline"
+                    style={{ color: 'var(--nest-text-tertiary)' }}
+                  >
+                    Zapomenuté heslo?
+                  </button>
                 </div>
 
                 {error && (
@@ -383,6 +421,70 @@ export default function AdminLoginPage() {
                   style={{ backgroundColor: 'var(--nest-yellow)', color: 'var(--nest-bg)' }}
                 >
                   {loading ? 'Přihlašuji...' : 'Přihlásit se'}
+                </button>
+              </form>
+
+              <div className="mt-6 text-center">
+                <button
+                  onClick={() => { setMode('login'); setError(''); setSuccess('') }}
+                  className="flex items-center justify-center gap-2 text-sm mx-auto transition-colors hover:underline"
+                  style={{ color: 'var(--nest-text-secondary)' }}
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Zpět na přihlášení
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* Forgot password */}
+          {mode === 'forgot_password' && (
+            <>
+              <h1 className="text-3xl font-bold text-center mb-2" style={{ color: 'var(--nest-text-primary)' }}>
+                Obnovení hesla
+              </h1>
+              <p className="text-center mb-8" style={{ color: 'var(--nest-text-secondary)' }}>
+                Zadej svůj email a pošleme ti odkaz pro obnovení hesla
+              </p>
+
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--nest-text-secondary)' }}>Email</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5" style={{ color: 'var(--nest-text-tertiary)' }} />
+                    <input
+                      type="email"
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      required
+                      className="w-full pl-10 pr-4 py-3 rounded-lg focus:outline-none focus:ring-2"
+                      style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
+                      placeholder="email@example.com"
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="px-4 py-3 rounded-lg text-sm" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#ef4444' }}>
+                    {error}
+                  </div>
+                )}
+
+                {success && (
+                  <div className="px-4 py-3 rounded-lg text-sm" style={{ backgroundColor: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34, 197, 94, 0.3)', color: '#22c55e' }}>
+                    {success}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading || !resetEmail}
+                  className="w-full font-semibold py-3 px-6 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  style={{ backgroundColor: 'var(--nest-yellow)', color: 'var(--nest-bg)' }}
+                >
+                  <KeyRound className="w-5 h-5" />
+                  {loading ? 'Odesílám...' : 'Odeslat odkaz pro obnovení'}
                 </button>
               </form>
 
