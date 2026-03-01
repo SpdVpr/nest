@@ -164,17 +164,25 @@ export default function CostsPage() {
 
     const startTipEdit = (guest: GuestCost) => {
         setTipEditGuest(guest.id)
-        setTipAmount(guest.tip > 0 ? guest.tip.toString() : '')
+        // Pre-fill with the current total (subtotal + existing tip)
+        const base = getBaseTotal(guest)
+        const currentTotal = base + guest.tip
+        setTipAmount(currentTotal > 0 ? currentTotal.toString() : '')
     }
 
     const applyPercentage = (guest: GuestCost, pct: number) => {
         const base = getBaseTotal(guest)
-        const calculated = Math.round(base * pct / 100)
-        setTipAmount(calculated.toString())
+        // Final amount = base + pct% of base
+        const finalAmount = base + Math.round(base * pct / 100)
+        setTipAmount(finalAmount.toString())
     }
 
     const saveTip = async (guestId: string, percentage?: number) => {
-        const amount = parseInt(tipAmount) || 0
+        // tipAmount is now the FINAL total - calculate tip as difference
+        const finalAmount = parseInt(tipAmount) || 0
+        const guest = guests.find(g => g.id === guestId)
+        const base = guest ? getBaseTotal(guest) : 0
+        const tipValue = Math.max(0, finalAmount - base)
         setTipSaving(true)
         try {
             const res = await fetch(`/api/event/${slug}/tips`, {
@@ -182,7 +190,7 @@ export default function CostsPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     guest_id: guestId,
-                    amount,
+                    amount: tipValue,
                     percentage: percentage ?? null,
                 }),
             })
@@ -423,46 +431,70 @@ export default function CostsPage() {
                                                 </div>
                                             )}
 
-                                            {/* Tip Section */}
+                                            {/* Tip Section - Final Amount Mode */}
                                             <div className={`mt-4 pt-4 border-t border-[var(--nest-border)]`}>
                                                 {tipEditGuest === guest.id ? (
-                                                    /* Tip editing mode */
+                                                    /* Tip editing mode - now using final total */
                                                     <div>
-                                                        <h4 className="text-sm font-semibold text-pink-600 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                                        <h4 className="text-sm font-semibold text-pink-600 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                                                             <Heart className="w-4 h-4" />
                                                             Dýško
                                                         </h4>
+                                                        <p className="text-xs text-[var(--nest-text-tertiary)] mb-3">
+                                                            Na kolik chceš zaokrouhlit? (bez dýška: {baseTotal.toLocaleString('cs-CZ')} Kč)
+                                                        </p>
 
-                                                        {/* Quick percentage buttons */}
+                                                        {/* Quick percentage buttons - now show final total */}
                                                         <div className="flex gap-2 mb-3">
                                                             {[5, 10, 15].map(pct => {
-                                                                const calcAmount = Math.round(baseTotal * pct / 100)
+                                                                const tipCalc = Math.round(baseTotal * pct / 100)
+                                                                const finalCalc = baseTotal + tipCalc
                                                                 return (
                                                                     <button
                                                                         key={pct}
                                                                         onClick={() => applyPercentage(guest, pct)}
-                                                                        className={`flex-1 py-2 px-3 rounded-xl text-sm font-semibold transition-all border-2 ${tipAmount === calcAmount.toString()
+                                                                        className={`flex-1 py-2 px-3 rounded-xl text-sm font-semibold transition-all border-2 ${tipAmount === finalCalc.toString()
                                                                             ? 'bg-pink-500 text-white border-pink-500 shadow-md'
                                                                             : 'bg-pink-900/30 text-pink-300 border-pink-700/50 hover:bg-pink-900/50'
                                                                             }`}
                                                                     >
-                                                                        <div className="text-lg">{pct}%</div>
-                                                                        <div className="text-xs opacity-75">{calcAmount} Kč</div>
+                                                                        <div className="text-lg">{finalCalc.toLocaleString('cs-CZ')} Kč</div>
+                                                                        <div className="text-xs opacity-75">+{pct}% ({tipCalc} Kč)</div>
                                                                     </button>
                                                                 )
                                                             })}
                                                         </div>
 
-                                                        {/* Custom amount */}
+                                                        {/* Quick round buttons */}
+                                                        <div className="flex gap-1.5 mb-3">
+                                                            {[50, 100, 500, 1000].map(step => {
+                                                                const roundedUp = Math.ceil(baseTotal / step) * step
+                                                                if (roundedUp <= baseTotal) return null
+                                                                return (
+                                                                    <button
+                                                                        key={step}
+                                                                        onClick={() => setTipAmount(roundedUp.toString())}
+                                                                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${tipAmount === roundedUp.toString()
+                                                                            ? 'bg-pink-500 text-white border-pink-500'
+                                                                            : 'bg-pink-900/20 text-pink-300 border-pink-700/40 hover:bg-pink-900/40'
+                                                                            }`}
+                                                                    >
+                                                                        {roundedUp.toLocaleString('cs-CZ')} Kč
+                                                                    </button>
+                                                                )
+                                                            })}
+                                                        </div>
+
+                                                        {/* Custom final amount */}
                                                         <div className="flex gap-2 items-center">
                                                             <div className="relative flex-1">
                                                                 <input
                                                                     type="number"
                                                                     value={tipAmount}
                                                                     onChange={(e) => setTipAmount(e.target.value)}
-                                                                    placeholder="Vlastní částka"
-                                                                    className="w-full pl-4 pr-12 py-2.5 border-2 border-[var(--nest-border)] rounded-xl focus:border-pink-400 focus:ring-2 focus:ring-pink-900/30 outline-none text-[var(--nest-text-primary)] bg-[var(--nest-bg)] font-medium"
-                                                                    min="0"
+                                                                    placeholder={`např. ${Math.ceil(baseTotal / 100) * 100}`}
+                                                                    className="w-full pl-4 pr-12 py-2.5 border-2 border-[var(--nest-border)] rounded-xl focus:border-pink-400 focus:ring-2 focus:ring-pink-900/30 outline-none text-[var(--nest-text-primary)] bg-[var(--nest-bg)] font-medium text-right"
+                                                                    min={baseTotal}
                                                                 />
                                                                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--nest-text-tertiary)] font-medium">Kč</span>
                                                             </div>
@@ -480,6 +512,13 @@ export default function CostsPage() {
                                                                 ✕
                                                             </button>
                                                         </div>
+
+                                                        {/* Show calculated tip */}
+                                                        {tipAmount && parseInt(tipAmount) > baseTotal && (
+                                                            <p className="text-xs text-pink-400 mt-1.5">
+                                                                → Dýško: {(parseInt(tipAmount) - baseTotal).toLocaleString('cs-CZ')} Kč
+                                                            </p>
+                                                        )}
 
                                                         {/* Remove tip */}
                                                         {guest.tip > 0 && (

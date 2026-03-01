@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, QrCode, Check, Clock, AlertTriangle, Plus, X, Edit2, Save, Copy, CreditCard, Settings, Download, ChevronDown, ChevronUp, Banknote, Heart, Loader2 } from 'lucide-react'
+import { ArrowLeft, QrCode, Check, Clock, AlertTriangle, Plus, X, Edit2, Save, Copy, CreditCard, Settings, Download, ChevronDown, ChevronUp, Banknote, Heart, Loader2, CheckSquare, Square, BarChart3 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 
 interface ConsumptionItem {
@@ -76,6 +76,17 @@ export default function SettlementPage() {
     const [loading, setLoading] = useState(true)
     const [expandedGuest, setExpandedGuest] = useState<string | null>(null)
     const [showQR, setShowQR] = useState<string | null>(null)
+
+    // Collapsible stats
+    const [showStats, setShowStats] = useState(false)
+
+    // Multi-select for QR
+    const [selectedGuests, setSelectedGuests] = useState<Set<string>>(new Set())
+
+    // Admin tip editing
+    const [tipEditGuest, setTipEditGuest] = useState<string | null>(null)
+    const [tipFinalAmount, setTipFinalAmount] = useState('')
+    const [tipSaving, setTipSaving] = useState(false)
 
     // Bank settings edit
     const [editingBank, setEditingBank] = useState(false)
@@ -443,6 +454,120 @@ export default function SettlementPage() {
         }
     }
 
+    // Generate QR for selected guests
+    const generateSelectedQR = async () => {
+        for (let i = 0; i < guests.length; i++) {
+            const guest = guests[i]
+            if (selectedGuests.has(guest.id)) {
+                const settlement = getSettlement(guest.id)
+                if (settlement.status !== 'paid') {
+                    await settlementAction(guest.id, 'generate_qr')
+                }
+            }
+        }
+        setSelectedGuests(new Set())
+    }
+
+    // Toggle guest selection
+    const toggleGuestSelection = (guestId: string) => {
+        setSelectedGuests(prev => {
+            const next = new Set(prev)
+            if (next.has(guestId)) {
+                next.delete(guestId)
+            } else {
+                next.add(guestId)
+            }
+            return next
+        })
+    }
+
+    // Select/deselect all
+    const toggleSelectAll = () => {
+        if (selectedGuests.size === guests.filter(g => getSettlement(g.id).status !== 'paid').length) {
+            setSelectedGuests(new Set())
+        } else {
+            setSelectedGuests(new Set(guests.filter(g => getSettlement(g.id).status !== 'paid').map(g => g.id)))
+        }
+    }
+
+    // Admin tip: compute current subtotal without tip to calculate tip from final amount
+    const getSubtotalWithoutTip = (guest: GuestCost): number => {
+        const s = getSettlement(guest.id)
+        const overrides = s.overrides || {}
+
+        const nightsVal = 'accommodation' in overrides ? overrides['accommodation'] : guest.nightsTotal
+
+        let consumptionVal = 0
+        guest.consumption.forEach((item, idx) => {
+            const key = `consumption-${idx}`
+            consumptionVal += key in overrides ? overrides[key] : item.totalPrice
+        })
+
+        let hardwareVal = 0
+        guest.hardware.forEach((item, idx) => {
+            const key = `hardware-${idx}`
+            hardwareVal += key in overrides ? overrides[key] : item.totalPrice
+        })
+
+        const customItemsVal = (s.custom_items || []).reduce((sum: number, ci: CustomItem) => sum + ci.amount, 0)
+
+        return nightsVal + consumptionVal + hardwareVal + customItemsVal
+    }
+
+    // Save admin tip
+    const saveAdminTip = async (guest: GuestCost) => {
+        const finalAmount = parseInt(tipFinalAmount) || 0
+        const subtotalWithoutTip = getSubtotalWithoutTip(guest)
+        const tipAmount = Math.max(0, finalAmount - subtotalWithoutTip)
+
+        setTipSaving(true)
+        try {
+            const token = localStorage.getItem('admin_token')
+            const slug = session?.slug || sessionId
+            const res = await fetch(`/api/event/${slug}/tips`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    guest_id: guest.id,
+                    amount: tipAmount,
+                    percentage: null,
+                }),
+            })
+            if (res.ok) {
+                setTipEditGuest(null)
+                setTipFinalAmount('')
+                await fetchData()
+            }
+        } catch (error) {
+            console.error('Error saving tip:', error)
+        } finally {
+            setTipSaving(false)
+        }
+    }
+
+    // Remove admin tip
+    const removeAdminTip = async (guest: GuestCost) => {
+        setTipSaving(true)
+        try {
+            const slug = session?.slug || sessionId
+            await fetch(`/api/event/${slug}/tips`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ guest_id: guest.id, amount: 0 }),
+            })
+            setTipEditGuest(null)
+            setTipFinalAmount('')
+            await fetchData()
+        } catch (error) {
+            console.error('Error removing tip:', error)
+        } finally {
+            setTipSaving(false)
+        }
+    }
+
     // Copy payment info
     const copyPaymentInfo = (guest: GuestCost, index: number) => {
         const total = getFinalTotal(guest)
@@ -498,14 +623,26 @@ export default function SettlementPage() {
                                 <p className="text-sm text-gray-500">{session?.name}</p>
                             </div>
                         </div>
-                        <button
-                            onClick={generateAllQR}
-                            disabled={saving || !bankSettings?.bank_iban}
-                            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <QrCode className="w-4 h-4" />
-                            Generovat QR pro všechny
-                        </button>
+                        <div className="flex items-center gap-2">
+                            {selectedGuests.size > 0 && (
+                                <button
+                                    onClick={generateSelectedQR}
+                                    disabled={saving || !bankSettings?.bank_iban}
+                                    className="bg-purple-600 hover:bg-purple-700 text-white font-semibold px-4 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <QrCode className="w-4 h-4" />
+                                    QR pro označené ({selectedGuests.size})
+                                </button>
+                            )}
+                            <button
+                                onClick={generateAllQR}
+                                disabled={saving || !bankSettings?.bank_iban}
+                                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <QrCode className="w-4 h-4" />
+                                QR pro všechny
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -591,27 +728,69 @@ export default function SettlementPage() {
                     )}
                 </div>
 
-                {/* Summary Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="bg-white rounded-xl shadow p-4">
-                        <p className="text-xs text-gray-500 uppercase font-medium">Celkem k výběru</p>
-                        <p className="text-2xl font-bold text-gray-900">{totalToCollect.toLocaleString('cs-CZ')} Kč</p>
-                    </div>
-                    <div className="bg-white rounded-xl shadow p-4">
-                        <p className="text-xs text-green-600 uppercase font-medium">Zaplaceno</p>
-                        <p className="text-2xl font-bold text-green-600">{totalPaid.toLocaleString('cs-CZ')} Kč</p>
-                        <p className="text-xs text-gray-400">{paidCount} z {guests.length} hostů</p>
-                    </div>
-                    <div className="bg-white rounded-xl shadow p-4">
-                        <p className="text-xs text-amber-600 uppercase font-medium">Čeká na platbu</p>
-                        <p className="text-2xl font-bold text-amber-600">{pendingCount}</p>
-                        <p className="text-xs text-gray-400">hostů</p>
-                    </div>
-                    <div className="bg-white rounded-xl shadow p-4">
-                        <p className="text-xs text-red-600 uppercase font-medium">Zbývá vybrat</p>
-                        <p className="text-2xl font-bold text-red-600">{totalRemaining.toLocaleString('cs-CZ')} Kč</p>
-                    </div>
+                {/* Summary Cards - Collapsible */}
+                <div className="bg-white rounded-xl shadow">
+                    <button
+                        onClick={() => setShowStats(!showStats)}
+                        className="w-full px-5 py-3 flex items-center justify-between text-left hover:bg-gray-50 transition-colors rounded-xl"
+                    >
+                        <div className="flex items-center gap-2">
+                            <BarChart3 className="w-5 h-5 text-blue-600" />
+                            <span className="font-semibold text-gray-900">Statistiky</span>
+                            <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: paidCount === guests.length ? 'rgba(34, 197, 94, 0.15)' : 'rgba(59, 130, 246, 0.15)', color: paidCount === guests.length ? '#22c55e' : '#3b82f6' }}>
+                                {paidCount}/{guests.length}
+                            </span>
+                        </div>
+                        {showStats ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                    </button>
+                    {showStats && (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-5 pb-5">
+                            <div className="bg-gray-50 rounded-xl p-4">
+                                <p className="text-xs text-gray-500 uppercase font-medium">Celkem k výběru</p>
+                                <p className="text-2xl font-bold text-gray-900">{totalToCollect.toLocaleString('cs-CZ')} Kč</p>
+                            </div>
+                            <div className="bg-gray-50 rounded-xl p-4">
+                                <p className="text-xs text-green-600 uppercase font-medium">Zaplaceno</p>
+                                <p className="text-2xl font-bold text-green-600">{totalPaid.toLocaleString('cs-CZ')} Kč</p>
+                                <p className="text-xs text-gray-400">{paidCount} z {guests.length} hostů</p>
+                            </div>
+                            <div className="bg-gray-50 rounded-xl p-4">
+                                <p className="text-xs text-amber-600 uppercase font-medium">Čeká na platbu</p>
+                                <p className="text-2xl font-bold text-amber-600">{pendingCount}</p>
+                                <p className="text-xs text-gray-400">hostů</p>
+                            </div>
+                            <div className="bg-gray-50 rounded-xl p-4">
+                                <p className="text-xs text-red-600 uppercase font-medium">Zbývá vybrat</p>
+                                <p className="text-2xl font-bold text-red-600">{totalRemaining.toLocaleString('cs-CZ')} Kč</p>
+                            </div>
+                        </div>
+                    )}
                 </div>
+
+                {/* Select All / Deselect All */}
+                {guests.length > 0 && (
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={toggleSelectAll}
+                            className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+                        >
+                            {selectedGuests.size === guests.filter(g => getSettlement(g.id).status !== 'paid').length && selectedGuests.size > 0 ? (
+                                <CheckSquare className="w-4 h-4 text-blue-600" />
+                            ) : (
+                                <Square className="w-4 h-4" />
+                            )}
+                            {selectedGuests.size > 0 ? `Označeno ${selectedGuests.size} hostů` : 'Označit všechny'}
+                        </button>
+                        {selectedGuests.size > 0 && (
+                            <button
+                                onClick={() => setSelectedGuests(new Set())}
+                                className="text-xs text-gray-400 hover:text-gray-600"
+                            >
+                                Zrušit výběr
+                            </button>
+                        )}
+                    </div>
+                )}
 
                 {/* Guest Settlement Cards */}
                 <div className="space-y-3">
@@ -630,11 +809,25 @@ export default function SettlementPage() {
                                     }`}
                             >
                                 {/* Summary row */}
-                                <button
+                                <div
+                                    className="w-full px-5 py-4 flex items-center justify-between text-left hover:bg-gray-50 transition-colors cursor-pointer"
                                     onClick={() => setExpandedGuest(isExpanded ? null : guest.id)}
-                                    className="w-full px-5 py-4 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
                                 >
                                     <div className="flex items-center gap-3">
+                                        {/* Selection checkbox */}
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                toggleGuestSelection(guest.id)
+                                            }}
+                                            className="flex-shrink-0 text-gray-400 hover:text-blue-600 transition-colors"
+                                        >
+                                            {selectedGuests.has(guest.id) ? (
+                                                <CheckSquare className="w-5 h-5 text-blue-600" />
+                                            ) : (
+                                                <Square className="w-5 h-5" />
+                                            )}
+                                        </button>
                                         <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg ${settlement.status === 'paid' ? 'bg-green-100 text-green-700' :
                                             settlement.status === 'pending' ? 'bg-amber-100 text-amber-700' :
                                                 'bg-gray-100 text-gray-700'
@@ -660,7 +853,7 @@ export default function SettlementPage() {
                                         </span>
                                         {isExpanded ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
                                     </div>
-                                </button>
+                                </div>
 
                                 {/* Expanded content */}
                                 {isExpanded && (
@@ -692,7 +885,14 @@ export default function SettlementPage() {
 
                                                 return (
                                                     <div className={`flex items-center justify-between py-1.5 text-sm group rounded-lg px-2 -mx-2 ${hasOverride ? 'bg-amber-50' : 'hover:bg-gray-50'}`}>
-                                                        <span className="text-gray-700">🏠 Ubytování ({guest.nights_count}× noc á {pricePerNight} Kč)</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-base">🏠</span>
+                                                            <span className="inline-flex items-center justify-center bg-blue-100 text-blue-700 font-bold text-xs rounded px-1.5 py-0.5 min-w-[28px]">{guest.nights_count}×</span>
+                                                            <div className="flex flex-col">
+                                                                <span className="text-gray-900 font-medium">Ubytování</span>
+                                                                <span className="text-xs text-gray-400">{pricePerNight} Kč / noc</span>
+                                                            </div>
+                                                        </div>
                                                         {isEditing ? (
                                                             <div className="flex items-center gap-1">
                                                                 <input
@@ -748,7 +948,14 @@ export default function SettlementPage() {
 
                                                 return (
                                                     <div key={idx} className={`flex items-center justify-between py-1.5 text-sm group rounded-lg px-2 -mx-2 ${hasOverride ? 'bg-amber-50' : 'hover:bg-gray-50'}`}>
-                                                        <span className="text-gray-700">🍕 {item.name} ({item.qty}× á {item.unitPrice} Kč)</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-base">🍕</span>
+                                                            <span className="inline-flex items-center justify-center bg-orange-100 text-orange-700 font-bold text-xs rounded px-1.5 py-0.5 min-w-[28px]">{item.qty}×</span>
+                                                            <div className="flex flex-col">
+                                                                <span className="text-gray-900 font-medium">{item.name}</span>
+                                                                <span className="text-xs text-gray-400">{item.unitPrice} Kč / ks</span>
+                                                            </div>
+                                                        </div>
                                                         {isEditing ? (
                                                             <div className="flex items-center gap-1">
                                                                 <input
@@ -804,7 +1011,11 @@ export default function SettlementPage() {
 
                                                 return (
                                                     <div key={idx} className={`flex items-center justify-between py-1.5 text-sm group rounded-lg px-2 -mx-2 ${hasOverride ? 'bg-amber-50' : 'hover:bg-gray-50'}`}>
-                                                        <span className="text-gray-700">💻 {item.name} ({item.qty}×)</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-base">💻</span>
+                                                            <span className="inline-flex items-center justify-center bg-purple-100 text-purple-700 font-bold text-xs rounded px-1.5 py-0.5 min-w-[28px]">{item.qty}×</span>
+                                                            <span className="text-gray-900 font-medium">{item.name}</span>
+                                                        </div>
                                                         {isEditing ? (
                                                             <div className="flex items-center gap-1">
                                                                 <input
@@ -850,57 +1061,153 @@ export default function SettlementPage() {
                                                 )
                                             })}
 
-                                            {/* Tip */}
-                                            {guest.tip > 0 && (() => {
+                                            {/* Tip - now always show with admin edit capability */}
+                                            {(() => {
                                                 const itemKey = 'tip'
                                                 const fullKey = `${guest.id}:${itemKey}`
                                                 const isEditing = editingItemKey === fullKey
                                                 const hasOverride = (settlement.overrides || {})[itemKey] !== undefined
                                                 const effectiveValue = getItemValue(guest.id, itemKey, guest.tip)
+                                                const isTipEditing = tipEditGuest === guest.id
+                                                const subtotalNoTip = getSubtotalWithoutTip(guest)
 
                                                 return (
-                                                    <div className={`flex items-center justify-between py-1.5 text-sm group rounded-lg px-2 -mx-2 ${hasOverride ? 'bg-amber-50' : 'hover:bg-gray-50'}`}>
-                                                        <span className="text-pink-600 flex items-center gap-1">
-                                                            <Heart className="w-3.5 h-3.5 fill-pink-500" />
-                                                            Dýško{guest.tipPercentage ? ` (${guest.tipPercentage}%)` : ''}
-                                                        </span>
-                                                        {isEditing ? (
-                                                            <div className="flex items-center gap-1">
-                                                                <input
-                                                                    type="number"
-                                                                    value={editingItemValue}
-                                                                    onChange={(e) => setEditingItemValue(e.target.value)}
-                                                                    className="w-24 px-2 py-1 border border-blue-300 rounded text-sm text-gray-900 text-right"
-                                                                    autoFocus
-                                                                    onKeyDown={(e) => {
-                                                                        if (e.key === 'Enter') saveItemOverride(guest.id, itemKey)
-                                                                        if (e.key === 'Escape') setEditingItemKey(null)
-                                                                    }}
-                                                                />
-                                                                <span className="text-gray-400 text-xs">Kč</span>
-                                                                <button onClick={() => saveItemOverride(guest.id, itemKey)} className="text-green-600 hover:text-green-700 p-0.5"><Check className="w-3.5 h-3.5" /></button>
-                                                                <button onClick={() => setEditingItemKey(null)} className="text-gray-400 hover:text-gray-600 p-0.5"><X className="w-3.5 h-3.5" /></button>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="flex items-center gap-1.5">
-                                                                {hasOverride && (
-                                                                    <span className="text-xs text-gray-400 line-through">{guest.tip.toLocaleString('cs-CZ')}</span>
-                                                                )}
-                                                                <span className={`font-medium ${hasOverride ? 'text-amber-700' : 'text-pink-600'}`}>{effectiveValue.toLocaleString('cs-CZ')} Kč</span>
-                                                                <button
-                                                                    onClick={() => startEditItem(guest.id, itemKey, effectiveValue)}
-                                                                    className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-blue-600 transition-opacity p-0.5"
-                                                                    title="Upravit částku"
-                                                                >
-                                                                    <Edit2 className="w-3.5 h-3.5" />
-                                                                </button>
-                                                                {hasOverride && (
+                                                    <div className="space-y-2">
+                                                        <div className={`flex items-center justify-between py-1.5 text-sm group rounded-lg px-2 -mx-2 ${hasOverride ? 'bg-amber-50' : 'hover:bg-gray-50'}`}>
+                                                            <span className="text-pink-600 flex items-center gap-1">
+                                                                <Heart className="w-3.5 h-3.5 fill-pink-500" />
+                                                                Dýško{guest.tipPercentage ? ` (${guest.tipPercentage}%)` : ''}
+                                                            </span>
+                                                            {isEditing ? (
+                                                                <div className="flex items-center gap-1">
+                                                                    <input
+                                                                        type="number"
+                                                                        value={editingItemValue}
+                                                                        onChange={(e) => setEditingItemValue(e.target.value)}
+                                                                        className="w-24 px-2 py-1 border border-blue-300 rounded text-sm text-gray-900 text-right"
+                                                                        autoFocus
+                                                                        onKeyDown={(e) => {
+                                                                            if (e.key === 'Enter') saveItemOverride(guest.id, itemKey)
+                                                                            if (e.key === 'Escape') setEditingItemKey(null)
+                                                                        }}
+                                                                    />
+                                                                    <span className="text-gray-400 text-xs">Kč</span>
+                                                                    <button onClick={() => saveItemOverride(guest.id, itemKey)} className="text-green-600 hover:text-green-700 p-0.5"><Check className="w-3.5 h-3.5" /></button>
+                                                                    <button onClick={() => setEditingItemKey(null)} className="text-gray-400 hover:text-gray-600 p-0.5"><X className="w-3.5 h-3.5" /></button>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex items-center gap-1.5">
+                                                                    {effectiveValue > 0 ? (
+                                                                        <>
+                                                                            {hasOverride && (
+                                                                                <span className="text-xs text-gray-400 line-through">{guest.tip.toLocaleString('cs-CZ')}</span>
+                                                                            )}
+                                                                            <span className={`font-medium ${hasOverride ? 'text-amber-700' : 'text-pink-600'}`}>{effectiveValue.toLocaleString('cs-CZ')} Kč</span>
+                                                                            <button
+                                                                                onClick={() => startEditItem(guest.id, itemKey, effectiveValue)}
+                                                                                className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-blue-600 transition-opacity p-0.5"
+                                                                                title="Upravit částku"
+                                                                            >
+                                                                                <Edit2 className="w-3.5 h-3.5" />
+                                                                            </button>
+                                                                            {hasOverride && (
+                                                                                <button
+                                                                                    onClick={() => removeItemOverride(guest.id, itemKey)}
+                                                                                    className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity p-0.5"
+                                                                                    title="Vrátit původní"
+                                                                                >
+                                                                                    <X className="w-3 h-3" />
+                                                                                </button>
+                                                                            )}
+                                                                        </>
+                                                                    ) : (
+                                                                        <span className="text-gray-400 text-sm">—</span>
+                                                                    )}
                                                                     <button
-                                                                        onClick={() => removeItemOverride(guest.id, itemKey)}
-                                                                        className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity p-0.5"
-                                                                        title="Vrátit původní"
+                                                                        onClick={() => {
+                                                                            setTipEditGuest(guest.id)
+                                                                            // Pre-fill with current total (subtotal + existing tip)
+                                                                            const currentTotal = subtotalNoTip + effectiveValue
+                                                                            setTipFinalAmount(currentTotal > 0 ? currentTotal.toString() : '')
+                                                                        }}
+                                                                        className="opacity-0 group-hover:opacity-100 text-pink-400 hover:text-pink-600 transition-opacity p-0.5"
+                                                                        title={effectiveValue > 0 ? 'Upravit dýško' : 'Přidat dýško'}
                                                                     >
-                                                                        <X className="w-3 h-3" />
+                                                                        <Heart className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Admin tip editor - final amount mode */}
+                                                        {isTipEditing && (
+                                                            <div className="px-3 -mx-2 py-2 rounded-lg border border-pink-200" style={{ borderLeft: '3px solid #ec4899' }}>
+                                                                <p className="text-xs text-pink-600 font-medium mb-2">
+                                                                    💖 Zadej finální částku (bez dýška je to {subtotalNoTip.toLocaleString('cs-CZ')} Kč)
+                                                                </p>
+                                                                <div className="flex gap-2 items-center">
+                                                                    <div className="relative flex-1">
+                                                                        <input
+                                                                            type="number"
+                                                                            value={tipFinalAmount}
+                                                                            onChange={(e) => setTipFinalAmount(e.target.value)}
+                                                                            placeholder={`např. ${Math.ceil(subtotalNoTip / 100) * 100}`}
+                                                                            className="w-full pl-3 pr-10 py-2 border border-pink-300 rounded-lg text-sm text-gray-900 text-right focus:ring-2 focus:ring-pink-200 focus:border-pink-400 outline-none"
+                                                                            autoFocus
+                                                                            min={subtotalNoTip}
+                                                                            onKeyDown={(e) => {
+                                                                                if (e.key === 'Enter') saveAdminTip(guest)
+                                                                                if (e.key === 'Escape') { setTipEditGuest(null); setTipFinalAmount('') }
+                                                                            }}
+                                                                        />
+                                                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">Kč</span>
+                                                                    </div>
+                                                                    <button
+                                                                        onClick={() => saveAdminTip(guest)}
+                                                                        disabled={tipSaving}
+                                                                        className="bg-pink-500 hover:bg-pink-600 text-white px-3 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+                                                                    >
+                                                                        {tipSaving ? '...' : 'Uložit'}
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => { setTipEditGuest(null); setTipFinalAmount('') }}
+                                                                        className="text-gray-400 hover:text-gray-600 p-2"
+                                                                    >
+                                                                        <X className="w-4 h-4" />
+                                                                    </button>
+                                                                </div>
+                                                                {/* Quick round buttons */}
+                                                                <div className="flex gap-1.5 mt-2">
+                                                                    {[50, 100, 500, 1000].map(step => {
+                                                                        const roundedUp = Math.ceil(subtotalNoTip / step) * step
+                                                                        if (roundedUp <= subtotalNoTip) return null
+                                                                        return (
+                                                                            <button
+                                                                                key={step}
+                                                                                onClick={() => setTipFinalAmount(roundedUp.toString())}
+                                                                                className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors border ${tipFinalAmount === roundedUp.toString()
+                                                                                    ? 'bg-pink-500 text-white border-pink-500'
+                                                                                    : 'bg-white text-pink-600 border-pink-200 hover:bg-pink-100'
+                                                                                    }`}
+                                                                            >
+                                                                                {roundedUp.toLocaleString('cs-CZ')} Kč
+                                                                            </button>
+                                                                        )
+                                                                    })}
+                                                                </div>
+                                                                {/* Show calculated tip */}
+                                                                {tipFinalAmount && parseInt(tipFinalAmount) > subtotalNoTip && (
+                                                                    <p className="text-xs text-pink-500 mt-1.5">
+                                                                        → Dýško bude: {(parseInt(tipFinalAmount) - subtotalNoTip).toLocaleString('cs-CZ')} Kč
+                                                                    </p>
+                                                                )}
+                                                                {/* Remove tip option */}
+                                                                {effectiveValue > 0 && (
+                                                                    <button
+                                                                        onClick={() => removeAdminTip(guest)}
+                                                                        className="mt-2 text-xs text-gray-400 hover:text-red-500 transition-colors"
+                                                                    >
+                                                                        Odebrat dýško
                                                                     </button>
                                                                 )}
                                                             </div>
