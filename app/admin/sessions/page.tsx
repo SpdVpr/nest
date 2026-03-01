@@ -1303,15 +1303,107 @@ function AdminSessionsPageInner() {
           </div>
         )}
 
-        <div className="bg-[#efefef] rounded-xl shadow overflow-hidden">
+
+        {/* Mobile card view */}
+        <div className="md:hidden space-y-3">
+          {sessions.map((session) => (
+            <div
+              key={session.id}
+              className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"
+            >
+              <Link
+                href={`/admin/sessions/${session.id}`}
+                className="block p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-semibold text-gray-900 text-base">{session.name}</h3>
+                      {session.is_active ? (
+                        <span className="px-2 py-0.5 text-xs font-semibold bg-green-100 text-green-800 rounded-full">
+                          Aktivní
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 text-xs font-semibold bg-gray-100 text-gray-600 rounded-full">
+                          Neaktivní
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {formatDateOnly(session.start_date)}
+                      {session.end_date ? ` – ${formatDateOnly(session.end_date)}` : ''}
+                    </p>
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {session.menu_enabled && (
+                        <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">🍽️ Menu</span>
+                      )}
+                      {session.hardware_pricing_enabled === false && (
+                        <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">🚫 HW cena</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center text-purple-600 flex-shrink-0 mt-1">
+                    <Eye className="w-5 h-5" />
+                  </div>
+                </div>
+              </Link>
+              {/* Admin actions row */}
+              {(showEdit || showCreate) && (
+                <div className="border-t border-gray-100 px-4 py-2.5 flex items-center gap-3 bg-gray-50">
+                  {showEdit && (
+                    <button
+                      onClick={() => startEditSession(session)}
+                      className="flex items-center text-sm text-blue-600 hover:text-blue-700"
+                    >
+                      <Edit className="w-3.5 h-3.5 mr-1" />
+                      Upravit
+                    </button>
+                  )}
+                  {showEdit && (
+                    <button
+                      onClick={() => toggleSessionActive(session.id, session.is_active)}
+                      className={`flex items-center text-sm ${session.is_active
+                        ? 'text-red-600 hover:text-red-700'
+                        : 'text-green-600 hover:text-green-700'
+                        }`}
+                    >
+                      {session.is_active ? (
+                        <><StopCircle className="w-3.5 h-3.5 mr-1" /> Ukončit</>
+                      ) : (
+                        <><PlayCircle className="w-3.5 h-3.5 mr-1" /> Aktivovat</>
+                      )}
+                    </button>
+                  )}
+                  {showCreate && (
+                    <button
+                      onClick={() => {
+                        resetForm()
+                        copyFromSession(session.id)
+                        setShowCreateForm(true)
+                        setEditingSession(null)
+                        window.scrollTo({ top: 0, behavior: 'smooth' })
+                      }}
+                      className="flex items-center text-sm text-gray-500 hover:text-gray-700"
+                    >
+                      <Copy className="w-3.5 h-3.5 mr-1" />
+                      Kopírovat
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop table view */}
+        <div className="hidden md:block bg-[#efefef] rounded-xl shadow overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[800px]">
+            <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Název</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Event Link</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Začátek</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Konec</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Termín</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Akce</th>
                 </tr>
@@ -1344,9 +1436,9 @@ function AdminSessionsPageInner() {
                         <span className="text-gray-400">-</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{formatDate(session.start_date)}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {session.end_date ? formatDate(session.end_date) : '-'}
+                    <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
+                      {formatDateOnly(session.start_date)}
+                      {session.end_date ? ` – ${formatDateOnly(session.end_date)}` : ''}
                     </td>
                     <td className="px-6 py-4">
                       {session.is_active ? (

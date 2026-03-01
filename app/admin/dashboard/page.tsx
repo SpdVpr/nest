@@ -22,7 +22,7 @@ import {
   Trophy
 } from 'lucide-react'
 import { Session } from '@/types/database.types'
-import { formatDate } from '@/lib/utils'
+import { formatDate, formatDateOnly } from '@/lib/utils'
 import { useAdminAuth } from '@/lib/admin-auth-context'
 import { canViewFinances, canManageUsers, canCreateEvents, canDeleteEvents, canEditSettings } from '@/lib/admin-roles'
 
@@ -266,84 +266,118 @@ export default function AdminDashboard() {
           </div>
 
           {sessions.length > 0 ? (
-            <div className="bg-[#efefef] rounded-xl shadow overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Název eventu</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Termín</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Akce</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {sessions.map((session) => (
-                    <tr key={session.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 font-semibold text-gray-900">
-                        <div className="flex items-center gap-2">
-                          {session.name}
+            <>
+              {/* Mobile card view */}
+              <div className="md:hidden space-y-3">
+                {sessions.map((session) => (
+                  <Link
+                    key={session.id}
+                    href={`/admin/sessions/${session.id}`}
+                    className="block bg-white rounded-xl shadow-sm border border-gray-200 p-4 active:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-bold text-gray-900">{session.name}</h3>
                           <span className="inline-flex items-center gap-1 text-xs font-semibold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
                             <Users className="w-3 h-3" />
                             {guestCountMap[session.id] || 0}
                           </span>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
-                        {formatDate(session.start_date)}
-                        {session.end_date && ` - ${formatDate(session.end_date)}`}
-                      </td>
-                      <td className="px-6 py-4">
+                        <p className="text-sm text-gray-500 mt-1">
+                          {formatDateOnly(session.start_date)}
+                          {session.end_date ? ` – ${formatDateOnly(session.end_date)}` : ''}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end gap-2 flex-shrink-0">
                         {getStatusBadge(session.status || 'upcoming')}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Link
-                            href={`/admin/sessions/${session.id}`}
-                            className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-                          >
-                            📊 Detail
-                          </Link>
-                          {showCreate && (
-                            <Link
-                              href={`/admin/sessions/${session.id}?edit=true`}
-                              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
-                              title="Upravit event"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Link>
-                          )}
-                          {showDelete && (
-                            <button
-                              onClick={() => handleDeleteEvent(session.id, session.name)}
-                              className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
-                              title="Smazat event"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                          {showCreate && (
-                            <Link
-                              href={`/admin/sessions?copyFrom=${session.id}`}
-                              className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
-                              title="Vytvořit nový event s nastavením tohoto"
-                            >
-                              <Copy className="w-4 h-4" />
-                            </Link>
-                          )}
-                          <Link
-                            href={`/event/${session.slug}`}
-                            target="_blank"
-                            className="bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-                          >
-                            🔗
-                          </Link>
-                        </div>
-                      </td>
+                        <span className="text-purple-500 text-xs font-medium">Detail →</span>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+
+              {/* Desktop table view */}
+              <div className="hidden md:block bg-[#efefef] rounded-xl shadow overflow-hidden">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Název eventu</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Termín</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Akce</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {sessions.map((session) => (
+                      <tr key={session.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => router.push(`/admin/sessions/${session.id}`)}>
+                        <td className="px-6 py-4 font-semibold text-gray-900">
+                          <div className="flex items-center gap-2">
+                            {session.name}
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                              <Users className="w-3 h-3" />
+                              {guestCountMap[session.id] || 0}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
+                          {formatDateOnly(session.start_date)}
+                          {session.end_date ? ` – ${formatDateOnly(session.end_date)}` : ''}
+                        </td>
+                        <td className="px-6 py-4">
+                          {getStatusBadge(session.status || 'upcoming')}
+                        </td>
+                        <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-2">
+                            <Link
+                              href={`/admin/sessions/${session.id}`}
+                              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                            >
+                              📊 Detail
+                            </Link>
+                            {showCreate && (
+                              <Link
+                                href={`/admin/sessions/${session.id}?edit=true`}
+                                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
+                                title="Upravit event"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Link>
+                            )}
+                            {showDelete && (
+                              <button
+                                onClick={() => handleDeleteEvent(session.id, session.name)}
+                                className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
+                                title="Smazat event"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                            {showCreate && (
+                              <Link
+                                href={`/admin/sessions?copyFrom=${session.id}`}
+                                className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
+                                title="Vytvořit nový event s nastavením tohoto"
+                              >
+                                <Copy className="w-4 h-4" />
+                              </Link>
+                            )}
+                            <Link
+                              href={`/event/${session.slug}`}
+                              target="_blank"
+                              className="bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                            >
+                              🔗
+                            </Link>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           ) : (
             <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-8 text-center">
               <p className="text-yellow-700 font-bold text-lg">⚠️ Žádné eventy</p>
