@@ -68,6 +68,7 @@ export default function CostsPage() {
     const [isPreliminary, setIsPreliminary] = useState(true)
     const [copiedVS, setCopiedVS] = useState<string | null>(null)
     const [hardwarePricingEnabled, setHardwarePricingEnabled] = useState(true)
+    const [sessionName, setSessionName] = useState('')
 
     useEffect(() => {
         if (slug) {
@@ -88,6 +89,7 @@ export default function CostsPage() {
                 setBankSettings(data.bankSettings || null)
                 setIsPreliminary(data.isPreliminary !== false)
                 setHardwarePricingEnabled(data.hardwarePricingEnabled !== false)
+                setSessionName(data.sessionName || '')
                 setLastRefresh(new Date())
             }
         } catch (error) {
@@ -104,7 +106,7 @@ export default function CostsPage() {
         const amount = guest.settlement.finalTotal.toFixed(2)
         const vs = guest.settlement.variable_symbol || ''
 
-        const rawMsg = `${guest.name}`
+        const rawMsg = sessionName ? `${sessionName} - ${guest.name}` : guest.name
         const cleanMsg = rawMsg
             .normalize('NFD')
             .replace(/[\u0300-\u036f]/g, '')
@@ -251,31 +253,15 @@ export default function CostsPage() {
                 </div>
             </div>
 
-            {/* Status Banner */}
-            {isPreliminary ? (
+            {/* Preliminary warning - only show if prices might change */}
+            {isPreliminary && (
                 <div className="bg-[var(--nest-warning)]/10 border border-[var(--nest-warning)]/30 rounded-2xl p-4 mb-6 flex items-start gap-3">
                     <AlertTriangle className="w-5 h-5 text-[var(--nest-warning)] flex-shrink-0 mt-0.5" />
                     <div>
                         <p className="font-semibold text-[var(--nest-warning)] text-sm">Předběžné ceny</p>
                         <p className="text-sm text-[var(--nest-text-secondary)]">
-                            Tyto ceny jsou orientační a mohou se ještě měnit. Finální vyúčtování s QR kódem k platbě vytvoří admin po skončení akce.
+                            Tyto ceny jsou orientační a mohou se ještě měnit.
                         </p>
-                    </div>
-                </div>
-            ) : (
-                <div className="bg-emerald-900/30 border-2 border-emerald-700/50 rounded-2xl p-4 mb-6 flex items-start gap-3">
-                    <CreditCard className="w-6 h-6 text-emerald-600 flex-shrink-0 mt-0.5" />
-                    <div>
-                        <p className="font-semibold text-emerald-400">Finální vyúčtování</p>
-                        <p className="text-sm text-emerald-300/80">
-                            Vyúčtování bylo dokončeno. Rozbal svou kartu pro zobrazení QR kódu k platbě.
-                        </p>
-                        {bankSettings && (
-                            <p className="text-sm text-emerald-400 mt-1 font-medium">
-                                💳 Účet: {bankSettings.bank_account}
-                                {bankSettings.account_holder && ` (${bankSettings.account_holder})`}
-                            </p>
-                        )}
                     </div>
                 </div>
             )}

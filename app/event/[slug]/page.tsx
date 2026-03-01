@@ -104,8 +104,9 @@ export default function EventPage() {
     {
       href: `/event/${slug}/costs`,
       icon: Wallet,
-      label: 'Náklady',
-      desc: 'Přehled cen',
+      label: 'Placení',
+      desc: 'Přehled a platba',
+      highlight: true,
     },
     ...(session.seats_enabled !== false ? [{
       href: `/event/${slug}/seats`,
@@ -133,8 +134,32 @@ export default function EventPage() {
     },
   ]
 
+  // Detect if today is the last day of the event
+  const isLastDay = (() => {
+    if (!session.end_date) return false
+    const today = new Date()
+    const endDate = new Date(session.end_date)
+    return today.getFullYear() === endDate.getFullYear() &&
+      today.getMonth() === endDate.getMonth() &&
+      today.getDate() === endDate.getDate()
+  })()
+
   return (
     <NestPage sessionSlug={slug} title={session.name}>
+      {/* Glow animation for last day payment button */}
+      {isLastDay && (
+        <style>{`
+          @keyframes paymentGlow {
+            0%, 100% { box-shadow: 0 0 8px rgba(236, 72, 153, 0.4), 0 0 20px rgba(236, 72, 153, 0.2); }
+            50% { box-shadow: 0 0 16px rgba(236, 72, 153, 0.6), 0 0 40px rgba(236, 72, 153, 0.3); }
+          }
+          .payment-glow {
+            animation: paymentGlow 2s ease-in-out infinite;
+            border-color: rgba(236, 72, 153, 0.6) !important;
+            background: linear-gradient(135deg, rgba(236, 72, 153, 0.15), rgba(168, 85, 247, 0.15)) !important;
+          }
+        `}</style>
+      )}
       {/* Event Header */}
       <div className="text-center mb-8 pt-4">
         <h1 className="text-3xl md:text-4xl font-bold mb-3">
@@ -179,21 +204,27 @@ export default function EventPage() {
 
       {/* Navigation Grid — compact cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {navItems.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className="group nest-card hover:border-[var(--nest-yellow)]/50 transition-all duration-200 p-4 flex flex-col items-center text-center gap-2.5 hover:bg-[var(--nest-yellow)]/10 hover:scale-[1.03] hover:shadow-lg hover:shadow-[var(--nest-yellow)]/5"
-          >
-            <div className="w-10 h-10 rounded-xl bg-[var(--nest-dark-3)] group-hover:bg-[var(--nest-yellow)]/10 flex items-center justify-center transition-colors">
-              <item.icon className="w-5 h-5 text-[var(--nest-yellow)]" />
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-[var(--nest-white)]">{item.label}</h3>
-              <p className="text-xs text-[var(--nest-white-40)] mt-0.5">{item.desc}</p>
-            </div>
-          </Link>
-        ))}
+        {navItems.map((item) => {
+          const isHighlightActive = (item as any).highlight && isLastDay
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`group nest-card hover:border-[var(--nest-yellow)]/50 transition-all duration-200 p-4 flex flex-col items-center text-center gap-2.5 hover:bg-[var(--nest-yellow)]/10 hover:scale-[1.03] hover:shadow-lg hover:shadow-[var(--nest-yellow)]/5 ${isHighlightActive ? 'payment-glow' : ''}`}
+            >
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${isHighlightActive ? 'bg-pink-500/20' : 'bg-[var(--nest-dark-3)] group-hover:bg-[var(--nest-yellow)]/10'}`}>
+                <item.icon className={`w-5 h-5 ${isHighlightActive ? 'text-pink-400' : 'text-[var(--nest-yellow)]'}`} />
+              </div>
+              <div>
+                <h3 className={`text-sm font-semibold ${isHighlightActive ? 'text-pink-300' : 'text-[var(--nest-white)]'}`}>{item.label}</h3>
+                <p className="text-xs text-[var(--nest-white-40)] mt-0.5">{item.desc}</p>
+                {isHighlightActive && (
+                  <span className="inline-block mt-1 text-[10px] font-bold uppercase tracking-wider text-pink-400 bg-pink-500/15 px-2 py-0.5 rounded-full">Poslední den!</span>
+                )}
+              </div>
+            </Link>
+          )
+        })}
       </div>
     </NestPage>
   )
