@@ -399,7 +399,7 @@ export default function SettlementPage() {
                 body.adjustments = settlement.adjustments || []
             }
 
-            await fetch(`/api/admin/sessions/${sessionId}/settlement`, {
+            const res = await fetch(`/api/admin/sessions/${sessionId}/settlement`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -408,9 +408,52 @@ export default function SettlementPage() {
                 body: JSON.stringify(body),
             })
 
-            await fetchData()
+            if (res.ok) {
+                // Update local state optimistically instead of full refetch
+                setSettlements(prev => {
+                    const current = prev[guestId] || {
+                        status: 'draft',
+                        adjustments: [],
+                        custom_items: [],
+                        overrides: {},
+                        notes: '',
+                        variable_symbol: '',
+                        qr_generated_at: null,
+                        paid_at: null,
+                    }
+
+                    const updated = { ...current }
+
+                    if (action === 'generate_qr') {
+                        updated.status = 'pending'
+                        updated.qr_generated_at = new Date().toISOString()
+                        updated.variable_symbol = body.variable_symbol || current.variable_symbol
+                    } else if (action === 'cancel_qr') {
+                        updated.status = 'draft'
+                        updated.qr_generated_at = null
+                        updated.variable_symbol = ''
+                    } else if (action === 'mark_paid') {
+                        updated.status = 'paid'
+                        updated.paid_at = new Date().toISOString()
+                    } else if (action === 'mark_unpaid') {
+                        updated.status = 'pending'
+                        updated.paid_at = null
+                    } else if (action === 'update') {
+                        if (extra.adjustments !== undefined) updated.adjustments = extra.adjustments
+                        if (extra.overrides !== undefined) updated.overrides = extra.overrides
+                        if (extra.custom_items !== undefined) updated.custom_items = extra.custom_items
+                        if (extra.notes !== undefined) updated.notes = extra.notes
+                    }
+
+                    return { ...prev, [guestId]: updated }
+                })
+            } else {
+                // Fallback: full refetch on error
+                await fetchData()
+            }
         } catch (error) {
             console.error('Error:', error)
+            await fetchData()
         } finally {
             setSaving(false)
         }
@@ -1435,6 +1478,21 @@ export default function SettlementPage() {
                                                 <QrCode className="w-4 h-4" />
                                                 {settlement.qr_generated_at ? 'Obnovit QR' : 'Generovat QR'}
                                             </button>
+
+                                            {/* Cancel QR */}
+                                            {settlement.qr_generated_at && settlement.status !== 'paid' && (
+                                                <button
+                                                    onClick={() => {
+                                                        settlementAction(guest.id, 'cancel_qr')
+                                                        setShowQR(null)
+                                                    }}
+                                                    disabled={saving}
+                                                    className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+                                                >
+                                                    <X className="w-4 h-4" />
+                                                    Zrušit QR
+                                                </button>
+                                            )}
 
                                             {/* Mark as paid */}
                                             {settlement.status !== 'paid' ? (

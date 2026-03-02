@@ -164,7 +164,20 @@ export default function AdminDashboard() {
     }
   }
 
-  const getStatusBadge = (status: string) => {
+  const getSessionStatus = (session: Session): string => {
+    const now = new Date()
+    const start = session.start_date ? new Date(session.start_date) : null
+    const end = session.end_date ? new Date(session.end_date) : null
+
+    if (!start) return 'upcoming'
+    if (now < start) return 'upcoming'
+    if (end && now > end) return 'completed'
+    // now >= start && (no end || now <= end) => active
+    return 'active'
+  }
+
+  const getStatusBadge = (session: Session) => {
+    const status = getSessionStatus(session)
     const statusColors: Record<string, string> = {
       draft: 'bg-gray-100 text-gray-800',
       upcoming: 'bg-blue-100 text-blue-800',
@@ -175,7 +188,7 @@ export default function AdminDashboard() {
     const statusLabels: Record<string, string> = {
       draft: 'Návrh',
       upcoming: 'Nadcházející',
-      active: 'Aktivní',
+      active: 'Probíhající',
       completed: 'Dokončený',
       cancelled: 'Zrušený',
     }
@@ -290,7 +303,7 @@ export default function AdminDashboard() {
                         </p>
                       </div>
                       <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                        {getStatusBadge(session.status || 'upcoming')}
+                        {getStatusBadge(session)}
                         <span className="text-purple-500 text-xs font-medium">Detail →</span>
                       </div>
                     </div>
@@ -326,7 +339,7 @@ export default function AdminDashboard() {
                           {session.end_date ? ` – ${formatDateOnly(session.end_date)}` : ''}
                         </td>
                         <td className="px-6 py-4">
-                          {getStatusBadge(session.status || 'upcoming')}
+                          {getStatusBadge(session)}
                         </td>
                         <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-2">

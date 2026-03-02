@@ -93,6 +93,20 @@ export async function POST(
             return NextResponse.json({ success: true, status: 'pending' })
         }
 
+        if (action === 'cancel_qr') {
+            // Cancel QR → reset to draft, clear QR data
+            if (!existingSnapshot.empty) {
+                await existingSnapshot.docs[0].ref.update({
+                    status: 'draft',
+                    qr_generated_at: null,
+                    variable_symbol: null,
+                    updated_at: now,
+                })
+            }
+
+            return NextResponse.json({ success: true, status: 'draft' })
+        }
+
         if (action === 'mark_paid') {
             const data: any = {
                 status: 'paid',
