@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Users, Monitor, Utensils, TrendingUp, Loader2, Edit2, Check, X, Edit, UtensilsCrossed, Heart, Cpu, ChevronDown, ChevronUp, CheckCircle2, Circle, Trophy } from 'lucide-react'
+import { ArrowLeft, Users, Monitor, Utensils, TrendingUp, Loader2, Edit2, Check, X, Edit, UtensilsCrossed, Heart, Cpu, ChevronDown, ChevronUp, CheckCircle2, Circle, Trophy, Trash2 } from 'lucide-react'
 import { Session, Guest, MenuItem, MealType, Game, GameLibraryItem, HardwareOverride, Product } from '@/types/database.types'
 import { HardwareItem } from '@/types/hardware.types'
 import { formatDate, formatDateOnly } from '@/lib/utils'
@@ -101,6 +101,34 @@ export default function EventDetailPage() {
   const [tips, setTips] = useState<Record<string, { amount: number; percentage: number | null }>>({})
   const [hwPrepared, setHwPrepared] = useState<Record<string, string>>({})
   const [gamesPrepared, setGamesPrepared] = useState<Record<string, string>>({})
+  const [deletingGuestId, setDeletingGuestId] = useState<string | null>(null)
+
+  const handleDeleteGuest = async (guestId: string, guestName: string) => {
+    if (!confirm(`Opravdu chcete smazat účastníka "${guestName}" z akce? Budou smazány všechny jeho rezervace, spotřeba a další data.`)) {
+      return
+    }
+    setDeletingGuestId(guestId)
+    try {
+      const token = localStorage.getItem('admin_token')
+      const res = await fetch(`/api/admin/sessions/${sessionId}/guests/${guestId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        alert(`Účastník "${guestName}" byl smazán.\nSmazáno: HW rezervace: ${data.deleted.hardware_reservations}, místa: ${data.deleted.seat_reservations}, hry: ${data.deleted.game_install_requests}, spotřeba: ${data.deleted.consumption}, jídla: ${data.deleted.menu_selections}, dýška: ${data.deleted.tips}`)
+        await fetchEventData()
+      } else {
+        const errData = await res.json()
+        alert(`Chyba: ${errData.error || 'Nepodařilo se smazat účastníka'}`)
+      }
+    } catch (err) {
+      console.error('Error deleting guest:', err)
+      alert('Chyba při mazání účastníka')
+    } finally {
+      setDeletingGuestId(null)
+    }
+  }
 
   useEffect(() => {
     const token = localStorage.getItem('admin_token')
@@ -1264,6 +1292,7 @@ export default function EventDetailPage() {
                   {showFinances && <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase text-red-600 font-bold">Celkem</th>}
                   {showFinances && <th className="px-4 py-3 text-left text-xs font-medium text-emerald-600 uppercase">💰 Záloha</th>}
                   {showFinances && <th className="px-4 py-3 text-left text-xs font-medium text-orange-600 uppercase">Zbývá</th>}
+                  {showEdit && <th className="px-4 py-3 text-center text-xs font-medium text-gray-400 uppercase"></th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -1367,6 +1396,21 @@ export default function EventDetailPage() {
                                 </span>
                               )
                             })()}
+                          </td>
+                        )}
+                        {showEdit && (
+                          <td className="px-4 py-3 text-center">
+                            <button
+                              onClick={() => handleDeleteGuest(guest.id, guest.name)}
+                              disabled={deletingGuestId === guest.id}
+                              title={`Smazat účastníka ${guest.name}`}
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+                            >
+                              {deletingGuestId === guest.id
+                                ? <Loader2 className="w-4 h-4 animate-spin" />
+                                : <Trash2 className="w-4 h-4" />
+                              }
+                            </button>
                           </td>
                         )}
                       </tr>

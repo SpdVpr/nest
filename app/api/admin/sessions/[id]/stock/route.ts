@@ -11,6 +11,21 @@ export async function GET(
     const db = getFirebaseAdminDb()
     const { id: sessionId } = await params
 
+    // Fetch actual consumption from the consumption collection
+    const consumptionSnapshot = await db.collection('consumption')
+      .where('session_id', '==', sessionId)
+      .get()
+
+    // Build a map of product_id → total consumed quantity
+    const consumptionMap: Record<string, number> = {}
+    consumptionSnapshot.docs.forEach(doc => {
+      const data = doc.data()
+      const pid = data.product_id
+      if (pid) {
+        consumptionMap[pid] = (consumptionMap[pid] || 0) + (data.quantity || 0)
+      }
+    })
+
     // Get session stock for this session
     const stockSnapshot = await db.collection('session_stock')
       .where('session_id', '==', sessionId)
@@ -49,11 +64,13 @@ export async function GET(
             const data = doc.data()
             const productDoc = await db.collection('products').doc(data.product_id).get()
             const productData = productDoc.exists ? productDoc.data() : null
+            const realConsumed = consumptionMap[data.product_id] || 0
 
             return {
               id: doc.id,
               ...data,
-              remaining_quantity: data.initial_quantity - data.consumed_quantity,
+              consumed_quantity: realConsumed,
+              remaining_quantity: data.initial_quantity - realConsumed,
               created_at: data.created_at?.toDate?.()?.toISOString() || data.created_at,
               updated_at: data.updated_at?.toDate?.()?.toISOString() || data.updated_at,
               products: productData ? {
@@ -94,10 +111,13 @@ export async function GET(
           return null
         }
 
+        const realConsumed = consumptionMap[data.product_id] || 0
+
         return {
           id: doc.id,
           ...data,
-          remaining_quantity: data.initial_quantity - data.consumed_quantity,
+          consumed_quantity: realConsumed,
+          remaining_quantity: data.initial_quantity - realConsumed,
           created_at: data.created_at?.toDate?.()?.toISOString() || data.created_at,
           updated_at: data.updated_at?.toDate?.()?.toISOString() || data.updated_at,
           products: {
