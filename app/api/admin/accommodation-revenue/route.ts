@@ -22,25 +22,32 @@ export async function GET(request: NextRequest) {
       .where('is_active', '==', true)
       .get()
 
-    // For each guest, get their session to find price_per_night
-    let totalRevenue = 0
+    // Batch-fetch all unique sessions at once (eliminates N+1)
+    const sessionIds = new Set<string>()
+    guestsSnapshot.docs.forEach(doc => {
+      const sid = doc.data().session_id
+      if (sid) sessionIds.add(sid)
+    })
 
-    await Promise.all(
-      guestsSnapshot.docs.map(async (guestDoc) => {
-        const guestData = guestDoc.data()
-        const sessionId = guestData.session_id
-        const nightsCount = guestData.nights_count || 1
-
-        if (sessionId) {
-          const sessionDoc = await db.collection('sessions').doc(sessionId).get()
-          if (sessionDoc.exists) {
-            const sessionData = sessionDoc.data()
-            const pricePerNight = sessionData?.price_per_night || 0
-            totalRevenue += nightsCount * pricePerNight
-          }
+    const sessionsMap = new Map<string, number>() // session_id -> price_per_night
+    if (sessionIds.size > 0) {
+      const sessionRefs = Array.from(sessionIds).map(id => db.collection('sessions').doc(id))
+      const sessionDocs = await db.getAll(...sessionRefs)
+      sessionDocs.forEach(doc => {
+        if (doc.exists) {
+          sessionsMap.set(doc.id, doc.data()?.price_per_night || 0)
         }
       })
-    )
+    }
+
+    // Calculate total revenue using cached session data
+    let totalRevenue = 0
+    guestsSnapshot.docs.forEach(doc => {
+      const guestData = doc.data()
+      const nightsCount = guestData.nights_count || 1
+      const pricePerNight = sessionsMap.get(guestData.session_id) || 0
+      totalRevenue += nightsCount * pricePerNight
+    })
 
     return NextResponse.json({ totalRevenue })
   } catch (error) {

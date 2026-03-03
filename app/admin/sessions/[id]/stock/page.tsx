@@ -171,28 +171,39 @@ export default function SessionStockPage() {
             </div>
           ) : (
             <div className="divide-y divide-gray-200">
-              {stock.map((item) => (
-                <div key={item.id} className="p-6 hover:bg-gray-50">
-                  <div className="flex items-start gap-4">
-                    {item.products.image_url && (
-                      <img
-                        src={item.products.image_url}
-                        alt={item.products.name}
-                        className="w-16 h-16 object-cover rounded-lg"
-                      />
-                    )}
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900">{item.products.name}</h3>
-                      <p className="text-sm text-gray-600 mt-1">{item.products.category}</p>
-                      <p className="text-sm text-purple-600 font-medium mt-1">{item.products.price} Kč</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-gray-600">Spotřebováno</p>
-                      <p className="text-2xl font-bold text-orange-600 mt-1">{item.consumed_quantity}×</p>
+              {stock
+                .slice()
+                .sort((a, b) => {
+                  // Items with consumption first
+                  if (a.consumed_quantity > 0 && b.consumed_quantity === 0) return -1
+                  if (a.consumed_quantity === 0 && b.consumed_quantity > 0) return 1
+                  // Among consumed items, sort by consumed quantity desc
+                  if (a.consumed_quantity !== b.consumed_quantity) return b.consumed_quantity - a.consumed_quantity
+                  // Then alphabetically
+                  return a.products.name.localeCompare(b.products.name)
+                })
+                .map((item) => (
+                  <div key={item.id} className="p-6 hover:bg-gray-50">
+                    <div className="flex items-start gap-4">
+                      {item.products.image_url && (
+                        <img
+                          src={item.products.image_url}
+                          alt={item.products.name}
+                          className="w-16 h-16 object-cover rounded-lg"
+                        />
+                      )}
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-gray-900">{item.products.name}</h3>
+                        <p className="text-sm text-gray-600 mt-1">{item.products.category}</p>
+                        <p className="text-sm text-purple-600 font-medium mt-1">{item.products.price} Kč</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-gray-600">Spotřebováno</p>
+                        <p className="text-2xl font-bold text-orange-600 mt-1">{item.consumed_quantity}×</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
             </div>
           )}
         </div>

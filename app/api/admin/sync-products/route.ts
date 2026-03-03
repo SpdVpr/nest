@@ -22,14 +22,28 @@ export async function POST(request: NextRequest) {
       .where('is_available', '==', true)
       .get()
 
-    // Get all sessions
+    // Get all sessions that haven't ended yet (upcoming/ongoing only)
     const sessionsSnapshot = await db.collection('sessions').get()
+    const now = new Date()
+    now.setHours(0, 0, 0, 0)
+
+    const upcomingSessions = sessionsSnapshot.docs.filter(doc => {
+      const data = doc.data()
+      const endDate = data.end_date?.toDate?.() || (data.end_date ? new Date(data.end_date) : null)
+      const startDate = data.start_date?.toDate?.() || (data.start_date ? new Date(data.start_date) : null)
+      // Keep if end_date is today or in the future
+      if (endDate) return endDate >= now
+      // If no end_date, keep if start_date is today or in the future
+      if (startDate) return startDate >= now
+      // If no dates at all, include it
+      return true
+    })
 
     let syncedCount = 0
-    const now = Timestamp.now()
+    const timestamp = Timestamp.now()
 
-    // For each session, add missing products to session_stock
-    for (const sessionDoc of sessionsSnapshot.docs) {
+    // For each upcoming session, add missing products to session_stock
+    for (const sessionDoc of upcomingSessions) {
       const sessionId = sessionDoc.id
 
       // Get existing stock for this session
@@ -51,8 +65,8 @@ export async function POST(request: NextRequest) {
             product_id: productDoc.id,
             initial_quantity: 0,
             consumed_quantity: 0,
-            created_at: now,
-            updated_at: now,
+            created_at: timestamp,
+            updated_at: timestamp,
           })
           syncedCount++
         }

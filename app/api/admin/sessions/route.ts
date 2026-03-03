@@ -17,11 +17,14 @@ export async function GET(request: NextRequest) {
     }
 
     const db = getFirebaseAdminDb()
-    const snapshot = await db.collection('sessions')
-      .orderBy('start_date', 'desc')
-      .get()
 
-    const sessions: Session[] = snapshot.docs.map(doc => ({
+    // Fetch sessions and all active guests in parallel
+    const [sessionsSnapshot, allGuestsSnapshot] = await Promise.all([
+      db.collection('sessions').orderBy('start_date', 'desc').get(),
+      db.collection('guests').where('is_active', '==', true).get(),
+    ])
+
+    const sessions: Session[] = sessionsSnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data(),
       created_at: doc.data().created_at?.toDate().toISOString() || new Date().toISOString(),
@@ -29,15 +32,15 @@ export async function GET(request: NextRequest) {
       end_date: doc.data().end_date?.toDate().toISOString() || null,
     } as Session))
 
-    // Fetch guest counts for each session
+    // Count guests per session in memory (eliminates N+1)
     const guestCounts: Record<string, number> = {}
-    await Promise.all(sessions.map(async (s) => {
-      const guestsSnap = await db.collection('guests')
-        .where('session_id', '==', s.id)
-        .where('is_active', '==', true)
-        .get()
-      guestCounts[s.id] = guestsSnap.size
-    }))
+    sessions.forEach(s => { guestCounts[s.id] = 0 })
+    allGuestsSnapshot.docs.forEach(doc => {
+      const sid = doc.data().session_id
+      if (sid in guestCounts) {
+        guestCounts[sid]++
+      }
+    })
 
     return NextResponse.json({ sessions, guest_counts: guestCounts })
   } catch (error) {
@@ -56,7 +59,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { name, start_date, end_date, start_time, end_time, description, status, menu_enabled, hardware_pricing_enabled, hardware_enabled, seats_enabled, hardware_overrides, surcharge_enabled } = await request.json()
+    const { name, start_date, end_date, start_time, end_time, description, status, menu_enabled, hardware_pricing_enabled, hardware_enabled, seats_enabled, hardware_overrides, surcharge_enabled, price_per_night } = await request.json()
 
     if (!name) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 })
@@ -96,7 +99,7 @@ export async function POST(request: NextRequest) {
       end_date: end_date ? Timestamp.fromDate(new Date(end_date)) : null,
       status: status || 'upcoming',
       description: description || null,
-      price_per_night: 0,
+      price_per_night: (typeof price_per_night === 'number' && price_per_night >= 0) ? price_per_night : 0,
       created_at: now,
     }
 

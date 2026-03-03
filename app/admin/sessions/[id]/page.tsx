@@ -288,108 +288,33 @@ export default function EventDetailPage() {
       setLoading(true)
       const token = localStorage.getItem('admin_token')
 
-      // Fetch session
-      const sessionRes = await fetch(`/api/admin/sessions/${sessionId}`, {
+      // Single consolidated API call instead of 10+ separate requests
+      const res = await fetch(`/api/admin/sessions/${sessionId}/full`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
-      if (sessionRes.ok) {
-        const data = await sessionRes.json()
-        setSession(data.session)
-        setNewPrice((data.session?.price_per_night || 0).toString())
 
-        // Use slug to fetch guests
-        const sessionSlug = data.session?.slug || sessionId
-        const guestsRes = await fetch(`/api/event/${sessionSlug}/guests`)
-        if (guestsRes.ok) {
-          const guestsData = await guestsRes.json()
-          setGuests(guestsData.guests || [])
-        }
+      if (!res.ok) {
+        console.error('Failed to fetch session data:', res.status)
+        return
       }
 
-      // Fetch hardware items
-      const itemsRes = await fetch('/api/hardware/items')
-      if (itemsRes.ok) {
-        const data = await itemsRes.json()
-        setHardwareItems(data.items || [])
-      }
+      const data = await res.json()
 
-      // Fetch hardware reservations for this session
-      const reservRes = await fetch(`/api/admin/sessions/${sessionId}/reservations`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      if (reservRes.ok) {
-        const data = await reservRes.json()
-        setReservations(data.reservations || [])
-      }
-
-      // Fetch consumption for this session
-      const consumRes = await fetch(`/api/admin/sessions/${sessionId}/consumption`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      if (consumRes.ok) {
-        const data = await consumRes.json()
-        setConsumption(data.consumption || [])
-      }
-
-      // Fetch games for this session
-      const gamesRes = await fetch(`/api/admin/sessions/${sessionId}/games`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      if (gamesRes.ok) {
-        const data = await gamesRes.json()
-        setGames(data.games || [])
-      }
-
-      // Fetch menu items for this session
-      const menuRes = await fetch(`/api/admin/sessions/${sessionId}/menu`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      if (menuRes.ok) {
-        const data = await menuRes.json()
-        setMenuItems(data.items || [])
-        setMenuEnabled(data.enabled || false)
-      }
-
-      // Fetch global game library
-      const libraryRes = await fetch('/api/admin/games', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      if (libraryRes.ok) {
-        const data = await libraryRes.json()
-        setLibraryGames((data.games || []).filter((g: GameLibraryItem) => g.is_available))
-      }
-
-      // Fetch game install requests
-      const installRes = await fetch(`/api/game-installs?session_id=${sessionId}`)
-      if (installRes.ok) {
-        const installData = await installRes.json()
-        setGameInstallRequests(installData.requests || [])
-      }
-
-      // Fetch seat reservations for this session
-      const seatsRes = await fetch(`/api/seats/reservations?session_id=${sessionId}`)
-      if (seatsRes.ok) {
-        const seatsData = await seatsRes.json()
-        setSeatReservations(seatsData.reservations || [])
-      }
-
-      // Fetch prepared state
-      const preparedRes = await fetch(`/api/admin/sessions/${sessionId}/prepared`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      if (preparedRes.ok) {
-        const preparedData = await preparedRes.json()
-        setHwPrepared(preparedData.hw_prepared || {})
-        setGamesPrepared(preparedData.games_prepared || {})
-      }
-
-      // Fetch tips for this session (use session slug from state or just-fetched data)
-      const tipSlug = session?.slug || sessionId
-      const tipsRes = await fetch(`/api/event/${tipSlug}/tips`)
-      if (tipsRes.ok) {
-        const tipsData = await tipsRes.json()
-        setTips(tipsData.tips || {})
-      }
+      setSession(data.session)
+      setNewPrice((data.session?.price_per_night || 0).toString())
+      setGuests(data.guests || [])
+      setHardwareItems(data.hardwareItems || [])
+      setReservations(data.reservations || [])
+      setConsumption(data.consumption || [])
+      setGames(data.games || [])
+      setMenuItems(data.menuItems || [])
+      setMenuEnabled(data.menuEnabled || false)
+      setLibraryGames((data.libraryGames || []).filter((g: GameLibraryItem) => g.is_available))
+      setGameInstallRequests(data.gameInstallRequests || [])
+      setSeatReservations(data.seatReservations || [])
+      setTips(data.tips || {})
+      setHwPrepared(data.hwPrepared || {})
+      setGamesPrepared(data.gamesPrepared || {})
     } catch (error) {
       console.error('Error fetching event data:', error)
     } finally {
@@ -446,12 +371,17 @@ export default function EventDetailPage() {
   }
 
   const getGuestHardware = (guestId: string) => {
+    const typeOrder: Record<string, number> = { pc: 0, monitor: 1, accessory: 2 }
     const guestReservations = reservations.filter(r => r.guest_id === guestId)
-    return guestReservations.map(r => ({
-      name: getHardwareName(r.hardware_item_id),
-      quantity: r.quantity || 1,
-      price: r.total_price
-    }))
+    return guestReservations.map(r => {
+      const hw = hardwareItems.find(h => h.id === r.hardware_item_id)
+      return {
+        name: hw?.name || 'Neznámý HW',
+        type: hw?.type || 'accessory',
+        quantity: r.quantity || 1,
+        price: r.total_price
+      }
+    }).sort((a, b) => (typeOrder[a.type] ?? 9) - (typeOrder[b.type] ?? 9))
   }
 
   const getTotalHardwareByGuest = (guestId: string) => {
@@ -1288,10 +1218,10 @@ export default function EventDetailPage() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">HW</th>
                   {showFinances && <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">HW (Kč)</th>}
                   {showFinances && <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Jídlo (Kč)</th>}
-                  {showFinances && <th className="px-4 py-3 text-left text-xs font-medium text-pink-500 uppercase">💖 Dýško</th>}
-                  {showFinances && <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase text-red-600 font-bold">Celkem</th>}
+                  {showFinances && <th className="px-4 py-3 text-left text-xs font-medium text-purple-500 uppercase">💖 Dýško</th>}
+                  {showFinances && <th className="px-4 py-3 text-left text-xs font-medium text-blue-600 uppercase font-bold">Celkem</th>}
                   {showFinances && <th className="px-4 py-3 text-left text-xs font-medium text-emerald-600 uppercase">💰 Záloha</th>}
-                  {showFinances && <th className="px-4 py-3 text-left text-xs font-medium text-orange-600 uppercase">Zbývá</th>}
+                  {showFinances && <th className="px-4 py-3 text-left text-xs font-medium text-teal-600 uppercase">Zbývá</th>}
                   {showEdit && <th className="px-4 py-3 text-center text-xs font-medium text-gray-400 uppercase"></th>}
                 </tr>
               </thead>
@@ -1347,11 +1277,11 @@ export default function EventDetailPage() {
                         {showFinances && (
                           <td className="px-4 py-3 text-sm font-medium">
                             {getTipByGuest(guest.id) > 0 ? (
-                              <span className="inline-flex items-center gap-1 text-pink-600 font-semibold">
-                                <Heart className="w-3.5 h-3.5 fill-pink-500" />
+                              <span className="inline-flex items-center gap-1 text-purple-600 font-semibold">
+                                <Heart className="w-3.5 h-3.5 fill-purple-500" />
                                 {getTipByGuest(guest.id)} Kč
                                 {tips[guest.id]?.percentage && (
-                                  <span className="text-xs text-pink-400">({tips[guest.id].percentage}%)</span>
+                                  <span className="text-xs text-purple-400">({tips[guest.id].percentage}%)</span>
                                 )}
                               </span>
                             ) : (
@@ -1359,7 +1289,7 @@ export default function EventDetailPage() {
                             )}
                           </td>
                         )}
-                        {showFinances && <td className="px-4 py-3 font-bold text-red-600">{totalPrice} Kč</td>}
+                        {showFinances && <td className="px-4 py-3 font-bold text-blue-600">{totalPrice} Kč</td>}
                         {showFinances && (
                           <td className="px-4 py-3">
                             <input
@@ -1391,7 +1321,7 @@ export default function EventDetailPage() {
                             {(() => {
                               const remaining = totalPrice - ((guest as any).deposit || 0)
                               return (
-                                <span className={remaining <= 0 ? 'text-green-600' : 'text-orange-600'}>
+                                <span className={remaining <= 0 ? 'text-green-600' : 'text-teal-600'}>
                                   {remaining <= 0 ? '✅ 0' : remaining} Kč
                                 </span>
                               )

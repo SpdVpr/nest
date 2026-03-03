@@ -20,36 +20,43 @@ export async function GET(request: NextRequest) {
     // Get all consumption records
     const consumptionSnapshot = await db.collection('consumption').get()
 
-    // Fetch product details for each consumption record
-    const records = await Promise.all(
-      consumptionSnapshot.docs.map(async (doc) => {
-        const data = doc.data()
+    // Batch-fetch all unique products at once (eliminates N+1)
+    const productIds = new Set<string>()
+    consumptionSnapshot.docs.forEach(doc => {
+      const pid = doc.data().product_id
+      if (pid) productIds.add(pid)
+    })
 
-        // Fetch product details
-        let product = null
-        if (data.product_id) {
-          const productDoc = await db.collection('products').doc(data.product_id).get()
-          if (productDoc.exists) {
-            product = {
-              id: productDoc.id,
-              name: productDoc.data()?.name,
-              price: productDoc.data()?.price,
-              category: productDoc.data()?.category,
-            }
-          }
-        }
-
-        return {
-          id: doc.id,
-          guest_id: data.guest_id,
-          product_id: data.product_id,
-          quantity: data.quantity,
-          session_id: data.session_id,
-          consumed_at: data.consumed_at?.toDate?.()?.toISOString() || data.consumed_at,
-          products: product,
+    const productsMap = new Map<string, any>()
+    if (productIds.size > 0) {
+      // Firestore getAll supports up to 500 docs per batch
+      const productRefs = Array.from(productIds).map(id => db.collection('products').doc(id))
+      const productDocs = await db.getAll(...productRefs)
+      productDocs.forEach(doc => {
+        if (doc.exists) {
+          productsMap.set(doc.id, {
+            id: doc.id,
+            name: doc.data()?.name,
+            price: doc.data()?.price,
+            category: doc.data()?.category,
+          })
         }
       })
-    )
+    }
+
+    // Map records with product lookups from cache
+    const records = consumptionSnapshot.docs.map(doc => {
+      const data = doc.data()
+      return {
+        id: doc.id,
+        guest_id: data.guest_id,
+        product_id: data.product_id,
+        quantity: data.quantity,
+        session_id: data.session_id,
+        consumed_at: data.consumed_at?.toDate?.()?.toISOString() || data.consumed_at,
+        products: data.product_id ? productsMap.get(data.product_id) || null : null,
+      }
+    })
 
     // Sort by consumed_at descending
     records.sort((a, b) => {

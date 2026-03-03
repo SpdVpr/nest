@@ -596,6 +596,25 @@ export default function CostsPage() {
                                                                             <span className="font-semibold text-[var(--nest-text-primary)] font-mono">{bankSettings.bank_account}</span>
                                                                         </div>
                                                                     )}
+                                                                    {bankSettings?.bank_iban && (
+                                                                        <div className="flex items-center justify-between text-sm">
+                                                                            <span className="text-[var(--nest-text-secondary)]">IBAN:</span>
+                                                                            <div className="flex items-center gap-1.5">
+                                                                                <span className="font-semibold text-[var(--nest-text-primary)] font-mono text-xs">{bankSettings.bank_iban}</span>
+                                                                                <button
+                                                                                    onClick={() => copyToClipboard(bankSettings.bank_iban, 'iban')}
+                                                                                    className="text-[var(--nest-text-tertiary)] hover:text-blue-400 transition-colors p-0.5"
+                                                                                    title="Kopírovat IBAN"
+                                                                                >
+                                                                                    {copiedVS === 'iban' ? (
+                                                                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                                                                                    ) : (
+                                                                                        <Copy className="w-3.5 h-3.5" />
+                                                                                    )}
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
                                                                     {guest.settlement.variable_symbol && (
                                                                         <div className="flex items-center justify-between text-sm">
                                                                             <span className="text-[var(--nest-text-secondary)]">VS:</span>

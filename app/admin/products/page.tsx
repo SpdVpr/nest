@@ -263,7 +263,7 @@ export default function AdminProductsPage() {
               ) : (
                 <>
                   <Upload className="w-4 h-4" />
-                  Přidat ke všem eventům
+                  Přidat ke všem nadcházejícím eventům
                 </>
               )}
             </button>

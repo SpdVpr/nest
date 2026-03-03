@@ -26,31 +26,37 @@ export async function GET(
       .where('session_id', '==', sessionId)
       .get()
 
-    // Fetch product details for each consumption record
-    const consumption = await Promise.all(
-      consumptionSnapshot.docs.map(async (doc) => {
-        const data = doc.data()
+    // Batch-fetch all unique products at once (eliminates N+1)
+    const productIds = new Set<string>()
+    consumptionSnapshot.docs.forEach(doc => {
+      const pid = doc.data().product_id
+      if (pid) productIds.add(pid)
+    })
 
-        // Fetch product details
-        let product = null
-        if (data.product_id) {
-          const productDoc = await db.collection('products').doc(data.product_id).get()
-          if (productDoc.exists) {
-            product = {
-              name: productDoc.data()?.name,
-              price: productDoc.data()?.price,
-            }
-          }
-        }
-
-        return {
-          id: doc.id,
-          ...data,
-          consumed_at: data.consumed_at?.toDate?.()?.toISOString() || data.consumed_at,
-          products: product,
+    const productsMap = new Map<string, any>()
+    if (productIds.size > 0) {
+      const productRefs = Array.from(productIds).map(id => db.collection('products').doc(id))
+      const productDocs = await db.getAll(...productRefs)
+      productDocs.forEach(doc => {
+        if (doc.exists) {
+          productsMap.set(doc.id, {
+            name: doc.data()?.name,
+            price: doc.data()?.price,
+          })
         }
       })
-    )
+    }
+
+    // Map records with product lookups from cache
+    const consumption = consumptionSnapshot.docs.map(doc => {
+      const data = doc.data()
+      return {
+        id: doc.id,
+        ...data,
+        consumed_at: data.consumed_at?.toDate?.()?.toISOString() || data.consumed_at,
+        products: data.product_id ? productsMap.get(data.product_id) || null : null,
+      }
+    })
 
     // Sort by consumed_at descending
     consumption.sort((a, b) => {
