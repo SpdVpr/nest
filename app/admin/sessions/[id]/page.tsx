@@ -78,6 +78,8 @@ export default function EventDetailPage() {
   const [editEventDescription, setEditEventDescription] = useState('')
   const [editPricePerNight, setEditPricePerNight] = useState('')
   const [editSurchargeEnabled, setEditSurchargeEnabled] = useState(false)
+  const [editAccessPassword, setEditAccessPassword] = useState('')
+  const [editPasswordError, setEditPasswordError] = useState('')
   const [savingEvent, setSavingEvent] = useState(false)
   // Hardware edit state
   const [editHwPricingEnabled, setEditHwPricingEnabled] = useState(true)
@@ -158,6 +160,8 @@ export default function EventDetailPage() {
     setEditEventDescription(sessionToEdit.description || '')
     setEditPricePerNight((sessionToEdit.price_per_night || 0).toString())
     setEditSurchargeEnabled((sessionToEdit as any).surcharge_enabled || false)
+    setEditAccessPassword((sessionToEdit as any).access_password || '')
+    setEditPasswordError('')
     // Load HW settings
     setEditHwPricingEnabled(sessionToEdit.hardware_pricing_enabled !== false)
     setEditHwEnabled((sessionToEdit as any).hardware_enabled !== false)
@@ -248,6 +252,7 @@ export default function EventDetailPage() {
       eventData.seats_enabled = editSeatsEnabled
       eventData.hardware_overrides = editHwOverrides
       eventData.top_products = editTopProducts
+      eventData.access_password = editAccessPassword.trim() || null
 
       const response = await fetch(`/api/admin/sessions/${sessionId}`, {
         method: 'PATCH',
@@ -258,7 +263,15 @@ export default function EventDetailPage() {
         body: JSON.stringify(eventData),
       })
 
-      if (!response.ok) throw new Error('Failed to update session')
+      if (!response.ok) {
+        const errorData = await response.json()
+        if (response.status === 409) {
+          setEditPasswordError(errorData.error)
+          setSavingEvent(false)
+          return
+        }
+        throw new Error('Failed to update session')
+      }
 
       setEditingEvent(false)
       fetchEventData()
@@ -280,6 +293,8 @@ export default function EventDetailPage() {
     setEditEventDescription('')
     setEditPricePerNight('')
     setEditSurchargeEnabled(false)
+    setEditAccessPassword('')
+    setEditPasswordError('')
     router.push(`/admin/sessions/${sessionId}`)
   }
 
@@ -764,6 +779,27 @@ export default function EventDetailPage() {
                   className="w-full px-4 py-2 rounded-lg"
                   style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--nest-text-secondary)' }}>🔑 Přístupové heslo</label>
+                <input
+                  type="text"
+                  value={editAccessPassword}
+                  onChange={(e) => {
+                    setEditAccessPassword(e.target.value)
+                    setEditPasswordError('')
+                  }}
+                  placeholder="např. nestlan25"
+                  className="w-full px-4 py-2 rounded-lg"
+                  style={{ backgroundColor: 'var(--nest-bg)', border: `1px solid ${editPasswordError ? '#f87171' : 'var(--nest-border)'}`, color: 'var(--nest-text-primary)' }}
+                />
+                {editPasswordError && (
+                  <p className="text-xs mt-1 font-medium" style={{ color: '#f87171' }}>❌ {editPasswordError}</p>
+                )}
+                <p className="text-xs mt-1" style={{ color: 'var(--nest-text-tertiary)' }}>
+                  Hosté zadají toto heslo na hlavní stránce a budou přesměrováni na tento event.
+                </p>
               </div>
 
               {/* Surcharge toggle */}
