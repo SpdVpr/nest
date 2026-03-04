@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Plus, Minus, Trophy, Beer, Filter } from 'lucide-react'
+import { Plus, Minus, Trophy, Beer, Filter, Clock, CalendarOff } from 'lucide-react'
 import { Session, Guest, Product } from '@/types/database.types'
 import { formatDate } from '@/lib/utils'
 import NestPage from '@/components/NestPage'
@@ -223,6 +223,29 @@ export default function EventSnacksPage() {
     .sort((a, b) => b.totalBeers - a.totalBeers)
     .slice(0, 3)
 
+  // Check if event is currently active (today is within start_date..end_date)
+  const isEventActive = (() => {
+    if (!session) return false
+    const now = new Date()
+    // Use local date only (no time comparison)
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+
+    const start = new Date(session.start_date)
+    const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate())
+
+    if (today < startDay) return false // event hasn't started
+
+    if (session.end_date) {
+      const end = new Date(session.end_date)
+      const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate())
+      if (today > endDay) return false // event already ended
+    } else {
+      // No end_date = single-day event
+      if (today > startDay) return false
+    }
+    return true
+  })()
+
   if (loading) {
     return <NestLoading message="Načítám občerstvení..." />
   }
@@ -234,6 +257,33 @@ export default function EventSnacksPage() {
 
         <div className="flex-1 overflow-auto">
           <div className="max-w-7xl mx-auto w-full px-4 md:px-6 py-6">
+
+            {/* Event not active banner */}
+            {!isEventActive && session && (
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-6 mb-6 text-center">
+                <div className="flex justify-center mb-3">
+                  {new Date() < new Date(session.start_date)
+                    ? <Clock className="w-10 h-10 text-amber-400" />
+                    : <CalendarOff className="w-10 h-10 text-amber-400" />
+                  }
+                </div>
+                <h2 className="text-lg font-bold text-amber-400 mb-1">
+                  {new Date() < new Date(session.start_date)
+                    ? 'Akce ještě nezačala'
+                    : 'Akce už skončila'
+                  }
+                </h2>
+                <p className="text-sm text-[var(--nest-text-secondary)]">
+                  {new Date() < new Date(session.start_date)
+                    ? `Občerstvení bude dostupné od ${formatDate(session.start_date)}${session.end_date ? ` do ${formatDate(session.end_date)}` : ''}.`
+                    : 'Občerstvení již není možné objednávat.'
+                  }
+                </p>
+                <p className="text-xs text-[var(--nest-text-tertiary)] mt-2">
+                  Evidenci konzumace lze provádět pouze v průběhu akce.
+                </p>
+              </div>
+            )}
             {guests.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-[var(--nest-white-60)] text-sm mb-4">Zatím nejsou žádní hosté</p>
@@ -444,15 +494,17 @@ export default function EventSnacksPage() {
                                     </div>
                                     <div className="flex items-center gap-1 flex-shrink-0">
                                       <button
-                                        onClick={() => handleDeleteProduct(grouped.ids[grouped.ids.length - 1])}
-                                        className="w-7 h-7 flex items-center justify-center rounded-full bg-[var(--nest-error)]/15 text-[var(--nest-error)] hover:bg-[var(--nest-error)]/25 transition-colors"
+                                        onClick={() => isEventActive && handleDeleteProduct(grouped.ids[grouped.ids.length - 1])}
+                                        disabled={!isEventActive}
+                                        className="w-7 h-7 flex items-center justify-center rounded-full bg-[var(--nest-error)]/15 text-[var(--nest-error)] hover:bg-[var(--nest-error)]/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                       >
                                         <Minus className="w-4 h-4" />
                                       </button>
                                       <span className="w-8 text-center font-bold">{grouped.totalQuantity}</span>
                                       <button
-                                        onClick={() => handleAddProduct(grouped.products.id)}
-                                        className="w-7 h-7 flex items-center justify-center rounded-full bg-[var(--nest-success)]/15 text-[var(--nest-success)] hover:bg-[var(--nest-success)]/25 transition-colors"
+                                        onClick={() => isEventActive && handleAddProduct(grouped.products.id)}
+                                        disabled={!isEventActive}
+                                        className="w-7 h-7 flex items-center justify-center rounded-full bg-[var(--nest-success)]/15 text-[var(--nest-success)] hover:bg-[var(--nest-success)]/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                       >
                                         <Plus className="w-4 h-4" />
                                       </button>
@@ -499,8 +551,9 @@ export default function EventSnacksPage() {
                         const renderProductCard = (product: Product) => (
                           <button
                             key={product.id}
-                            onClick={() => handleAddProduct(product.id)}
-                            className={`relative rounded-xl p-4 text-center transition-all transform hover:scale-105 active:scale-95 ${justAdded === product.id
+                            onClick={() => isEventActive && handleAddProduct(product.id)}
+                            disabled={!isEventActive}
+                            className={`relative rounded-xl p-4 text-center transition-all transform ${!isEventActive ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'} ${justAdded === product.id
                               ? 'bg-[var(--nest-success)] text-[var(--nest-dark)] shadow-xl scale-105'
                               : 'nest-card hover:border-[var(--nest-yellow)]/30'
                               }`}

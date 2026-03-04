@@ -314,6 +314,12 @@ export default function AdminDashboard() {
                     const isPast = endDate ? endDate < now : (startDate ? startDate < now : false)
                     return eventFilter === 'upcoming' ? !isPast : isPast
                   })
+                  .sort((a, b) => {
+                    const dateA = new Date(a.start_date).getTime()
+                    const dateB = new Date(b.start_date).getTime()
+                    // Upcoming: nearest first (ascending). Past: most recent first (descending).
+                    return eventFilter === 'upcoming' ? dateA - dateB : dateB - dateA
+                  })
                   .map((session) => (
                     <Link
                       key={session.id}
@@ -363,6 +369,11 @@ export default function AdminDashboard() {
                         const startDate = session.start_date ? new Date(session.start_date) : null
                         const isPast = endDate ? endDate < now : (startDate ? startDate < now : false)
                         return eventFilter === 'upcoming' ? !isPast : isPast
+                      })
+                      .sort((a, b) => {
+                        const dateA = new Date(a.start_date).getTime()
+                        const dateB = new Date(b.start_date).getTime()
+                        return eventFilter === 'upcoming' ? dateA - dateB : dateB - dateA
                       })
                       .map((session) => (
                         <tr key={session.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => router.push(`/admin/sessions/${session.id}`)}>

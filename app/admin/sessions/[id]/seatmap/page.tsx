@@ -44,6 +44,11 @@ interface GameInstallRequest {
     game_names: string[]
 }
 
+interface GameLibraryItem {
+    id: string
+    name: string
+}
+
 const ALL_SEATS = [
     'A1', 'A2', 'A3', 'A4', 'A5', 'A6',
     'B1', 'B2', 'B3', 'B4', 'B5', 'B6',
@@ -66,6 +71,7 @@ export default function AdminSeatMapPage() {
     const [hardwareItems, setHardwareItems] = useState<HardwareItem[]>([])
     const [hardwareReservations, setHardwareReservations] = useState<HardwareReservation[]>([])
     const [gameInstallRequests, setGameInstallRequests] = useState<GameInstallRequest[]>([])
+    const [libraryGames, setLibraryGames] = useState<GameLibraryItem[]>([])
     const [loading, setLoading] = useState(true)
     const [selectedSeat, setSelectedSeat] = useState<string | null>(null)
     const [hwPrepared, setHwPrepared] = useState<Record<string, string>>({})
@@ -157,6 +163,13 @@ export default function AdminSeatMapPage() {
                 setGameInstallRequests(installData.requests || [])
             }
 
+            // Fetch game library (to distinguish custom games)
+            const gameLibRes = await fetch('/api/game-library')
+            if (gameLibRes.ok) {
+                const gameLibData = await gameLibRes.json()
+                setLibraryGames(gameLibData.games || [])
+            }
+
             // Fetch prepared state
             const prepRes = await fetch(`/api/admin/sessions/${sessionId}/prepared`, {
                 headers: { Authorization: `Bearer ${token}` },
@@ -188,6 +201,8 @@ export default function AdminSeatMapPage() {
         const req = gameInstallRequests.find(r => r.guest_id === guestId)
         return req?.game_names || []
     }
+    const libraryGameNames = new Set(libraryGames.map(g => g.name))
+    const isCustomGame = (gameName: string) => !libraryGameNames.has(gameName)
 
     const togglePrepared = async (guestId: string, type: 'hw' | 'games') => {
         const current = type === 'hw' ? hwPrepared : gamesPrepared
@@ -468,8 +483,9 @@ export default function AdminSeatMapPage() {
                             </h4>
                             <div className="flex flex-wrap gap-1.5">
                                 {gameInstalls.map((game, i) => (
-                                    <span key={i} className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ backgroundColor: 'rgba(251,191,36,0.1)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.2)' }}>
-                                        🎮 {game}
+                                    <span key={i} className="text-xs px-2.5 py-1 rounded-full font-medium" style={isCustomGame(game) ? { backgroundColor: 'rgba(16,185,129,0.1)', color: '#34d399', border: '1px solid rgba(16,185,129,0.25)' } : { backgroundColor: 'rgba(251,191,36,0.1)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.2)' }}>
+                                        {isCustomGame(game) ? '✏️' : '🎮'} {game}
+                                        {isCustomGame(game) && <span className="ml-1 opacity-60">(vlastní)</span>}
                                     </span>
                                 ))}
                             </div>
@@ -822,9 +838,11 @@ export default function AdminSeatMapPage() {
                                             {[...allGames].sort().map(game => {
                                                 // Count how many guests want this game
                                                 const requestCount = gameInstallRequests.filter(r => (r.game_names || []).includes(game)).length
+                                                const custom = isCustomGame(game)
                                                 return (
-                                                    <span key={game} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ backgroundColor: 'rgba(251,191,36,0.08)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.2)' }}>
-                                                        🎮 {game}
+                                                    <span key={game} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium" style={custom ? { backgroundColor: 'rgba(16,185,129,0.08)', color: '#34d399', border: '1px solid rgba(16,185,129,0.25)' } : { backgroundColor: 'rgba(251,191,36,0.08)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.2)' }}>
+                                                        {custom ? '✏️' : '🎮'} {game}
+                                                        {custom && <span className="opacity-50">(vlastní)</span>}
                                                         {requestCount > 1 && (
                                                             <span className="text-[10px] opacity-60">({requestCount}×)</span>
                                                         )}

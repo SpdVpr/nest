@@ -77,6 +77,7 @@ export default function EventHardwarePage() {
   const [selectedGameInstalls, setSelectedGameInstalls] = useState<Set<string>>(new Set())
   const [savingGameInstalls, setSavingGameInstalls] = useState(false)
   const [existingGameInstalls, setExistingGameInstalls] = useState<string[]>([])
+  const [customGameName, setCustomGameName] = useState('')
 
   useEffect(() => {
     setMounted(true)
@@ -527,7 +528,37 @@ export default function EventHardwarePage() {
         )
       })()}
 
-
+      {/* Game installs — right below My Reservations */}
+      {
+        selectedGuest && existingGameInstalls.length > 0 && (
+          <div className="nest-card-elevated p-5 mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-bold text-sm flex items-center gap-2 text-[var(--nest-text-primary)]">
+                🎮 Hry k instalaci
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--nest-yellow)]/15 text-[var(--nest-yellow)] font-semibold">
+                  {existingGameInstalls.length}
+                </span>
+              </h3>
+              <button
+                onClick={() => setShowGameInstallPicker(true)}
+                className="text-xs px-3 py-1.5 rounded-lg bg-[var(--nest-yellow)]/10 border border-[var(--nest-yellow)]/20 text-[var(--nest-yellow)] font-medium hover:bg-[var(--nest-yellow)]/20 transition-colors"
+              >
+                Upravit
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {existingGameInstalls.map((name, i) => {
+                const isCustom = !libraryGames.some(g => g.name === name)
+                return (
+                  <span key={i} className={`text-xs px-2.5 py-1 rounded-full font-medium border ${isCustom ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-[var(--nest-yellow)]/10 text-[var(--nest-yellow)] border-[var(--nest-yellow)]/20'}`}>
+                    {isCustom ? '✏️ ' : ''}{name}
+                  </span>
+                )
+              })}
+            </div>
+          </div>
+        )
+      }
 
       {/* Category Selection */}
       <div className="bg-[var(--nest-surface)] rounded-2xl shadow-xl p-6 mb-6">
@@ -847,11 +878,14 @@ export default function EventHardwarePage() {
                                   {guestGames.length > 0 ? (
                                     <>
                                       <span className="text-xs text-[var(--nest-text-tertiary)]">🎮</span>
-                                      {guestGames.map((name, i) => (
-                                        <span key={i} className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--nest-yellow)]/10 text-[var(--nest-yellow)]/80 border border-[var(--nest-yellow)]/15">
-                                          {name}
-                                        </span>
-                                      ))}
+                                      {guestGames.map((name, i) => {
+                                        const isCustom = !libraryGames.some(g => g.name === name)
+                                        return (
+                                          <span key={i} className={`text-[10px] px-1.5 py-0.5 rounded-full border ${isCustom ? 'bg-emerald-500/10 text-emerald-400/80 border-emerald-500/15' : 'bg-[var(--nest-yellow)]/10 text-[var(--nest-yellow)]/80 border-[var(--nest-yellow)]/15'}`}>
+                                            {isCustom ? '✏️ ' : ''}{name}
+                                          </span>
+                                        )
+                                      })}
                                     </>
                                   ) : (
                                     <span className="text-[10px] text-[var(--nest-text-tertiary)] italic">🎮 Žádné hry</span>
@@ -954,125 +988,181 @@ export default function EventHardwarePage() {
 
       {/* Game Install Picker Modal */}
       {
-        showGameInstallPicker && selectedGuest && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-[var(--nest-surface)] rounded-2xl shadow-2xl p-6 max-w-lg w-full max-h-[85vh] flex flex-col">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 rounded-xl bg-[var(--nest-yellow)]/10 flex items-center justify-center text-2xl">🎮</div>
-                <div className="flex-1">
-                  <h2 className="text-xl font-bold text-[var(--nest-text-primary)]">Výběr her k instalaci</h2>
-                  <p className="text-sm text-[var(--nest-text-secondary)]">Které hry chceš mít nainstalované na tvém PC?</p>
+        showGameInstallPicker && selectedGuest && (() => {
+          // Determine which selected games are custom (not in library)
+          const libraryGameNames = new Set(libraryGames.map(g => g.name))
+          const customGames = Array.from(selectedGameInstalls).filter(name => !libraryGameNames.has(name))
+
+          const handleAddCustomGame = () => {
+            const trimmed = customGameName.trim()
+            if (!trimmed) return
+            // Check if already exists (library or custom)
+            if (selectedGameInstalls.has(trimmed)) {
+              setCustomGameName('')
+              return
+            }
+            setSelectedGameInstalls(prev => {
+              const next = new Set(prev)
+              next.add(trimmed)
+              return next
+            })
+            setCustomGameName('')
+          }
+
+          return (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <div className="bg-[var(--nest-surface)] rounded-2xl shadow-2xl p-6 max-w-lg w-full max-h-[85vh] flex flex-col">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 rounded-xl bg-[var(--nest-yellow)]/10 flex items-center justify-center text-2xl">🎮</div>
+                  <div className="flex-1">
+                    <h2 className="text-xl font-bold text-[var(--nest-text-primary)]">Výběr her k instalaci</h2>
+                    <p className="text-sm text-[var(--nest-text-secondary)]">Které hry chceš mít nainstalované na tvém PC?</p>
+                  </div>
+                  <button
+                    onClick={() => setShowGameInstallPicker(false)}
+                    className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-[var(--nest-text-secondary)] hover:text-[var(--nest-text-primary)] hover:bg-[var(--nest-surface-alt)] transition-colors"
+                    title="Zavřít"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
-                <button
-                  onClick={() => setShowGameInstallPicker(false)}
-                  className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-[var(--nest-text-secondary)] hover:text-[var(--nest-text-primary)] hover:bg-[var(--nest-surface-alt)] transition-colors"
-                  title="Zavřít"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
 
-              <div className="bg-[var(--nest-yellow)]/10 border border-[var(--nest-yellow)]/20 rounded-lg p-3 mb-4">
-                <p className="text-xs text-[var(--nest-yellow)]">
-                  Vyber hry, které chceš mít připravené na svém PC při příjezdu. Admin je nainstaluje předem.
-                </p>
-              </div>
+                <div className="bg-[var(--nest-yellow)]/10 border border-[var(--nest-yellow)]/20 rounded-lg p-3 mb-4">
+                  <p className="text-xs text-[var(--nest-yellow)]">
+                    Vyber hry, které chceš mít připravené na svém PC při příjezdu. Admin je nainstaluje předem.
+                  </p>
+                </div>
 
-              <div className="flex-1 overflow-y-auto space-y-2 mb-4">
-                {libraryGames.map(game => {
-                  const isSelected = selectedGameInstalls.has(game.name)
-                  return (
-                    <button
-                      key={game.id}
-                      onClick={() => toggleGameInstall(game.name)}
-                      className={`w-full text-left p-3 rounded-xl border-2 transition-all flex items-center gap-3 ${isSelected
-                        ? 'border-[var(--nest-yellow)] bg-[var(--nest-yellow)]/10 shadow-md'
-                        : 'border-[var(--nest-border)] hover:border-[var(--nest-yellow)]/40 hover:bg-[var(--nest-surface-alt)]'
-                        }`}
-                    >
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm flex-shrink-0 ${isSelected
-                        ? 'bg-[var(--nest-yellow)] text-[var(--nest-bg)]'
-                        : 'bg-[var(--nest-bg)] text-[var(--nest-text-tertiary)]'
-                        }`}>
-                        {isSelected ? '✓' : '+'}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={`font-semibold ${isSelected ? 'text-[var(--nest-yellow)]' : 'text-[var(--nest-text-primary)]'}`}>
-                          {game.name}
-                        </p>
-                        <div className="flex gap-2 mt-0.5">
-                          {game.category && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--nest-bg)] text-[var(--nest-text-secondary)]">
-                              {game.category}
-                            </span>
-                          )}
-                          {game.max_players && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--nest-bg)] text-[var(--nest-text-secondary)]">
-                              👥 max {game.max_players}
-                            </span>
-                          )}
+                <div className="flex-1 overflow-y-auto space-y-2 mb-4">
+                  {/* Library games */}
+                  {libraryGames.map(game => {
+                    const isSelected = selectedGameInstalls.has(game.name)
+                    return (
+                      <button
+                        key={game.id}
+                        onClick={() => toggleGameInstall(game.name)}
+                        className={`w-full text-left p-3 rounded-xl border-2 transition-all flex items-center gap-3 ${isSelected
+                          ? 'border-[var(--nest-yellow)] bg-[var(--nest-yellow)]/10 shadow-md'
+                          : 'border-[var(--nest-border)] hover:border-[var(--nest-yellow)]/40 hover:bg-[var(--nest-surface-alt)]'
+                          }`}
+                      >
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm flex-shrink-0 ${isSelected
+                          ? 'bg-[var(--nest-yellow)] text-[var(--nest-bg)]'
+                          : 'bg-[var(--nest-bg)] text-[var(--nest-text-tertiary)]'
+                          }`}>
+                          {isSelected ? '✓' : '+'}
                         </div>
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`font-semibold ${isSelected ? 'text-[var(--nest-yellow)]' : 'text-[var(--nest-text-primary)]'}`}>
+                            {game.name}
+                          </p>
+                          <div className="flex gap-2 mt-0.5">
+                            {game.category && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--nest-bg)] text-[var(--nest-text-secondary)]">
+                                {game.category}
+                              </span>
+                            )}
+                            {game.max_players && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--nest-bg)] text-[var(--nest-text-secondary)]">
+                                👥 max {game.max_players}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    )
+                  })}
 
-              <div className="border-t border-[var(--nest-border)] pt-4 flex items-center justify-between">
-                <p className="text-sm text-[var(--nest-text-secondary)]">
-                  Vybráno: <span className="font-bold text-[var(--nest-yellow)]">{selectedGameInstalls.size}</span> her
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      setShowGameInstallPicker(false)
-                      alert('Rezervace byla vytvořena! Hry můžeš vybrat později.')
-                    }}
-                    className="px-4 py-2.5 text-[var(--nest-text-secondary)] hover:text-[var(--nest-text-primary)] font-medium text-sm"
-                  >
-                    Přeskočit
-                  </button>
-                  <button
-                    onClick={handleSaveGameInstalls}
-                    disabled={savingGameInstalls}
-                    className="px-6 py-2.5 bg-[var(--nest-yellow)] hover:bg-[var(--nest-yellow-dark)] disabled:bg-[var(--nest-border)] text-[var(--nest-bg)] rounded-xl font-semibold text-sm transition-colors"
-                  >
-                    {savingGameInstalls ? 'Ukládám...' : `Potvrdit výběr (${selectedGameInstalls.size})`}
-                  </button>
+                  {/* Custom games that were already added */}
+                  {customGames.length > 0 && (
+                    <>
+                      <div className="flex items-center gap-2 pt-3 pb-1">
+                        <div className="h-px flex-1 bg-[var(--nest-border)]" />
+                        <span className="text-[10px] font-bold text-[var(--nest-text-tertiary)] uppercase tracking-wider">Vlastní hry</span>
+                        <div className="h-px flex-1 bg-[var(--nest-border)]" />
+                      </div>
+                      {customGames.map(gameName => (
+                        <button
+                          key={`custom-${gameName}`}
+                          onClick={() => toggleGameInstall(gameName)}
+                          className="w-full text-left p-3 rounded-xl border-2 transition-all flex items-center gap-3 border-emerald-500/40 bg-emerald-500/10 shadow-md"
+                        >
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm flex-shrink-0 bg-emerald-500 text-white">
+                            ✓
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-emerald-400">
+                              {gameName}
+                            </p>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-900/30 text-emerald-400/80 border border-emerald-500/20">
+                              ✏️ vlastní hra
+                            </span>
+                          </div>
+                          <X className="w-4 h-4 text-emerald-400/60 hover:text-red-400 flex-shrink-0" />
+                        </button>
+                      ))}
+                    </>
+                  )}
+                </div>
+
+                {/* Custom game input */}
+                <div className="bg-[var(--nest-bg)] rounded-xl p-3 mb-4 border border-[var(--nest-border)]">
+                  <p className="text-xs text-[var(--nest-text-secondary)] mb-2 font-medium">
+                    💡 Nenašel jsi svou hru? Napiš její název:
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={customGameName}
+                      onChange={(e) => setCustomGameName(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleAddCustomGame()}
+                      placeholder="Název hry (např. Minecraft)"
+                      className="flex-1 bg-[var(--nest-surface)] border border-[var(--nest-border)] rounded-lg px-3 py-2 text-sm text-[var(--nest-text-primary)] placeholder:text-[var(--nest-text-tertiary)] focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 outline-none"
+                    />
+                    <button
+                      onClick={handleAddCustomGame}
+                      disabled={!customGameName.trim()}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-[var(--nest-border)] disabled:text-[var(--nest-text-tertiary)] text-white rounded-lg font-medium text-sm transition-colors flex items-center gap-1.5"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Přidat
+                    </button>
+                  </div>
+                </div>
+
+                <div className="border-t border-[var(--nest-border)] pt-4 flex items-center justify-between">
+                  <p className="text-sm text-[var(--nest-text-secondary)]">
+                    Vybráno: <span className="font-bold text-[var(--nest-yellow)]">{selectedGameInstalls.size}</span> her
+                    {customGames.length > 0 && (
+                      <span className="text-emerald-400 ml-1">({customGames.length} vlastních)</span>
+                    )}
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        setShowGameInstallPicker(false)
+                        alert('Rezervace byla vytvořena! Hry můžeš vybrat později.')
+                      }}
+                      className="px-4 py-2.5 text-[var(--nest-text-secondary)] hover:text-[var(--nest-text-primary)] font-medium text-sm"
+                    >
+                      Přeskočit
+                    </button>
+                    <button
+                      onClick={handleSaveGameInstalls}
+                      disabled={savingGameInstalls}
+                      className="px-6 py-2.5 bg-[var(--nest-yellow)] hover:bg-[var(--nest-yellow-dark)] disabled:bg-[var(--nest-border)] text-[var(--nest-bg)] rounded-xl font-semibold text-sm transition-colors"
+                    >
+                      {savingGameInstalls ? 'Ukládám...' : `Potvrdit výběr (${selectedGameInstalls.size})`}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        )
+          )
+        })()
       }
 
-      {/* Existing game install info */}
-      {
-        selectedGuest && existingGameInstalls.length > 0 && (
-          <div className="max-w-5xl mx-auto px-4 mb-4">
-            <div className="bg-[var(--nest-yellow)]/10 border border-[var(--nest-yellow)]/20 rounded-xl p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-semibold text-[var(--nest-yellow)] text-sm flex items-center gap-2">
-                  🎮 Tvoje vybrané hry k instalaci
-                </h3>
-                <button
-                  onClick={() => setShowGameInstallPicker(true)}
-                  className="text-xs text-[var(--nest-yellow)]/80 hover:text-[var(--nest-yellow)] font-medium underline"
-                >
-                  Upravit
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {existingGameInstalls.map((name, i) => (
-                  <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-[var(--nest-yellow)]/10 text-[var(--nest-yellow)] font-medium border border-[var(--nest-yellow)]/20">
-                    {name}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        )
-      }
+
     </NestPage >
   )
 }

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Armchair } from 'lucide-react'
+import { ArrowLeft, Armchair, Monitor, Cpu, Gamepad2, Edit2 } from 'lucide-react'
 import NestPage from '@/components/NestPage'
 import { Session, Guest, SeatReservation } from '@/types/database.types'
 import { formatDate } from '@/lib/utils'
@@ -26,6 +26,8 @@ export default function EventSeatsPage() {
   const [session, setSession] = useState<Session | null>(null)
   const [guests, setGuests] = useState<Guest[]>([])
   const [reservations, setReservations] = useState<SeatReservation[]>([])
+  const [hwReservations, setHwReservations] = useState<any[]>([])
+  const [gameInstalls, setGameInstalls] = useState<Record<string, string[]>>({})
   const [loading, setLoading] = useState(true)
   const [selectedGuest, setSelectedGuest] = useState<Guest | null>(null)
   const [selectedSeat, setSelectedSeat] = useState<string | null>(null)
@@ -88,6 +90,24 @@ export default function EventSeatsPage() {
       if (!seatsRes.ok) throw new Error('Failed')
       const seatsData = await seatsRes.json()
       setReservations(seatsData.reservations || [])
+
+      // Fetch HW reservations
+      const hwRes = await fetch(`/api/hardware/reservations?session_id=${eventData.session.id}`)
+      if (hwRes.ok) {
+        const hwData = await hwRes.json()
+        setHwReservations(hwData.reservations || [])
+      }
+
+      // Fetch game install requests
+      const installRes = await fetch(`/api/game-installs?session_id=${eventData.session.id}`)
+      if (installRes.ok) {
+        const installData = await installRes.json()
+        const installMap: Record<string, string[]> = {}
+          ; (installData.requests || []).forEach((r: any) => {
+            installMap[r.guest_id] = r.game_names || []
+          })
+        setGameInstalls(installMap)
+      }
 
       const storedGuest = guestStorage.getCurrentGuest(slug)
       if (storedGuest && guestsData.guests) {
@@ -319,6 +339,13 @@ export default function EventSeatsPage() {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {guests.map((guest) => {
             const guestSeats = reservations.filter(r => r.guest_id === guest.id).map(r => r.seat_id)
+            const guestHw = hwReservations.filter((r: any) => r.guest_id === guest.id && r.status !== 'cancelled')
+            const guestGames = gameInstalls[guest.id] || []
+            const isSelected = selectedGuest?.id === guest.id
+            const hasPc = guestHw.some((r: any) => r.hardware_items?.type === 'pc')
+            const hasMonitor = guestHw.some((r: any) => r.hardware_items?.type === 'monitor')
+            const hasAccessory = guestHw.some((r: any) => r.hardware_items?.type === 'accessory')
+
             return (
               <button
                 key={guest.id}
@@ -326,14 +353,23 @@ export default function EventSeatsPage() {
                   setSelectedGuest(guest)
                   guestStorage.setCurrentGuest({ id: guest.id, name: guest.name, session_slug: slug })
                 }}
-                className={`p-4 rounded-xl border-2 transition-all text-left ${selectedGuest?.id === guest.id
+                className={`p-4 rounded-xl border-2 transition-all text-left ${isSelected
                   ? 'border-[var(--nest-yellow)] bg-[var(--nest-yellow)]/10 text-[var(--nest-text-primary)]'
                   : 'border-[var(--nest-border)] hover:border-[var(--nest-yellow)]/40 text-[var(--nest-text-primary)]'
                   }`}
               >
-                <div className="font-semibold">{guest.name}</div>
+                <div className="flex items-center justify-between gap-1">
+                  <div className="font-semibold truncate">{guest.name}</div>
+                  {/* Small HW/game indicators */}
+                  <div className="flex gap-0.5 flex-shrink-0">
+                    {hasPc && <Cpu className="w-3 h-3 text-blue-400/60" />}
+                    {hasMonitor && <Monitor className="w-3 h-3 text-purple-400/60" />}
+                    {hasAccessory && <Gamepad2 className="w-3 h-3 text-green-400/60" />}
+                    {guestGames.length > 0 && <span className="text-[10px] leading-none">🎮</span>}
+                  </div>
+                </div>
                 {guestSeats.length > 0 ? (
-                  <div className="text-xs mt-1 text-emerald-400/80 font-medium">🪑 Místo: {guestSeats.join(', ')}</div>
+                  <div className="text-xs mt-1 text-emerald-400/80 font-medium">🪑 {guestSeats.join(', ')}</div>
                 ) : (
                   <div className="text-xs mt-1 text-[var(--nest-text-tertiary)]">Bez místa</div>
                 )}
@@ -342,6 +378,105 @@ export default function EventSeatsPage() {
           })}
         </div>
       </div>
+
+      {/* Selected Guest Detail Panel */}
+      {selectedGuest && (() => {
+        const guestHw = hwReservations.filter((r: any) => r.guest_id === selectedGuest.id && r.status !== 'cancelled')
+        const guestGames = gameInstalls[selectedGuest.id] || []
+        const guestSeats = reservations.filter(r => r.guest_id === selectedGuest.id).map(r => r.seat_id)
+
+        if (guestHw.length === 0 && guestGames.length === 0) {
+          return (
+            <div className="bg-[var(--nest-surface)] rounded-2xl shadow-xl p-5 mb-6 border border-[var(--nest-border)]">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-[var(--nest-text-primary)] flex items-center gap-2">
+                    <span className="text-[var(--nest-yellow)]">{selectedGuest.name}</span>
+                    {guestSeats.length > 0 && <span className="text-xs text-emerald-400/80 font-medium">🪑 {guestSeats.join(', ')}</span>}
+                  </h3>
+                  <p className="text-sm text-[var(--nest-text-tertiary)] mt-1">Žádný hardware ani hry k instalaci</p>
+                </div>
+                <Link
+                  href={`/event/${slug}/hardware`}
+                  className="inline-flex items-center gap-1.5 text-sm px-4 py-2 rounded-xl bg-[var(--nest-yellow)] hover:bg-[var(--nest-yellow-dark)] text-[var(--nest-bg)] font-semibold transition-colors shadow-lg shadow-[var(--nest-yellow)]/20"
+                >
+                  <Edit2 className="w-4 h-4" />
+                  Přidat HW a hry
+                </Link>
+              </div>
+            </div>
+          )
+        }
+
+        // Sort: PC first, then monitor, then accessories
+        const typeOrder = (t?: string) => t === 'pc' ? 0 : t === 'monitor' ? 1 : 2
+        const sortedHw = [...guestHw].sort((a: any, b: any) => typeOrder(a.hardware_items?.type) - typeOrder(b.hardware_items?.type))
+
+        return (
+          <div className="bg-[var(--nest-surface)] rounded-2xl shadow-xl overflow-hidden mb-6 border border-[var(--nest-border)]">
+            {/* Header */}
+            <div className="px-5 py-3 bg-gradient-to-r from-[var(--nest-yellow)]/10 to-transparent border-b border-[var(--nest-border)]">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-[var(--nest-text-primary)] flex items-center gap-2">
+                  <span className="text-[var(--nest-yellow)]">{selectedGuest.name}</span>
+                  {guestSeats.length > 0 && <span className="text-xs text-emerald-400/80 font-medium">🪑 {guestSeats.join(', ')}</span>}
+                </h3>
+                <Link
+                  href={`/event/${slug}/hardware`}
+                  className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[var(--nest-yellow)]/10 border border-[var(--nest-yellow)]/30 text-[var(--nest-yellow)] hover:bg-[var(--nest-yellow)] hover:text-[var(--nest-bg)] transition-all font-semibold"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                  Upravit HW a hry
+                </Link>
+              </div>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* HW Reservations */}
+              {sortedHw.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-bold text-[var(--nest-text-secondary)] mb-2 flex items-center gap-1.5">
+                    <Monitor className="w-3.5 h-3.5 text-blue-400" />
+                    Rezervovaný hardware
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {sortedHw.map((hw: any, i: number) => {
+                      const type = hw.hardware_items?.type || 'accessory'
+                      const name = hw.hardware_items?.name || 'Neznámé'
+                      return (
+                        <span key={i} className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border font-medium ${type === 'pc' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                            : type === 'monitor' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+                              : 'bg-green-500/10 text-green-400 border-green-500/20'
+                          }`}>
+                          {type === 'pc' ? <Cpu className="w-3.5 h-3.5" /> : type === 'monitor' ? <Monitor className="w-3.5 h-3.5" /> : <Gamepad2 className="w-3.5 h-3.5" />}
+                          {hw.quantity > 1 ? `${hw.quantity}× ` : ''}{name}
+                        </span>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Game Installs */}
+              {guestGames.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-bold text-[var(--nest-text-secondary)] mb-2 flex items-center gap-1.5">
+                    <Gamepad2 className="w-3.5 h-3.5 text-[var(--nest-yellow)]" />
+                    Hry k instalaci ({guestGames.length})
+                  </h4>
+                  <div className="flex flex-wrap gap-1.5">
+                    {guestGames.map((name, i) => (
+                      <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-[var(--nest-yellow)]/10 text-[var(--nest-yellow)] font-medium border border-[var(--nest-yellow)]/20">
+                        🎮 {name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Legend */}
       <div className="bg-[var(--nest-surface)] rounded-2xl shadow-xl p-4 mb-6">

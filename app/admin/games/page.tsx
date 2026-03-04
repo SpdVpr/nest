@@ -229,34 +229,36 @@ export default function AdminGamesPage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <p className="text-gray-600">Načítám...</p>
+            <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--nest-bg)' }}>
+                <p style={{ color: 'var(--nest-text-secondary)' }}>Načítám...</p>
             </div>
         )
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 py-8 px-4">
+        <div className="min-h-screen py-8 px-4" style={{ backgroundColor: 'var(--nest-bg)' }}>
             <div className="max-w-6xl mx-auto">
                 {/* Header */}
                 <div className="mb-8">
                     <Link
                         href="/admin/dashboard"
-                        className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
+                        className="inline-flex items-center gap-2 mb-4 transition-colors"
+                        style={{ color: 'var(--nest-text-secondary)' }}
                     >
                         <ArrowLeft className="w-5 h-5" />
                         Zpět na dashboard
                     </Link>
                     <div className="flex items-center justify-between">
                         <div>
-                            <h1 className="text-3xl font-bold text-gray-900">🎮 Správa her</h1>
-                            <p className="text-gray-600 mt-1">
+                            <h1 className="text-3xl font-bold" style={{ color: 'var(--nest-text-primary)' }}>🎮 Správa her</h1>
+                            <p className="mt-1" style={{ color: 'var(--nest-text-secondary)' }}>
                                 {games.length} her v databázi • {games.filter(g => g.is_available).length} dostupných
                             </p>
                         </div>
                         <button
                             onClick={handleCreate}
-                            className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-6 py-3 rounded-xl font-semibold"
+                            className="flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-colors"
+                            style={{ backgroundColor: 'var(--nest-yellow)', color: 'var(--nest-bg)' }}
                         >
                             <Plus className="w-5 h-5" />
                             Přidat hru
@@ -265,24 +267,25 @@ export default function AdminGamesPage() {
                 </div>
 
                 {/* Info Banner */}
-                <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 mb-6">
-                    <p className="text-violet-900 text-sm">
+                <div className="rounded-xl p-4 mb-6" style={{ backgroundColor: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.25)' }}>
+                    <p className="text-sm" style={{ color: 'rgb(167, 139, 250)' }}>
                         🎮 <strong>Centrální databáze her.</strong> Zde spravujete hry, které je možné nainstalovat na PC při rezervaci.
                         Hry z tohoto seznamu se zobrazují hostům u eventů.
                     </p>
                 </div>
 
                 {/* Search + Categories */}
-                <div className="bg-[#efefef] rounded-xl shadow-sm p-4 mb-6 space-y-3">
+                <div className="rounded-xl shadow-sm p-4 mb-6 space-y-3" style={{ backgroundColor: 'var(--nest-surface)', border: '1px solid var(--nest-border)' }}>
                     {/* Search */}
                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--nest-text-tertiary)' }} />
                         <input
                             type="text"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder="Vyhledat hru..."
-                            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none"
+                            className="w-full pl-10 pr-4 py-2 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none"
+                            style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
                         />
                     </div>
 
@@ -290,10 +293,11 @@ export default function AdminGamesPage() {
                     <div className="flex flex-wrap gap-2">
                         <button
                             onClick={() => setActiveCategory('all')}
-                            className={`px-4 py-2 rounded-lg font-semibold transition text-sm ${activeCategory === 'all'
-                                ? 'bg-gradient-to-r from-violet-500 to-purple-500 text-white'
-                                : 'text-gray-600 hover:bg-gray-100'
-                                }`}
+                            className={`px-4 py-2 rounded-lg font-semibold transition text-sm`}
+                            style={activeCategory === 'all'
+                                ? { background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', color: 'white' }
+                                : { color: 'var(--nest-text-secondary)', backgroundColor: 'var(--nest-bg)' }
+                            }
                         >
                             Vše ({games.length})
                         </button>
@@ -301,10 +305,11 @@ export default function AdminGamesPage() {
                             <button
                                 key={cat}
                                 onClick={() => setActiveCategory(cat)}
-                                className={`px-4 py-2 rounded-lg font-semibold transition text-sm ${activeCategory === cat
-                                    ? 'bg-gradient-to-r from-violet-500 to-purple-500 text-white'
-                                    : 'text-gray-600 hover:bg-gray-100'
-                                    }`}
+                                className="px-4 py-2 rounded-lg font-semibold transition text-sm"
+                                style={activeCategory === cat
+                                    ? { background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', color: 'white' }
+                                    : { color: 'var(--nest-text-secondary)', backgroundColor: 'var(--nest-bg)' }
+                                }
                             >
                                 {getCategoryIcon(cat)} {cat} ({games.filter(g => (g.category || 'Ostatní') === cat).length})
                             </button>
@@ -314,65 +319,69 @@ export default function AdminGamesPage() {
 
                 {/* Editing / Create Modal */}
                 {editingGame && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                        <div className="bg-[#efefef] rounded-2xl shadow-xl p-8 max-w-md w-full">
-                            <h2 className="text-2xl font-bold text-gray-900 mb-6">
+                    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
+                        <div className="rounded-2xl shadow-xl p-8 max-w-md w-full" style={{ backgroundColor: 'var(--nest-surface)', border: '1px solid var(--nest-border)' }}>
+                            <h2 className="text-2xl font-bold mb-6" style={{ color: 'var(--nest-text-primary)' }}>
                                 {isCreating ? '➕ Nová hra' : '✏️ Upravit hru'}
                             </h2>
 
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    <label className="block text-sm font-medium mb-1" style={{ color: 'var(--nest-text-secondary)' }}>
                                         Název hry *
                                     </label>
                                     <input
                                         type="text"
                                         value={editingGame.name}
                                         onChange={(e) => setEditingGame({ ...editingGame, name: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+                                        className="w-full px-4 py-2 rounded-lg"
+                                        style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
                                         placeholder="např. Counter-Strike 2"
                                         autoFocus
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    <label className="block text-sm font-medium mb-1" style={{ color: 'var(--nest-text-secondary)' }}>
                                         Kategorie
                                     </label>
                                     <select
                                         value={editingGame.category}
                                         onChange={(e) => setEditingGame({ ...editingGame, category: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+                                        className="w-full px-4 py-2 rounded-lg"
+                                        style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
                                     >
-                                        <option value="">— Vybrat kategorii —</option>
+                                        <option value="" style={{ backgroundColor: 'var(--nest-bg)', color: 'var(--nest-text-primary)' }}>— Vybrat kategorii —</option>
                                         {GAME_CATEGORIES.map(cat => (
-                                            <option key={cat} value={cat}>{getCategoryIcon(cat)} {cat}</option>
+                                            <option key={cat} value={cat} style={{ backgroundColor: 'var(--nest-bg)', color: 'var(--nest-text-primary)' }}>{getCategoryIcon(cat)} {cat}</option>
                                         ))}
                                     </select>
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    <label className="block text-sm font-medium mb-1" style={{ color: 'var(--nest-text-secondary)' }}>
                                         Max hráčů (LAN)
                                     </label>
                                     <input
                                         type="number"
                                         value={editingGame.max_players}
                                         onChange={(e) => setEditingGame({ ...editingGame, max_players: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+                                        className="w-full px-4 py-2 rounded-lg"
+                                        style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
                                         placeholder="např. 10"
                                         min="1"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    <label className="block text-sm font-medium mb-1" style={{ color: 'var(--nest-text-secondary)' }}>
                                         Poznámky
                                     </label>
                                     <textarea
                                         value={editingGame.notes}
                                         onChange={(e) => setEditingGame({ ...editingGame, notes: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+                                        className="w-full px-4 py-2 rounded-lg"
+                                        style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
                                         placeholder="Velikost instalace, požadavky, Steam/Epic..."
                                         rows={3}
                                     />
@@ -386,7 +395,8 @@ export default function AdminGamesPage() {
                                         setIsCreating(false)
                                     }}
                                     disabled={saving}
-                                    className="flex-1 px-6 py-3 border-2 border-gray-300 rounded-xl font-semibold hover:bg-gray-50 text-gray-900"
+                                    className="flex-1 px-6 py-3 rounded-xl font-semibold transition-colors"
+                                    style={{ border: '2px solid var(--nest-border)', color: 'var(--nest-text-primary)', backgroundColor: 'transparent' }}
                                 >
                                     <X className="w-5 h-5 inline mr-2" />
                                     Zrušit
@@ -394,7 +404,8 @@ export default function AdminGamesPage() {
                                 <button
                                     onClick={handleSave}
                                     disabled={saving || !editingGame.name.trim()}
-                                    className="flex-1 px-6 py-3 bg-violet-600 hover:bg-violet-700 disabled:bg-gray-300 text-white rounded-xl font-semibold"
+                                    className="flex-1 px-6 py-3 rounded-xl font-semibold transition-colors disabled:opacity-40"
+                                    style={{ backgroundColor: 'var(--nest-yellow)', color: 'var(--nest-bg)' }}
                                 >
                                     <Save className="w-5 h-5 inline mr-2" />
                                     {saving ? 'Ukládám...' : 'Uložit'}
@@ -406,55 +417,71 @@ export default function AdminGamesPage() {
 
                 {/* Games List */}
                 {filteredGames.length === 0 ? (
-                    <div className="bg-[#efefef] rounded-xl shadow-sm p-8 text-center">
+                    <div className="rounded-xl shadow-sm p-8 text-center" style={{ backgroundColor: 'var(--nest-surface)', border: '1px solid var(--nest-border)' }}>
                         {games.length === 0 ? (
                             <div>
-                                <Gamepad2 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                                <p className="text-gray-500 text-lg font-medium mb-2">Zatím žádné hry v databázi</p>
-                                <p className="text-gray-400 text-sm mb-4">Klikni na &quot;Přidat hru&quot; pro vytvoření první.</p>
+                                <Gamepad2 className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--nest-text-tertiary)' }} />
+                                <p className="text-lg font-medium mb-2" style={{ color: 'var(--nest-text-secondary)' }}>Zatím žádné hry v databázi</p>
+                                <p className="text-sm mb-4" style={{ color: 'var(--nest-text-tertiary)' }}>Klikni na &quot;Přidat hru&quot; pro vytvoření první.</p>
                                 <button
                                     onClick={handleCreate}
-                                    className="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-6 py-3 rounded-xl font-semibold"
+                                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold"
+                                    style={{ backgroundColor: 'var(--nest-yellow)', color: 'var(--nest-bg)' }}
                                 >
                                     <Plus className="w-5 h-5" />
                                     Přidat první hru
                                 </button>
                             </div>
                         ) : (
-                            <p className="text-gray-500">Žádné hry neodpovídají filtru.</p>
+                            <p style={{ color: 'var(--nest-text-secondary)' }}>Žádné hry neodpovídají filtru.</p>
                         )}
                     </div>
                 ) : (
-                    <div className="bg-[#efefef] rounded-xl shadow-sm overflow-hidden">
-                        <div className="bg-gradient-to-r from-violet-500 to-purple-500 px-6 py-3 flex items-center justify-between">
+                    <div className="rounded-xl shadow-sm overflow-hidden" style={{ backgroundColor: 'var(--nest-surface)', border: '1px solid var(--nest-border)' }}>
+                        <div className="px-6 py-3" style={{ background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)' }}>
                             <h2 className="text-xl font-bold text-white">
                                 🎮 Hry ({filteredGames.length})
                             </h2>
                         </div>
-                        <div className="divide-y divide-gray-200">
-                            {filteredGames.map((game) => (
-                                <div key={game.id} className="p-4 hover:bg-gray-50 flex items-center gap-4">
+                        <div style={{ borderTop: '1px solid var(--nest-border)' }}>
+                            {filteredGames.map((game, idx) => (
+                                <div
+                                    key={game.id}
+                                    className="p-4 flex items-center gap-4 transition-colors"
+                                    style={{
+                                        borderBottom: idx < filteredGames.length - 1 ? '1px solid var(--nest-border)' : 'none',
+                                    }}
+                                >
                                     {/* Icon */}
-                                    <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-violet-100 flex items-center justify-center text-xl">
+                                    <div
+                                        className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center text-xl"
+                                        style={{ backgroundColor: 'rgba(139, 92, 246, 0.15)' }}
+                                    >
                                         {getCategoryIcon(game.category)}
                                     </div>
 
                                     {/* Info */}
                                     <div className="flex-1 min-w-0">
-                                        <p className="font-semibold text-gray-900 text-lg">{game.name}</p>
+                                        <p className="font-semibold text-lg" style={{ color: 'var(--nest-text-primary)' }}>{game.name}</p>
                                         <div className="flex flex-wrap gap-2 mt-0.5">
                                             {game.category && (
-                                                <span className="text-xs px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 font-medium">
+                                                <span
+                                                    className="text-xs px-2 py-0.5 rounded-full font-medium"
+                                                    style={{ backgroundColor: 'rgba(139, 92, 246, 0.15)', color: 'rgb(167, 139, 250)' }}
+                                                >
                                                     {game.category}
                                                 </span>
                                             )}
                                             {game.max_players && (
-                                                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">
+                                                <span
+                                                    className="text-xs px-2 py-0.5 rounded-full font-medium"
+                                                    style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: 'rgb(96, 165, 250)' }}
+                                                >
                                                     👥 max {game.max_players} hráčů
                                                 </span>
                                             )}
                                             {game.notes && (
-                                                <span className="text-xs text-gray-500 italic truncate max-w-[200px]">
+                                                <span className="text-xs italic truncate max-w-[200px]" style={{ color: 'var(--nest-text-tertiary)' }}>
                                                     {game.notes}
                                                 </span>
                                             )}
@@ -465,10 +492,11 @@ export default function AdminGamesPage() {
                                     <div className="flex-shrink-0">
                                         <button
                                             onClick={() => toggleAvailability(game)}
-                                            className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${game.is_available
-                                                ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                                                : 'bg-red-100 text-red-800 hover:bg-red-200'
-                                                }`}
+                                            className="px-3 py-1 rounded-full text-xs font-semibold transition-colors"
+                                            style={game.is_available
+                                                ? { backgroundColor: 'rgba(34, 197, 94, 0.15)', color: 'rgb(74, 222, 128)' }
+                                                : { backgroundColor: 'rgba(239, 68, 68, 0.15)', color: 'rgb(248, 113, 113)' }
+                                            }
                                         >
                                             {game.is_available ? '✅ Dostupná' : '❌ Nedostupná'}
                                         </button>
@@ -478,14 +506,16 @@ export default function AdminGamesPage() {
                                     <div className="flex-shrink-0 flex gap-1">
                                         <button
                                             onClick={() => handleEdit(game)}
-                                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                                            className="p-2 rounded-lg transition-colors"
+                                            style={{ color: 'rgb(96, 165, 250)' }}
                                             title="Upravit"
                                         >
                                             <Edit2 className="w-5 h-5" />
                                         </button>
                                         <button
                                             onClick={() => handleDelete(game.id, game.name)}
-                                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                                            className="p-2 rounded-lg transition-colors"
+                                            style={{ color: 'rgb(248, 113, 113)' }}
                                             title="Smazat"
                                         >
                                             <Trash2 className="w-5 h-5" />
