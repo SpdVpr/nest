@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { name, start_date, end_date, start_time, end_time, description, status, menu_enabled, hardware_pricing_enabled, hardware_enabled, seats_enabled, hardware_overrides, surcharge_enabled, price_per_night } = await request.json()
+    const { name, start_date, end_date, start_time, end_time, description, status, menu_enabled, hardware_pricing_enabled, hardware_enabled, seats_enabled, hardware_overrides, surcharge_enabled, price_per_night, access_password } = await request.json()
 
     if (!name) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 })
@@ -135,6 +135,23 @@ export async function POST(request: NextRequest) {
       sessionData.seats_enabled = Boolean(seats_enabled)
     } else {
       sessionData.seats_enabled = true  // default: seat reservation enabled
+    }
+
+    // Handle access_password with uniqueness check
+    if (access_password && access_password.trim()) {
+      const passwordTrimmed = access_password.trim().toLowerCase()
+      const existingPassword = await db.collection('sessions')
+        .where('access_password', '==', passwordTrimmed)
+        .limit(1)
+        .get()
+
+      if (!existingPassword.empty) {
+        return NextResponse.json(
+          { error: 'Toto heslo už používá jiný event. Zvol jiné.' },
+          { status: 409 }
+        )
+      }
+      sessionData.access_password = passwordTrimmed
     }
 
     const docRef = await db.collection('sessions').add(sessionData)

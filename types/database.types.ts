@@ -25,6 +25,7 @@ export interface Session {
   seats_enabled?: boolean      // if false, seat reservation section is completely hidden (default true)
   hardware_overrides?: Record<string, HardwareOverride>  // per-item quantity overrides for this session
   top_products?: string[]   // product IDs that should have TOP leaderboard on the snacks page
+  access_password?: string   // unique password for guests to access this event from the homepage
   status?: 'draft' | 'upcoming' | 'active' | 'completed' | 'cancelled'
   description?: string | null
   created_at: string

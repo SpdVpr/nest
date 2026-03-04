@@ -52,6 +52,8 @@ function AdminSessionsPageInner() {
   const [newSessionDescription, setNewSessionDescription] = useState('')
   const [newPricePerNight, setNewPricePerNight] = useState('')
   const [surchargeEnabled, setSurchargeEnabled] = useState(false)
+  const [accessPassword, setAccessPassword] = useState('')
+  const [passwordError, setPasswordError] = useState('')
 
   // Reservation toggles
   const [hardwareEnabled, setHardwareEnabled] = useState(true)
@@ -390,6 +392,7 @@ function AdminSessionsPageInner() {
       sessionData.seats_enabled = seatsEnabled
       sessionData.hardware_overrides = hardwareOverrides
       sessionData.surcharge_enabled = surchargeEnabled
+      sessionData.access_password = accessPassword.trim() || null
 
       const priceVal = parseFloat(newPricePerNight)
       sessionData.price_per_night = !isNaN(priceVal) && priceVal >= 0 ? priceVal : 0
@@ -403,7 +406,14 @@ function AdminSessionsPageInner() {
         body: JSON.stringify(sessionData),
       })
 
-      if (!response.ok) throw new Error('Failed to create session')
+      if (!response.ok) {
+        const errorData = await response.json()
+        if (response.status === 409) {
+          setPasswordError(errorData.error)
+          return
+        }
+        throw new Error('Failed to create session')
+      }
 
       const result = await response.json()
       const newSessionId = result.session?.id
@@ -500,6 +510,7 @@ function AdminSessionsPageInner() {
       sessionData.hardware_enabled = hardwareEnabled
       sessionData.seats_enabled = seatsEnabled
       sessionData.hardware_overrides = hardwareOverrides
+      sessionData.access_password = accessPassword.trim() || null
 
       const response = await fetch(`/api/admin/sessions/${editingSession.id}`, {
         method: 'PATCH',
@@ -510,7 +521,14 @@ function AdminSessionsPageInner() {
         body: JSON.stringify(sessionData),
       })
 
-      if (!response.ok) throw new Error('Failed to update session')
+      if (!response.ok) {
+        const errorData = await response.json()
+        if (response.status === 409) {
+          setPasswordError(errorData.error)
+          return
+        }
+        throw new Error('Failed to update session')
+      }
 
       resetForm()
       setEditingSession(null)
@@ -537,6 +555,8 @@ function AdminSessionsPageInner() {
     setHardwareEnabled((session as any).hardware_enabled !== false)
     setSeatsEnabled((session as any).seats_enabled !== false)
     setHardwareOverrides((session as any).hardware_overrides || {})
+    setAccessPassword((session as any).access_password || '')
+    setPasswordError('')
     setShowHardwareConfig(false)
     setShowCreateForm(false)
   }
@@ -565,6 +585,8 @@ function AdminSessionsPageInner() {
     setHardwareOverrides({})
     setShowHardwareConfig(false)
     setCopiedGames([])
+    setAccessPassword('')
+    setPasswordError('')
   }
 
   const cancelEdit = () => {
@@ -688,6 +710,27 @@ function AdminSessionsPageInner() {
             className="w-full px-4 py-2 rounded-lg"
             style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary)' }}
           />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-2" style={{ color: 'var(--nest-text-secondary)' }}>🔑 Přístupové heslo</label>
+          <input
+            type="text"
+            value={accessPassword}
+            onChange={(e) => {
+              setAccessPassword(e.target.value)
+              setPasswordError('')
+            }}
+            placeholder="např. nestlan25"
+            className="w-full px-4 py-2 rounded-lg"
+            style={{ backgroundColor: 'var(--nest-bg)', border: `1px solid ${passwordError ? '#f87171' : 'var(--nest-border)'}`, color: 'var(--nest-text-primary)' }}
+          />
+          {passwordError && (
+            <p className="text-xs mt-1 font-medium" style={{ color: '#f87171' }}>❌ {passwordError}</p>
+          )}
+          <p className="text-xs mt-1" style={{ color: 'var(--nest-text-tertiary)' }}>
+            Hosté zadají toto heslo na hlavní stránce a budou přesměrováni na tento event. Každý event musí mít unikátní heslo.
+          </p>
         </div>
 
         {/* Surcharge toggle */}
@@ -1311,8 +1354,8 @@ function AdminSessionsPageInner() {
           <button
             onClick={() => setEventFilter('upcoming')}
             className={`px-4 py-2 rounded-lg font-semibold text-sm transition-colors ${eventFilter === 'upcoming'
-                ? 'bg-purple-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              ? 'bg-purple-600 text-white'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
           >
             Aktuální a nadcházející
@@ -1320,8 +1363,8 @@ function AdminSessionsPageInner() {
           <button
             onClick={() => setEventFilter('past')}
             className={`px-4 py-2 rounded-lg font-semibold text-sm transition-colors ${eventFilter === 'past'
-                ? 'bg-purple-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              ? 'bg-purple-600 text-white'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
           >
             Proběhlé
@@ -1372,6 +1415,9 @@ function AdminSessionsPageInner() {
                         )}
                         {session.hardware_pricing_enabled === false && (
                           <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">🚫 HW cena</span>
+                        )}
+                        {session.access_password && (
+                          <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(255, 211, 105, 0.15)', color: '#FFD369' }}>🔑 {session.access_password}</span>
                         )}
                       </div>
                     </div>
@@ -1463,6 +1509,9 @@ function AdminSessionsPageInner() {
                         )}
                         {session.hardware_overrides && Object.keys(session.hardware_overrides).length > 0 && (
                           <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">🖥️ HW úpravy</span>
+                        )}
+                        {session.access_password && (
+                          <span className="ml-2 text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(255, 211, 105, 0.15)', color: '#FFD369' }}>🔑 {session.access_password}</span>
                         )}
                       </td>
                       <td className="px-6 py-4 text-sm" onClick={(e) => e.stopPropagation()}>

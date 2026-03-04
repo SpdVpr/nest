@@ -110,6 +110,27 @@ export async function PATCH(
     if (body.top_products !== undefined) {
       updateData.top_products = Array.isArray(body.top_products) ? body.top_products : []
     }
+    if (body.access_password !== undefined) {
+      if (body.access_password && body.access_password.trim()) {
+        const passwordTrimmed = body.access_password.trim().toLowerCase()
+        // Check uniqueness (exclude current session)
+        const existingPassword = await db.collection('sessions')
+          .where('access_password', '==', passwordTrimmed)
+          .limit(2)
+          .get()
+
+        const conflict = existingPassword.docs.find(doc => doc.id !== id)
+        if (conflict) {
+          return NextResponse.json(
+            { error: 'Toto heslo už používá jiný event. Zvol jiné.' },
+            { status: 409 }
+          )
+        }
+        updateData.access_password = passwordTrimmed
+      } else {
+        updateData.access_password = null
+      }
+    }
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json(
