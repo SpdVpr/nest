@@ -34,7 +34,6 @@ export default function AdminProductsPage() {
   const [editingProduct, setEditingProduct] = useState<EditingProduct | null>(null)
   const [isCreating, setIsCreating] = useState(false)
   const [uploading, setUploading] = useState(false)
-  const [syncing, setSyncing] = useState(false)
   const [activeTab, setActiveTab] = useState<string>('all')
 
   useEffect(() => {
@@ -114,7 +113,7 @@ export default function AdminProductsPage() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Opravdu smazat tento produkt? Změna se projeví ve všech eventech!')) return
+    if (!confirm('Opravdu smazat tento produkt? Zmizí z nadcházejících eventů.')) return
 
     try {
       const token = localStorage.getItem('admin_token')
@@ -161,29 +160,6 @@ export default function AdminProductsPage() {
       alert('Chyba při nahrávání obrázku')
     } finally {
       setUploading(false)
-    }
-  }
-
-  const handleSyncProducts = async () => {
-    setSyncing(true)
-    try {
-      const token = localStorage.getItem('admin_token')
-      const response = await fetch('/api/admin/sync-products', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        alert(`✅ Produkty synchronizovány! Přidáno ${data.synced_count} položek.`)
-      } else {
-        alert('❌ Chyba při synchronizaci')
-      }
-    } catch (error) {
-      console.error('Error syncing products:', error)
-      alert('❌ Chyba při synchronizaci')
-    } finally {
-      setSyncing(false)
     }
   }
 
@@ -245,29 +221,10 @@ export default function AdminProductsPage() {
 
         {/* Info Banner */}
         <div className="rounded-xl p-4 mb-6" style={{ backgroundColor: 'rgba(147, 51, 234, 0.1)', border: '1px solid rgba(147, 51, 234, 0.2)' }}>
-          <div className="flex items-start justify-between">
-            <p className="text-sm" style={{ color: '#c084fc' }}>
-              ⚠️ <strong>Změny se projeví okamžitě ve všech eventech!</strong> Tento seznam je sdílený
-              pro všechny LAN party. Pokud upravíš nebo smažeš produkt, změna ovlivní i už založené eventy.
-            </p>
-            <button
-              onClick={handleSyncProducts}
-              disabled={syncing}
-              className="ml-4 flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg font-semibold text-sm whitespace-nowrap transition-colors"
-            >
-              {syncing ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Synchronizuji...
-                </>
-              ) : (
-                <>
-                  <Upload className="w-4 h-4" />
-                  Přidat ke všem nadcházejícím eventům
-                </>
-              )}
-            </button>
-          </div>
+          <p className="text-sm" style={{ color: '#c084fc' }}>
+            💡 Produkty a jejich ceny se automaticky zobrazují u všech <strong>nadcházejících</strong> eventů.
+            Proběhlé eventy zůstávají beze změn.
+          </p>
         </div>
 
         {/* Category Tabs */}

@@ -81,26 +81,39 @@ export async function POST(request: NextRequest) {
       updated_at: newDoc.data()?.updated_at?.toDate?.()?.toISOString() || newDoc.data()?.updated_at,
     }
 
-    // Auto-add this product to all existing sessions
+    // Auto-add this product to upcoming/ongoing sessions only (not past ones)
     if (productData.is_available) {
       try {
         const sessionsSnapshot = await db.collection('sessions').get()
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
 
-        const batch = db.batch()
-        sessionsSnapshot.docs.forEach(sessionDoc => {
-          const stockRef = db.collection('session_stock').doc()
-          batch.set(stockRef, {
-            session_id: sessionDoc.id,
-            product_id: docRef.id,
-            initial_quantity: 0,
-            consumed_quantity: 0,
-            created_at: now,
-            updated_at: now,
-          })
+        const upcomingSessions = sessionsSnapshot.docs.filter(doc => {
+          const data = doc.data()
+          const endDate = data.end_date?.toDate?.() || (data.end_date ? new Date(data.end_date) : null)
+          const startDate = data.start_date?.toDate?.() || (data.start_date ? new Date(data.start_date) : null)
+          if (endDate) return endDate >= today
+          if (startDate) return startDate >= today
+          return true
         })
 
-        await batch.commit()
-        console.log(`✅ Product ${product.name} added to ${sessionsSnapshot.size} sessions`)
+        if (upcomingSessions.length > 0) {
+          const batch = db.batch()
+          upcomingSessions.forEach(sessionDoc => {
+            const stockRef = db.collection('session_stock').doc()
+            batch.set(stockRef, {
+              session_id: sessionDoc.id,
+              product_id: docRef.id,
+              initial_quantity: 0,
+              consumed_quantity: 0,
+              created_at: now,
+              updated_at: now,
+            })
+          })
+
+          await batch.commit()
+          console.log(`✅ Product ${product.name} added to ${upcomingSessions.length} upcoming sessions`)
+        }
       } catch (syncError) {
         console.error('Error syncing product to sessions:', syncError)
         // Don't fail the request if sync fails
