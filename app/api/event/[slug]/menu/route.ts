@@ -50,7 +50,24 @@ export async function GET(
             return (a.order || 0) - (b.order || 0)
         })
 
-        return NextResponse.json({ items, enabled: true })
+        // If guest_id is provided, fetch their saved selections
+        const guestId = request.nextUrl.searchParams.get('guest_id')
+        let savedSelections: Record<string, boolean> | null = null
+
+        if (guestId) {
+            const selSnapshot = await db.collection('guest_meal_selections')
+                .where('guest_id', '==', guestId)
+                .where('session_id', '==', sessionDoc.id)
+                .limit(1)
+                .get()
+
+            if (!selSnapshot.empty) {
+                const selData = selSnapshot.docs[0].data()
+                savedSelections = selData.meal_selections || null
+            }
+        }
+
+        return NextResponse.json({ items, enabled: true, savedSelections })
     } catch (error) {
         console.error('Error fetching menu:', error)
         return NextResponse.json(
@@ -67,7 +84,7 @@ export async function POST(
 ) {
     try {
         const { slug } = await params
-        const { guest_id, first_meal_id, last_meal_id, dietary_restrictions, dietary_note } = await request.json()
+        const { guest_id, meal_selections, selected_meal_ids, dietary_restrictions, dietary_note } = await request.json()
 
         if (!guest_id) {
             return NextResponse.json({ error: 'guest_id is required' }, { status: 400 })
@@ -113,42 +130,39 @@ export async function POST(
             .limit(1)
             .get()
 
+        const selectionData = {
+            guest_id,
+            session_id: sessionId,
+            meal_selections: meal_selections || {},
+            selected_meal_ids: selected_meal_ids || [],
+            updated_at: now,
+        }
+
         if (selectionSnapshot.empty) {
             // Create new
             const selRef = await db.collection('guest_meal_selections').add({
-                guest_id,
-                session_id: sessionId,
-                first_meal_id: first_meal_id || null,
-                last_meal_id: last_meal_id || null,
+                ...selectionData,
                 created_at: now,
-                updated_at: now,
             })
 
             return NextResponse.json({
                 selection: {
                     id: selRef.id,
-                    guest_id,
-                    session_id: sessionId,
-                    first_meal_id: first_meal_id || null,
-                    last_meal_id: last_meal_id || null,
+                    ...selectionData,
+                    created_at: now.toDate().toISOString(),
+                    updated_at: now.toDate().toISOString(),
                 }
             }, { status: 201 })
         } else {
             // Update existing
             const existingDoc = selectionSnapshot.docs[0]
-            await existingDoc.ref.update({
-                first_meal_id: first_meal_id || null,
-                last_meal_id: last_meal_id || null,
-                updated_at: now,
-            })
+            await existingDoc.ref.update(selectionData)
 
             return NextResponse.json({
                 selection: {
                     id: existingDoc.id,
-                    guest_id,
-                    session_id: sessionId,
-                    first_meal_id: first_meal_id || null,
-                    last_meal_id: last_meal_id || null,
+                    ...selectionData,
+                    updated_at: now.toDate().toISOString(),
                 }
             })
         }

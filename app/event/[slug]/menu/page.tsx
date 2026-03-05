@@ -62,14 +62,19 @@ export default function EventMenuPage() {
         }
     }, [slug])
 
-    // Initialize all meals as "will eat" (true) by default when items load
+    // Initialize all meals as "will eat" (true) by default when items load,
+    // but only for meals that don't have a saved selection
     useEffect(() => {
-        if (menuItems.length > 0 && Object.keys(selections).length === 0) {
-            const defaultSelections: Record<string, boolean> = {}
-            menuItems.forEach(item => {
-                defaultSelections[item.id] = true
+        if (menuItems.length > 0) {
+            setSelections(prev => {
+                const merged: Record<string, boolean> = { ...prev }
+                menuItems.forEach(item => {
+                    if (merged[item.id] === undefined) {
+                        merged[item.id] = true // default to selected
+                    }
+                })
+                return merged
             })
-            setSelections(defaultSelections)
         }
     }, [menuItems])
 
@@ -83,14 +88,24 @@ export default function EventMenuPage() {
                 setSession(eventData.session)
             }
 
-            const menuRes = await fetch(`/api/event/${slug}/menu`)
+            // Get guest info for the query param
+            const guest = guestStorage.getCurrentGuest(slug)
+            const gId = guest?.id
+
+            const menuUrl = gId
+                ? `/api/event/${slug}/menu?guest_id=${gId}`
+                : `/api/event/${slug}/menu`
+            const menuRes = await fetch(menuUrl)
             if (menuRes.ok) {
                 const menuData = await menuRes.json()
                 setMenuItems(menuData.items || [])
                 setMenuEnabled(menuData.enabled || false)
-            }
 
-            // TODO: fetch existing guest selections if they've saved before
+                // Restore saved selections if available
+                if (menuData.savedSelections && typeof menuData.savedSelections === 'object') {
+                    setSelections(menuData.savedSelections)
+                }
+            }
         } catch (error) {
             console.error('Error fetching data:', error)
         } finally {
