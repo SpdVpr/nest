@@ -60,6 +60,9 @@ export default function CostsPage() {
     const [expandedGuest, setExpandedGuest] = useState<string | null>(null)
     const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
     const [pricePerNight, setPricePerNight] = useState(0)
+    const [effectivePricePerNight, setEffectivePricePerNight] = useState(0)
+    const [surchargeEnabled, setSurchargeEnabled] = useState(false)
+    const [guestCount, setGuestCount] = useState(0)
     const [tipEditGuest, setTipEditGuest] = useState<string | null>(null)
     const [tipAmount, setTipAmount] = useState('')
     const [tipSaving, setTipSaving] = useState(false)
@@ -86,6 +89,9 @@ export default function CostsPage() {
                 const data = await res.json()
                 setGuests(data.guests)
                 setPricePerNight(data.pricePerNight || 0)
+                setEffectivePricePerNight(data.effectivePricePerNight || data.pricePerNight || 0)
+                setSurchargeEnabled(data.surchargeEnabled || false)
+                setGuestCount(data.guestCount || 0)
                 setBankSettings(data.bankSettings || null)
                 setIsPreliminary(data.isPreliminary !== false)
                 setHardwarePricingEnabled(data.hardwarePricingEnabled !== false)
@@ -354,23 +360,39 @@ export default function CostsPage() {
                                     {isExpanded && (
                                         <div className="px-5 pb-5 border-t border-[var(--nest-border)]">
                                             {/* Accommodation */}
-                                            {guest.nightsTotal > 0 && (
-                                                <div className="mt-4">
-                                                    <h4 className="text-sm font-semibold text-[var(--nest-text-secondary)] uppercase tracking-wider mb-2">
-                                                        🏠 Ubytování — {guest.nightsTotal.toLocaleString('cs-CZ')} Kč
-                                                    </h4>
-                                                    <div className="flex items-center justify-between py-1.5 text-sm">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-[var(--nest-text-tertiary)] text-xs w-8">{guest.nights_count}×</span>
-                                                            <span className="text-[var(--nest-text-primary)]">Noc</span>
-                                                            <span className="text-[var(--nest-text-tertiary)] text-xs">({pricePerNight} Kč/noc)</span>
+                                            {guest.nightsTotal > 0 && (() => {
+                                                const surchargePerNight = surchargeEnabled ? Math.max(0, 10 - guestCount) * 150 : 0
+                                                const hasSurcharge = surchargePerNight > 0
+
+                                                return (
+                                                    <div className="mt-4">
+                                                        <h4 className="text-sm font-semibold text-[var(--nest-text-secondary)] uppercase tracking-wider mb-2">
+                                                            🏠 Ubytování — {guest.nightsTotal.toLocaleString('cs-CZ')} Kč
+                                                        </h4>
+                                                        <div className="flex items-center justify-between py-1.5 text-sm">
+                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                                <span className="text-[var(--nest-text-tertiary)] text-xs w-8">{guest.nights_count}×</span>
+                                                                <span className="text-[var(--nest-text-primary)]">Noc</span>
+                                                                {hasSurcharge ? (
+                                                                    <span className="text-[var(--nest-text-tertiary)] text-xs">
+                                                                        ({pricePerNight.toLocaleString('cs-CZ')} + <span className="text-amber-400">{surchargePerNight}</span> Kč/noc)
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-[var(--nest-text-tertiary)] text-xs">({pricePerNight.toLocaleString('cs-CZ')} Kč/noc)</span>
+                                                                )}
+                                                            </div>
+                                                            <span className="font-semibold text-[var(--nest-text-primary)]">
+                                                                {guest.nightsTotal.toLocaleString('cs-CZ')} Kč
+                                                            </span>
                                                         </div>
-                                                        <span className="font-semibold text-[var(--nest-text-primary)]">
-                                                            {guest.nightsTotal.toLocaleString('cs-CZ')} Kč
-                                                        </span>
+                                                        {hasSurcharge && (
+                                                            <p className="text-xs text-amber-400/80 mt-1.5 pl-10">
+                                                                ⚠️ Příplatek +{surchargePerNight} Kč/noc (méně než 10 účastníků – aktuálně {guestCount})
+                                                            </p>
+                                                        )}
                                                     </div>
-                                                </div>
-                                            )}
+                                                )
+                                            })()}
 
                                             {/* Consumption */}
                                             {guest.consumption.length > 0 && (

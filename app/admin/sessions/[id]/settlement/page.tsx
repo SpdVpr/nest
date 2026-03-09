@@ -927,7 +927,10 @@ export default function SettlementPage() {
                                                 const effectiveValue = getItemValue(guest.id, itemKey, guest.nightsTotal)
 
                                                 return (
-                                                    <div className={`flex items-center justify-between py-1.5 text-sm group rounded-lg px-2 -mx-2 ${hasOverride ? 'bg-amber-50' : 'hover:bg-gray-50'}`}>
+                                                    <div
+                                                        className={`flex items-center justify-between py-2.5 text-sm group rounded-lg px-2 -mx-2 cursor-pointer ${hasOverride ? 'bg-amber-50' : 'hover:bg-gray-50 active:bg-gray-100'}`}
+                                                        onClick={() => { if (!isEditing) startEditItem(guest.id, itemKey, effectiveValue) }}
+                                                    >
                                                         <div className="flex items-center gap-2">
                                                             <span className="text-base">🏠</span>
                                                             <span className="inline-flex items-center justify-center bg-blue-100 text-blue-700 font-bold text-xs rounded px-1.5 py-0.5 min-w-[28px]">{guest.nights_count}×</span>
@@ -937,7 +940,7 @@ export default function SettlementPage() {
                                                             </div>
                                                         </div>
                                                         {isEditing ? (
-                                                            <div className="flex items-center gap-1">
+                                                            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                                                                 <input
                                                                     type="number"
                                                                     value={editingItemValue}
@@ -950,8 +953,8 @@ export default function SettlementPage() {
                                                                     }}
                                                                 />
                                                                 <span className="text-gray-400 text-xs">Kč</span>
-                                                                <button onClick={() => saveItemOverride(guest.id, itemKey)} className="text-green-600 hover:text-green-700 p-0.5"><Check className="w-3.5 h-3.5" /></button>
-                                                                <button onClick={() => setEditingItemKey(null)} className="text-gray-400 hover:text-gray-600 p-0.5"><X className="w-3.5 h-3.5" /></button>
+                                                                <button onClick={() => saveItemOverride(guest.id, itemKey)} className="text-green-600 hover:text-green-700 p-1"><Check className="w-4 h-4" /></button>
+                                                                <button onClick={() => setEditingItemKey(null)} className="text-gray-400 hover:text-gray-600 p-1"><X className="w-4 h-4" /></button>
                                                             </div>
                                                         ) : (
                                                             <div className="flex items-center gap-1.5">
@@ -959,17 +962,11 @@ export default function SettlementPage() {
                                                                     <span className="text-xs text-gray-400 line-through">{guest.nightsTotal.toLocaleString('cs-CZ')}</span>
                                                                 )}
                                                                 <span className={`font-medium ${hasOverride ? 'text-amber-700' : 'text-gray-900'}`}>{effectiveValue.toLocaleString('cs-CZ')} Kč</span>
-                                                                <button
-                                                                    onClick={() => startEditItem(guest.id, itemKey, effectiveValue)}
-                                                                    className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-blue-600 transition-opacity p-0.5"
-                                                                    title="Upravit částku"
-                                                                >
-                                                                    <Edit2 className="w-3.5 h-3.5" />
-                                                                </button>
+                                                                <Edit2 className="w-3.5 h-3.5 text-gray-300 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" />
                                                                 {hasOverride && (
                                                                     <button
-                                                                        onClick={() => removeItemOverride(guest.id, itemKey)}
-                                                                        className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity p-0.5"
+                                                                        onClick={(e) => { e.stopPropagation(); removeItemOverride(guest.id, itemKey) }}
+                                                                        className="text-gray-400 hover:text-red-500 p-0.5"
                                                                         title="Vrátit původní"
                                                                     >
                                                                         <X className="w-3 h-3" />
@@ -990,7 +987,11 @@ export default function SettlementPage() {
                                                 const effectiveValue = getItemValue(guest.id, itemKey, item.totalPrice)
 
                                                 return (
-                                                    <div key={idx} className={`flex items-center justify-between py-1.5 text-sm group rounded-lg px-2 -mx-2 ${hasOverride ? 'bg-amber-50' : 'hover:bg-gray-50'}`}>
+                                                    <div
+                                                        key={idx}
+                                                        className={`flex items-center justify-between py-2.5 text-sm group rounded-lg px-2 -mx-2 cursor-pointer ${hasOverride ? 'bg-amber-50' : 'hover:bg-gray-50 active:bg-gray-100'}`}
+                                                        onClick={() => { if (!isEditing) startEditItem(guest.id, itemKey, effectiveValue) }}
+                                                    >
                                                         <div className="flex items-center gap-2">
                                                             <span className="text-base">🍕</span>
                                                             <span className="inline-flex items-center justify-center bg-orange-100 text-orange-700 font-bold text-xs rounded px-1.5 py-0.5 min-w-[28px]">{item.qty}×</span>
@@ -1000,7 +1001,7 @@ export default function SettlementPage() {
                                                             </div>
                                                         </div>
                                                         {isEditing ? (
-                                                            <div className="flex items-center gap-1">
+                                                            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                                                                 <input
                                                                     type="number"
                                                                     value={editingItemValue}
@@ -1013,8 +1014,8 @@ export default function SettlementPage() {
                                                                     }}
                                                                 />
                                                                 <span className="text-gray-400 text-xs">Kč</span>
-                                                                <button onClick={() => saveItemOverride(guest.id, itemKey)} className="text-green-600 hover:text-green-700 p-0.5"><Check className="w-3.5 h-3.5" /></button>
-                                                                <button onClick={() => setEditingItemKey(null)} className="text-gray-400 hover:text-gray-600 p-0.5"><X className="w-3.5 h-3.5" /></button>
+                                                                <button onClick={() => saveItemOverride(guest.id, itemKey)} className="text-green-600 hover:text-green-700 p-1"><Check className="w-4 h-4" /></button>
+                                                                <button onClick={() => setEditingItemKey(null)} className="text-gray-400 hover:text-gray-600 p-1"><X className="w-4 h-4" /></button>
                                                             </div>
                                                         ) : (
                                                             <div className="flex items-center gap-1.5">
@@ -1022,17 +1023,11 @@ export default function SettlementPage() {
                                                                     <span className="text-xs text-gray-400 line-through">{item.totalPrice.toLocaleString('cs-CZ')}</span>
                                                                 )}
                                                                 <span className={`font-medium ${hasOverride ? 'text-amber-700' : 'text-gray-900'}`}>{effectiveValue.toLocaleString('cs-CZ')} Kč</span>
-                                                                <button
-                                                                    onClick={() => startEditItem(guest.id, itemKey, effectiveValue)}
-                                                                    className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-blue-600 transition-opacity p-0.5"
-                                                                    title="Upravit částku"
-                                                                >
-                                                                    <Edit2 className="w-3.5 h-3.5" />
-                                                                </button>
+                                                                <Edit2 className="w-3.5 h-3.5 text-gray-300 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" />
                                                                 {hasOverride && (
                                                                     <button
-                                                                        onClick={() => removeItemOverride(guest.id, itemKey)}
-                                                                        className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity p-0.5"
+                                                                        onClick={(e) => { e.stopPropagation(); removeItemOverride(guest.id, itemKey) }}
+                                                                        className="text-gray-400 hover:text-red-500 p-0.5"
                                                                         title="Vrátit původní"
                                                                     >
                                                                         <X className="w-3 h-3" />
@@ -1053,14 +1048,18 @@ export default function SettlementPage() {
                                                 const effectiveValue = getItemValue(guest.id, itemKey, item.totalPrice)
 
                                                 return (
-                                                    <div key={idx} className={`flex items-center justify-between py-1.5 text-sm group rounded-lg px-2 -mx-2 ${hasOverride ? 'bg-amber-50' : 'hover:bg-gray-50'}`}>
+                                                    <div
+                                                        key={idx}
+                                                        className={`flex items-center justify-between py-2.5 text-sm group rounded-lg px-2 -mx-2 cursor-pointer ${hasOverride ? 'bg-amber-50' : 'hover:bg-gray-50 active:bg-gray-100'}`}
+                                                        onClick={() => { if (!isEditing) startEditItem(guest.id, itemKey, effectiveValue) }}
+                                                    >
                                                         <div className="flex items-center gap-2">
                                                             <span className="text-base">💻</span>
                                                             <span className="inline-flex items-center justify-center bg-purple-100 text-purple-700 font-bold text-xs rounded px-1.5 py-0.5 min-w-[28px]">{item.qty}×</span>
                                                             <span className="text-gray-900 font-medium">{item.name}</span>
                                                         </div>
                                                         {isEditing ? (
-                                                            <div className="flex items-center gap-1">
+                                                            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                                                                 <input
                                                                     type="number"
                                                                     value={editingItemValue}
@@ -1073,8 +1072,8 @@ export default function SettlementPage() {
                                                                     }}
                                                                 />
                                                                 <span className="text-gray-400 text-xs">Kč</span>
-                                                                <button onClick={() => saveItemOverride(guest.id, itemKey)} className="text-green-600 hover:text-green-700 p-0.5"><Check className="w-3.5 h-3.5" /></button>
-                                                                <button onClick={() => setEditingItemKey(null)} className="text-gray-400 hover:text-gray-600 p-0.5"><X className="w-3.5 h-3.5" /></button>
+                                                                <button onClick={() => saveItemOverride(guest.id, itemKey)} className="text-green-600 hover:text-green-700 p-1"><Check className="w-4 h-4" /></button>
+                                                                <button onClick={() => setEditingItemKey(null)} className="text-gray-400 hover:text-gray-600 p-1"><X className="w-4 h-4" /></button>
                                                             </div>
                                                         ) : (
                                                             <div className="flex items-center gap-1.5">
@@ -1082,17 +1081,11 @@ export default function SettlementPage() {
                                                                     <span className="text-xs text-gray-400 line-through">{item.totalPrice.toLocaleString('cs-CZ')}</span>
                                                                 )}
                                                                 <span className={`font-medium ${hasOverride ? 'text-amber-700' : 'text-gray-900'}`}>{effectiveValue.toLocaleString('cs-CZ')} Kč</span>
-                                                                <button
-                                                                    onClick={() => startEditItem(guest.id, itemKey, effectiveValue)}
-                                                                    className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-blue-600 transition-opacity p-0.5"
-                                                                    title="Upravit částku"
-                                                                >
-                                                                    <Edit2 className="w-3.5 h-3.5" />
-                                                                </button>
+                                                                <Edit2 className="w-3.5 h-3.5 text-gray-300 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" />
                                                                 {hasOverride && (
                                                                     <button
-                                                                        onClick={() => removeItemOverride(guest.id, itemKey)}
-                                                                        className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity p-0.5"
+                                                                        onClick={(e) => { e.stopPropagation(); removeItemOverride(guest.id, itemKey) }}
+                                                                        className="text-gray-400 hover:text-red-500 p-0.5"
                                                                         title="Vrátit původní"
                                                                     >
                                                                         <X className="w-3 h-3" />
@@ -1116,13 +1109,26 @@ export default function SettlementPage() {
 
                                                 return (
                                                     <div className="space-y-2">
-                                                        <div className={`flex items-center justify-between py-1.5 text-sm group rounded-lg px-2 -mx-2 ${hasOverride ? 'bg-amber-50' : 'hover:bg-gray-50'}`}>
+                                                        <div
+                                                            className={`flex items-center justify-between py-2.5 text-sm group rounded-lg px-2 -mx-2 cursor-pointer ${hasOverride ? 'bg-amber-50' : 'hover:bg-gray-50 active:bg-gray-100'}`}
+                                                            onClick={() => {
+                                                                if (!isEditing) {
+                                                                    if (effectiveValue > 0) {
+                                                                        startEditItem(guest.id, itemKey, effectiveValue)
+                                                                    } else {
+                                                                        setTipEditGuest(guest.id)
+                                                                        const currentTotal = subtotalNoTip + effectiveValue
+                                                                        setTipFinalAmount(currentTotal > 0 ? currentTotal.toString() : '')
+                                                                    }
+                                                                }
+                                                            }}
+                                                        >
                                                             <span className="text-pink-600 flex items-center gap-1">
                                                                 <Heart className="w-3.5 h-3.5 fill-pink-500" />
                                                                 Dýško{guest.tipPercentage ? ` (${guest.tipPercentage}%)` : ''}
                                                             </span>
                                                             {isEditing ? (
-                                                                <div className="flex items-center gap-1">
+                                                                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                                                                     <input
                                                                         type="number"
                                                                         value={editingItemValue}
@@ -1135,8 +1141,8 @@ export default function SettlementPage() {
                                                                         }}
                                                                     />
                                                                     <span className="text-gray-400 text-xs">Kč</span>
-                                                                    <button onClick={() => saveItemOverride(guest.id, itemKey)} className="text-green-600 hover:text-green-700 p-0.5"><Check className="w-3.5 h-3.5" /></button>
-                                                                    <button onClick={() => setEditingItemKey(null)} className="text-gray-400 hover:text-gray-600 p-0.5"><X className="w-3.5 h-3.5" /></button>
+                                                                    <button onClick={() => saveItemOverride(guest.id, itemKey)} className="text-green-600 hover:text-green-700 p-1"><Check className="w-4 h-4" /></button>
+                                                                    <button onClick={() => setEditingItemKey(null)} className="text-gray-400 hover:text-gray-600 p-1"><X className="w-4 h-4" /></button>
                                                                 </div>
                                                             ) : (
                                                                 <div className="flex items-center gap-1.5">
@@ -1146,17 +1152,11 @@ export default function SettlementPage() {
                                                                                 <span className="text-xs text-gray-400 line-through">{guest.tip.toLocaleString('cs-CZ')}</span>
                                                                             )}
                                                                             <span className={`font-medium ${hasOverride ? 'text-amber-700' : 'text-pink-600'}`}>{effectiveValue.toLocaleString('cs-CZ')} Kč</span>
-                                                                            <button
-                                                                                onClick={() => startEditItem(guest.id, itemKey, effectiveValue)}
-                                                                                className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-blue-600 transition-opacity p-0.5"
-                                                                                title="Upravit částku"
-                                                                            >
-                                                                                <Edit2 className="w-3.5 h-3.5" />
-                                                                            </button>
+                                                                            <Edit2 className="w-3.5 h-3.5 text-gray-300 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" />
                                                                             {hasOverride && (
                                                                                 <button
-                                                                                    onClick={() => removeItemOverride(guest.id, itemKey)}
-                                                                                    className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity p-0.5"
+                                                                                    onClick={(e) => { e.stopPropagation(); removeItemOverride(guest.id, itemKey) }}
+                                                                                    className="text-gray-400 hover:text-red-500 p-0.5"
                                                                                     title="Vrátit původní"
                                                                                 >
                                                                                     <X className="w-3 h-3" />
@@ -1164,20 +1164,11 @@ export default function SettlementPage() {
                                                                             )}
                                                                         </>
                                                                     ) : (
-                                                                        <span className="text-gray-400 text-sm">—</span>
+                                                                        <>
+                                                                            <span className="text-gray-400 text-sm">—</span>
+                                                                            <Heart className="w-3.5 h-3.5 text-pink-300 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" />
+                                                                        </>
                                                                     )}
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            setTipEditGuest(guest.id)
-                                                                            // Pre-fill with current total (subtotal + existing tip)
-                                                                            const currentTotal = subtotalNoTip + effectiveValue
-                                                                            setTipFinalAmount(currentTotal > 0 ? currentTotal.toString() : '')
-                                                                        }}
-                                                                        className="opacity-0 group-hover:opacity-100 text-pink-400 hover:text-pink-600 transition-opacity p-0.5"
-                                                                        title={effectiveValue > 0 ? 'Upravit dýško' : 'Přidat dýško'}
-                                                                    >
-                                                                        <Heart className="w-3.5 h-3.5" />
-                                                                    </button>
                                                                 </div>
                                                             )}
                                                         </div>
@@ -1257,13 +1248,13 @@ export default function SettlementPage() {
 
                                             {/* Custom cost items */}
                                             {(settlement.custom_items || []).map((ci: CustomItem, idx: number) => (
-                                                <div key={`custom-${idx}`} className="flex items-center justify-between py-1.5 text-sm group rounded-lg px-2 -mx-2 bg-blue-50">
+                                                <div key={`custom-${idx}`} className="flex items-center justify-between py-2.5 text-sm group rounded-lg px-2 -mx-2 bg-blue-50">
                                                     <span className="text-blue-700">📌 {ci.label}</span>
                                                     <div className="flex items-center gap-1.5">
                                                         <span className="font-medium text-blue-700">{ci.amount.toLocaleString('cs-CZ')} Kč</span>
                                                         <button
                                                             onClick={() => removeCustomItem(guest.id, idx)}
-                                                            className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity p-0.5"
+                                                            className="text-gray-400 hover:text-red-500 p-0.5"
                                                             title="Odebrat položku"
                                                         >
                                                             <X className="w-3.5 h-3.5" />
