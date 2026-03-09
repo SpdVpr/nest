@@ -114,6 +114,8 @@ export default function SettlementPage() {
 
     const [saving, setSaving] = useState(false)
     const [pricePerNight, setPricePerNight] = useState(0)
+    const [surchargeEnabled, setSurchargeEnabled] = useState(false)
+    const [guestCount, setGuestCount] = useState(0)
 
     useEffect(() => {
         const token = localStorage.getItem('admin_token')
@@ -144,6 +146,8 @@ export default function SettlementPage() {
                     const costsData = await costsRes.json()
                     setGuests(costsData.guests || [])
                     setPricePerNight(costsData.pricePerNight || 0)
+                    setSurchargeEnabled(costsData.surchargeEnabled || false)
+                    setGuestCount(costsData.guestCount || 0)
                 }
             }
 
@@ -936,7 +940,16 @@ export default function SettlementPage() {
                                                             <span className="inline-flex items-center justify-center bg-blue-100 text-blue-700 font-bold text-xs rounded px-1.5 py-0.5 min-w-[28px]">{guest.nights_count}×</span>
                                                             <div className="flex flex-col">
                                                                 <span className="text-gray-900 font-medium">Ubytování</span>
-                                                                <span className="text-xs text-gray-400">{pricePerNight} Kč / noc</span>
+                                                                {(() => {
+                                                                    const surchargePerNight = surchargeEnabled ? Math.max(0, 10 - guestCount) * 150 : 0
+                                                                    return surchargePerNight > 0 ? (
+                                                                        <span className="text-xs text-gray-400">
+                                                                            {pricePerNight.toLocaleString('cs-CZ')} + <span className="text-amber-500 font-medium">{surchargePerNight}</span> Kč / noc
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="text-xs text-gray-400">{pricePerNight.toLocaleString('cs-CZ')} Kč / noc</span>
+                                                                    )
+                                                                })()}
                                                             </div>
                                                         </div>
                                                         {isEditing ? (
