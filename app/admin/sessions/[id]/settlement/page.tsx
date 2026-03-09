@@ -928,7 +928,7 @@ export default function SettlementPage() {
 
                                                 return (
                                                     <div
-                                                        className={`flex items-center justify-between py-2.5 text-sm group rounded-lg px-2 -mx-2 cursor-pointer ${hasOverride ? 'bg-amber-50' : 'hover:bg-gray-50 active:bg-gray-100'}`}
+                                                        className={`flex items-center justify-between py-2.5 text-sm group rounded-lg px-2 -mx-2 cursor-pointer hover:bg-gray-50/50 ${hasOverride ? 'border-l-2 border-amber-400 pl-3' : ''}`}
                                                         onClick={() => { if (!isEditing) startEditItem(guest.id, itemKey, effectiveValue) }}
                                                     >
                                                         <div className="flex items-center gap-2">
@@ -989,7 +989,7 @@ export default function SettlementPage() {
                                                 return (
                                                     <div
                                                         key={idx}
-                                                        className={`flex items-center justify-between py-2.5 text-sm group rounded-lg px-2 -mx-2 cursor-pointer ${hasOverride ? 'bg-amber-50' : 'hover:bg-gray-50 active:bg-gray-100'}`}
+                                                        className={`flex items-center justify-between py-2.5 text-sm group rounded-lg px-2 -mx-2 cursor-pointer hover:bg-gray-50/50 ${hasOverride ? 'border-l-2 border-amber-400 pl-3' : ''}`}
                                                         onClick={() => { if (!isEditing) startEditItem(guest.id, itemKey, effectiveValue) }}
                                                     >
                                                         <div className="flex items-center gap-2">
@@ -1050,7 +1050,7 @@ export default function SettlementPage() {
                                                 return (
                                                     <div
                                                         key={idx}
-                                                        className={`flex items-center justify-between py-2.5 text-sm group rounded-lg px-2 -mx-2 cursor-pointer ${hasOverride ? 'bg-amber-50' : 'hover:bg-gray-50 active:bg-gray-100'}`}
+                                                        className={`flex items-center justify-between py-2.5 text-sm group rounded-lg px-2 -mx-2 cursor-pointer hover:bg-gray-50/50 ${hasOverride ? 'border-l-2 border-amber-400 pl-3' : ''}`}
                                                         onClick={() => { if (!isEditing) startEditItem(guest.id, itemKey, effectiveValue) }}
                                                     >
                                                         <div className="flex items-center gap-2">
@@ -1110,7 +1110,7 @@ export default function SettlementPage() {
                                                 return (
                                                     <div className="space-y-2">
                                                         <div
-                                                            className={`flex items-center justify-between py-2.5 text-sm group rounded-lg px-2 -mx-2 cursor-pointer ${hasOverride ? 'bg-amber-50' : 'hover:bg-gray-50 active:bg-gray-100'}`}
+                                                            className={`flex items-center justify-between py-2.5 text-sm group rounded-lg px-2 -mx-2 cursor-pointer hover:bg-gray-50/50 ${hasOverride ? 'border-l-2 border-amber-400 pl-3' : ''}`}
                                                             onClick={() => {
                                                                 if (!isEditing) {
                                                                     if (effectiveValue > 0) {
