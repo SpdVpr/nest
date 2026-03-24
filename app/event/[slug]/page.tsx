@@ -5,22 +5,32 @@ import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import {
   Calendar, Pizza, MonitorSmartphone, Users, AlertCircle,
-  Armchair, UtensilsCrossed, Gamepad2, Wallet, UserPlus, ChevronRight, Trophy
+  Armchair, UtensilsCrossed, Gamepad2, Wallet, UserPlus, ChevronRight, Trophy, LogIn, UserCheck
 } from 'lucide-react'
-import { Session } from '@/types/database.types'
+import { Session, Guest } from '@/types/database.types'
 import { formatEventRange } from '@/lib/utils'
 import NestPage from '@/components/NestPage'
 import NestLoading from '@/components/NestLoading'
+import EventChecklist from '@/components/EventChecklist'
+import { useGuestAuth } from '@/lib/auth-context'
+import { guestStorage } from '@/lib/guest-storage'
 
 export default function EventPage() {
   const params = useParams()
   const router = useRouter()
   const slug = params?.slug as string
+  const { isAuthenticated, userProfile, getClaimedGuestForSession } = useGuestAuth()
 
   const [session, setSession] = useState<Session | null>(null)
   const [guestCount, setGuestCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Checklist state
+  const [currentGuest, setCurrentGuest] = useState<Guest | null>(null)
+  const [seatReserved, setSeatReserved] = useState(false)
+  const [hwReserved, setHwReserved] = useState(false)
+  const [gamesVoted, setGamesVoted] = useState(false)
 
   useEffect(() => {
     if (slug) {
@@ -46,9 +56,49 @@ export default function EventPage() {
       setSession(data.session)
 
       const guestsResponse = await fetch(`/api/event/${slug}/guests`)
+      let allGuests: Guest[] = []
       if (guestsResponse.ok) {
         const guestsData = await guestsResponse.json()
-        setGuestCount(guestsData.guests?.length || 0)
+        allGuests = guestsData.guests || []
+        setGuestCount(allGuests.length)
+      }
+
+      // Determine current guest (from auth context or local storage)
+      const storedGuest = guestStorage.getCurrentGuest(slug)
+      const myGuest = allGuests.find((g: Guest) => g.id === storedGuest?.id) || null
+      setCurrentGuest(myGuest)
+
+      // Fetch checklist data if we have a guest and a session
+      if (myGuest && data.session) {
+        const sessionId = data.session.id
+        try {
+          // Seats
+          const seatsRes = await fetch(`/api/seats/reservations?session_id=${sessionId}`)
+          if (seatsRes.ok) {
+            const seatsData = await seatsRes.json()
+            const mySeat = (seatsData.reservations || []).some((r: any) => r.guest_id === myGuest.id)
+            setSeatReserved(mySeat)
+          }
+
+          // Hardware
+          const hwRes = await fetch(`/api/hardware/reservations?session_id=${sessionId}`)
+          if (hwRes.ok) {
+            const hwData = await hwRes.json()
+            const myHw = (hwData.reservations || []).some((r: any) => r.guest_id === myGuest.id && r.status === 'active')
+            setHwReserved(myHw)
+          }
+
+          // Games - check if guest has any votes
+          const gamesRes = await fetch(`/api/event/${slug}/games`)
+          if (gamesRes.ok) {
+            const gamesData = await gamesRes.json()
+            const votes = gamesData.votes || []
+            const hasVoted = votes.some((v: any) => v.guest_id === myGuest.id)
+            setGamesVoted(hasVoted)
+          }
+        } catch {
+          // Don't fail the page if checklist fetch fails
+        }
       }
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -81,6 +131,9 @@ export default function EventPage() {
       </NestPage>
     )
   }
+
+  // Check if authenticated user has a claimed guest for this session
+  const claimedGuest = session ? getClaimedGuestForSession(session.id) : null
 
   const navItems = [
     {
@@ -181,26 +234,74 @@ export default function EventPage() {
         )}
       </div>
 
-      {/* REGISTRATION — Dominant CTA */}
-      <Link
-        href={`/event/${slug}/register`}
-        className="block mb-6 group"
-      >
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[var(--nest-yellow-dark)] to-[var(--nest-yellow)] p-5 nest-glow transition-all duration-300 group-hover:scale-[1.02]">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-[var(--nest-dark)]/20 flex items-center justify-center">
-                <UserPlus className="w-6 h-6 text-[var(--nest-dark)]" />
-              </div>
-              <div>
-                <h2 className="text-lg font-bold text-[var(--nest-dark)]">Registrace na akci</h2>
-                <p className="text-sm text-[var(--nest-dark)]/70">Zaregistruj se a vyber si svůj termín</p>
-              </div>
-            </div>
-            <ChevronRight className="w-6 h-6 text-[var(--nest-dark)]/60 group-hover:translate-x-1 transition-transform" />
+      {/* Authenticated user badge */}
+      {isAuthenticated && claimedGuest && (
+        <div className="mb-4 flex items-center gap-3 px-4 py-3 rounded-xl" style={{ backgroundColor: 'rgba(34, 197, 94, 0.08)', border: '1px solid rgba(34, 197, 94, 0.2)' }}>
+          <UserCheck className="w-5 h-5 text-green-400 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <span className="text-sm text-green-300">Přihlášen/a jako </span>
+            <span className="text-sm font-semibold text-green-200">{claimedGuest.name}</span>
           </div>
         </div>
-      </Link>
+      )}
+
+      {/* Checklist — shows after registration */}
+      {currentGuest && session && (
+        <EventChecklist
+          slug={slug}
+          session={session}
+          guest={currentGuest}
+          seatReserved={seatReserved}
+          hwReserved={hwReserved}
+          gamesVoted={gamesVoted}
+        />
+      )}
+
+      {/* REGISTRATION — Dominant CTA (hide if user already has claimed guest) */}
+      {!claimedGuest && (
+        <Link
+          href={`/event/${slug}/register`}
+          className="block mb-4 group"
+        >
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[var(--nest-yellow-dark)] to-[var(--nest-yellow)] p-5 nest-glow transition-all duration-300 group-hover:scale-[1.02]">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-[var(--nest-dark)]/20 flex items-center justify-center">
+                  <UserPlus className="w-6 h-6 text-[var(--nest-dark)]" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-[var(--nest-dark)]">Registrace na akci</h2>
+                  <p className="text-sm text-[var(--nest-dark)]/70">Zaregistruj se a vyber si svůj termín</p>
+                </div>
+              </div>
+              <ChevronRight className="w-6 h-6 text-[var(--nest-dark)]/60 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+        </Link>
+      )}
+
+      {/* LOGIN CTA — for users who aren't authenticated yet */}
+      {!isAuthenticated && (
+        <Link
+          href={`/auth/login?redirect=/event/${slug}`}
+          className="block mb-6 group"
+        >
+          <div className="relative overflow-hidden rounded-2xl p-4 transition-all duration-300 group-hover:scale-[1.01]" style={{ backgroundColor: 'var(--nest-surface)', border: '1px solid var(--nest-border)' }}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)' }}>
+                  <LogIn className="w-5 h-5 text-[var(--nest-yellow)]" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-[var(--nest-white)]">Přihlásit se</h3>
+                  <p className="text-xs text-[var(--nest-white-40)]">Propoj svůj účet a uchovej historii</p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-[var(--nest-white-40)] group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+        </Link>
+      )}
 
       {/* Navigation Grid — compact cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">

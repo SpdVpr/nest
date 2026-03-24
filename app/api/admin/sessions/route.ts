@@ -70,8 +70,15 @@ export async function POST(request: NextRequest) {
     // Generate slug from name and date with random 4-digit suffix for uniqueness
     const startDate = start_date || new Date().toISOString()
     const dateStr = new Date(startDate).toISOString().split('T')[0] // YYYY-MM-DD
+    // Transliterate Czech diacritics before slugifying
+    const diacriticsMap: Record<string, string> = {
+      'á': 'a', 'č': 'c', 'ď': 'd', 'é': 'e', 'ě': 'e', 'í': 'i',
+      'ň': 'n', 'ó': 'o', 'ř': 'r', 'š': 's', 'ť': 't', 'ú': 'u',
+      'ů': 'u', 'ý': 'y', 'ž': 'z',
+    }
     const slugBase = `${name}-${dateStr}`
       .toLowerCase()
+      .replace(/[áčďéěíňóřšťúůýž]/g, ch => diacriticsMap[ch] || ch)
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '')
       .substring(0, 50)

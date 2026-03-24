@@ -2,7 +2,7 @@
 import { getFirebaseAdminDb } from './admin'
 import { Timestamp } from 'firebase-admin/firestore'
 import type { DocumentData } from 'firebase-admin/firestore'
-import { Session, Guest, Product, HardwareItem } from '@/types/database.types'
+import { Session, Guest, Product, HardwareItem, UserProfile } from '@/types/database.types'
 
 /**
  * Convert Firestore document to typed object with proper date handling
@@ -201,5 +201,62 @@ export async function getHardwareItemById(itemId: string): Promise<HardwareItem 
   }
 
   return docToObject<HardwareItem>(itemDoc.data()!, itemDoc.id)
+}
+
+/**
+ * Get user profile by Firebase Auth UID
+ */
+export async function getUserProfile(uid: string): Promise<UserProfile | null> {
+  const db = getFirebaseAdminDb()
+  const userDoc = await db.collection('users').doc(uid).get()
+
+  if (!userDoc.exists) {
+    return null
+  }
+
+  return docToObject<UserProfile>(userDoc.data()!, userDoc.id)
+}
+
+/**
+ * Get all guests claimed by a user (across all sessions)
+ */
+export async function getGuestsByUserId(userId: string): Promise<Guest[]> {
+  const db = getFirebaseAdminDb()
+  const snapshot = await db.collection('guests')
+    .where('user_id', '==', userId)
+    .get()
+
+  const guests = snapshot.docs.map(doc => docToObject<Guest>(doc.data(), doc.id))
+  return guests.sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/**
+ * Get unclaimed guests for a session (where user_id is null or absent)
+ */
+export async function getUnclaimedGuestsBySessionId(sessionId: string): Promise<Guest[]> {
+  const db = getFirebaseAdminDb()
+  // Firestore doesn't support "field is null OR field doesn't exist" in a single query,
+  // so we get all active guests and filter in memory
+  const snapshot = await db.collection('guests')
+    .where('session_id', '==', sessionId)
+    .where('is_active', '==', true)
+    .get()
+
+  const guests = snapshot.docs
+    .map(doc => docToObject<Guest>(doc.data(), doc.id))
+    .filter(g => !g.user_id)
+
+  return guests.sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/**
+ * Get all sessions (for claiming UI)
+ */
+export async function getAllSessions(): Promise<Session[]> {
+  const db = getFirebaseAdminDb()
+  const snapshot = await db.collection('sessions').get()
+
+  const sessions = snapshot.docs.map(doc => docToObject<Session>(doc.data(), doc.id))
+  return sessions.sort((a, b) => b.created_at.localeCompare(a.created_at))
 }
 

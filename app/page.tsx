@@ -1,14 +1,49 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { QRCodeSVG } from 'qrcode.react'
+import { LogIn, Calendar, ChevronRight, User, LogOut } from 'lucide-react'
+import { useGuestAuth } from '@/lib/auth-context'
 
 export default function HomePage() {
   const router = useRouter()
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const { userProfile, isAuthenticated, claimedGuests, loading: authLoading, logout } = useGuestAuth()
+
+  const [sessionDetails, setSessionDetails] = useState<Record<string, { name: string; slug: string; start_date: string; end_date: string | null }>>({})
+
+  // Fetch session details for claimed guests
+  useEffect(() => {
+    if (!isAuthenticated || claimedGuests.length === 0) return
+
+    const fetchSessions = async () => {
+      const details: Record<string, any> = {}
+      await Promise.all(
+        claimedGuests.map(async (guest) => {
+          if (details[guest.session_id]) return
+          try {
+            const res = await fetch(`/api/sessions/${guest.session_id}`)
+            if (res.ok) {
+              const data = await res.json()
+              details[guest.session_id] = {
+                name: data.session?.name || 'Event',
+                slug: data.session?.slug || '',
+                start_date: data.session?.start_date || '',
+                end_date: data.session?.end_date || null,
+              }
+            }
+          } catch { }
+        })
+      )
+      setSessionDetails(details)
+    }
+
+    fetchSessions()
+  }, [isAuthenticated, claimedGuests])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -44,7 +79,26 @@ export default function HomePage() {
     }
   }
 
+  const handleLogout = async () => {
+    await logout()
+  }
+
   const siteUrl = 'https://nest-rust.vercel.app/'
+
+  // Get unique sessions from claimed guests
+  const userSessions = claimedGuests
+    .filter(g => sessionDetails[g.session_id]?.slug)
+    .reduce((acc, guest) => {
+      if (!acc.find(s => s.sessionId === guest.session_id)) {
+        const session = sessionDetails[guest.session_id]
+        acc.push({
+          sessionId: guest.session_id,
+          guestName: guest.name,
+          ...session,
+        })
+      }
+      return acc
+    }, [] as { sessionId: string; guestName: string; name: string; slug: string; start_date: string; end_date: string | null }[])
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: 'var(--nest-bg)' }}>
@@ -62,6 +116,89 @@ export default function HomePage() {
             LAN Party Hub
           </p>
         </div>
+
+        {/* Authenticated user — show their events */}
+        {isAuthenticated && userProfile && (
+          <div className="w-full space-y-4">
+            {/* User badge */}
+            <div
+              className="w-full rounded-2xl p-4 flex items-center justify-between"
+              style={{ backgroundColor: 'var(--nest-surface)', border: '1px solid var(--nest-border)' }}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'rgba(245, 158, 11, 0.15)' }}>
+                  {userProfile.avatar_url ? (
+                    <img src={userProfile.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover" />
+                  ) : (
+                    <User className="w-5 h-5" style={{ color: 'var(--nest-yellow)' }} />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold truncate" style={{ color: 'var(--nest-text-primary)' }}>
+                    {userProfile.display_name}
+                  </div>
+                  <div className="text-xs truncate" style={{ color: 'var(--nest-text-tertiary)' }}>
+                    {userProfile.email}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <Link
+                  href="/auth/profile"
+                  className="p-2 rounded-lg transition-colors hover:bg-white/5"
+                  title="Profil"
+                >
+                  <User className="w-4 h-4" style={{ color: 'var(--nest-text-tertiary)' }} />
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="p-2 rounded-lg transition-colors hover:bg-white/5"
+                  title="Odhlásit se"
+                >
+                  <LogOut className="w-4 h-4" style={{ color: 'var(--nest-text-tertiary)' }} />
+                </button>
+              </div>
+            </div>
+
+            {/* User's events — quick access */}
+            {userSessions.length > 0 && (
+              <div
+                className="w-full rounded-2xl overflow-hidden"
+                style={{ backgroundColor: 'var(--nest-surface)', border: '1px solid var(--nest-border)' }}
+              >
+                <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--nest-border)' }}>
+                  <h2 className="text-sm font-semibold" style={{ color: 'var(--nest-text-primary)' }}>
+                    Tvoje eventy
+                  </h2>
+                </div>
+                {userSessions.map((session, idx) => (
+                  <Link
+                    key={session.sessionId}
+                    href={`/event/${session.slug}`}
+                    className="flex items-center justify-between px-4 py-3 transition-colors hover:bg-[var(--nest-yellow)]/5"
+                    style={idx < userSessions.length - 1 ? { borderBottom: '1px solid var(--nest-border)' } : {}}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)' }}>
+                        <Calendar className="w-4 h-4" style={{ color: 'var(--nest-yellow)' }} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium truncate" style={{ color: 'var(--nest-text-primary)' }}>
+                          {session.name}
+                        </div>
+                        <div className="text-xs" style={{ color: 'var(--nest-text-tertiary)' }}>
+                          jako {session.guestName}
+                          {session.start_date && ` · ${new Date(session.start_date).toLocaleDateString('cs-CZ')}`}
+                        </div>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--nest-text-tertiary)' }} />
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Password Form */}
         <div
@@ -137,6 +274,30 @@ export default function HomePage() {
             </button>
           </form>
         </div>
+
+        {/* Login CTA — only show if not authenticated */}
+        {!authLoading && !isAuthenticated && (
+          <Link
+            href="/auth/login"
+            className="w-full rounded-2xl p-4 flex items-center justify-between transition-colors hover:bg-white/[0.02]"
+            style={{ backgroundColor: 'var(--nest-surface)', border: '1px solid var(--nest-border)' }}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)' }}>
+                <LogIn className="w-4 h-4" style={{ color: 'var(--nest-yellow)' }} />
+              </div>
+              <div>
+                <div className="text-sm font-semibold" style={{ color: 'var(--nest-text-primary)' }}>
+                  Přihlásit se
+                </div>
+                <div className="text-xs" style={{ color: 'var(--nest-text-tertiary)' }}>
+                  Propoj účet a uchovej historii
+                </div>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4" style={{ color: 'var(--nest-text-tertiary)' }} />
+          </Link>
+        )}
 
         {/* QR Code */}
         <div className="flex flex-col items-center gap-3">

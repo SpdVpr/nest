@@ -1,9 +1,11 @@
 // @ts-nocheck
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getFirebaseAdminDb } from '@/lib/firebase/admin'
 import { Timestamp } from 'firebase-admin/firestore'
+import { verifyGuestRequest } from '@/lib/verify-guest'
+import { getGuestById } from '@/lib/firebase/queries'
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const db = getFirebaseAdminDb()
     const body = await request.json()
@@ -14,6 +16,19 @@ export async function POST(request: Request) {
     // Detailed validation
     if (!guest_id) {
       return NextResponse.json({ error: 'Missing guest_id' }, { status: 400 })
+    }
+
+    // Optional auth: verify ownership of claimed guest
+    try {
+      const authUser = await verifyGuestRequest(request)
+      if (authUser) {
+        const guest = await getGuestById(guest_id)
+        if (guest?.user_id && guest.user_id !== authUser.uid) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
+      }
+    } catch {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
     // Support both old format (hardware_item_ids) and new format (reservationItems with quantity)

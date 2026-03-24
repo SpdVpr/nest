@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { LogOut, User } from 'lucide-react'
 import { guestStorage, StoredGuest } from '@/lib/guest-storage'
+import { useGuestAuth } from '@/lib/auth-context'
 
 interface EventGuestHeaderProps {
   session_slug: string
@@ -12,6 +13,7 @@ interface EventGuestHeaderProps {
 export default function EventGuestHeader({ session_slug, onLogout }: EventGuestHeaderProps) {
   const [currentGuest, setCurrentGuest] = useState<StoredGuest | null>(null)
   const [mounted, setMounted] = useState(false)
+  const { userProfile, isAuthenticated, logout: authLogout } = useGuestAuth()
 
   useEffect(() => {
     setMounted(true)
@@ -30,7 +32,12 @@ export default function EventGuestHeader({ session_slug, onLogout }: EventGuestH
     return () => clearInterval(interval)
   }, [session_slug])
 
-  const handleLogout = () => {
+  const displayName = isAuthenticated ? userProfile?.display_name : currentGuest?.name
+
+  const handleLogout = async () => {
+    if (isAuthenticated) {
+      await authLogout()
+    }
     guestStorage.clearCurrentGuest()
     setCurrentGuest(null)
     onLogout?.()
@@ -40,7 +47,7 @@ export default function EventGuestHeader({ session_slug, onLogout }: EventGuestH
     return null
   }
 
-  if (!currentGuest) {
+  if (!displayName) {
     return null
   }
 
@@ -49,7 +56,7 @@ export default function EventGuestHeader({ session_slug, onLogout }: EventGuestH
       <div className="bg-[#efefef] rounded-lg shadow-lg p-3 flex items-center gap-3 border-2 border-purple-200">
         <div className="flex items-center gap-2">
           <User className="w-5 h-5 text-purple-600" />
-          <span className="font-semibold text-gray-900">{currentGuest.name}</span>
+          <span className="font-semibold text-gray-900">{displayName}</span>
         </div>
         <button
           onClick={handleLogout}

@@ -37,38 +37,36 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     const [loading, setLoading] = useState(true)
     const [isLegacyAuth, setIsLegacyAuth] = useState(false)
 
-    const fetchAdminUser = useCallback(async (firebaseUser: User) => {
-        try {
-            const token = await firebaseUser.getIdToken()
-            const res = await fetch('/api/admin/me', {
-                headers: { 'Authorization': `Bearer ${token}` },
-            })
-            if (res.ok) {
-                const data = await res.json()
-                setAdminUser(data.user)
-            } else {
-                setAdminUser(null)
-            }
-        } catch (error) {
-            console.error('Failed to fetch admin user:', error)
-            setAdminUser(null)
-        }
-    }, [])
 
     useEffect(() => {
         const auth = getFirebaseAuth()
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
             setUser(firebaseUser)
+            let foundAdmin = false
+
             if (firebaseUser) {
-                await fetchAdminUser(firebaseUser)
-                setIsLegacyAuth(false)
-            } else {
-                setAdminUser(null)
-                // Check for legacy admin_token
+                // Try to fetch admin user from Firestore
+                try {
+                    const token = await firebaseUser.getIdToken()
+                    const res = await fetch('/api/admin/me', {
+                        headers: { 'Authorization': `Bearer ${token}` },
+                    })
+                    if (res.ok) {
+                        const data = await res.json()
+                        setAdminUser(data.user)
+                        setIsLegacyAuth(false)
+                        foundAdmin = true
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch admin user:', error)
+                }
+            }
+
+            // If no admin found via Firebase Auth, check legacy token
+            if (!foundAdmin) {
                 const legacyToken = localStorage.getItem('admin_token')
                 if (legacyToken) {
                     setIsLegacyAuth(true)
-                    // Legacy admin user has full admin access
                     setAdminUser({
                         uid: 'legacy',
                         email: 'admin@local',
@@ -77,13 +75,21 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
                         created_at: new Date().toISOString(),
                         approved: true,
                     })
+                } else if (!firebaseUser) {
+                    setAdminUser(null)
+                    setIsLegacyAuth(false)
+                } else {
+                    // Firebase user exists but is not an admin — clear admin state
+                    setAdminUser(null)
+                    setIsLegacyAuth(false)
                 }
             }
+
             setLoading(false)
         })
 
         return () => unsubscribe()
-    }, [fetchAdminUser])
+    }, [])
 
     const logout = useCallback(async () => {
         const auth = getFirebaseAuth()

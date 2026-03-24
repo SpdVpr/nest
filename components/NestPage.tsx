@@ -1,6 +1,7 @@
 'use client'
 
 import NestNav from '@/components/NestNav'
+import LiveBroadcast from '@/components/LiveBroadcast'
 
 interface NestPageProps {
     children: React.ReactNode
@@ -35,6 +36,7 @@ export default function NestPage({
                 title={title}
                 onLogout={onLogout}
             />
+            {sessionSlug && <LiveBroadcast slug={sessionSlug} />}
             <main className={`${maxWidth} mx-auto px-4 py-6 ${className}`}>
                 {children}
             </main>

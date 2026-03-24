@@ -10,6 +10,7 @@ import DateRangeCalendar from '@/components/DateRangeCalendar'
 import { guestStorage } from '@/lib/guest-storage'
 import NestPage from '@/components/NestPage'
 import NestLoading from '@/components/NestLoading'
+import { useGuestAuth } from '@/lib/auth-context'
 
 const MIN_GUESTS_FOR_BASE_PRICE = 10
 const SURCHARGE_PER_MISSING_GUEST = 150
@@ -18,6 +19,7 @@ export default function RegisterPage() {
   const params = useParams()
   const router = useRouter()
   const slug = params?.slug as string
+  const { firebaseUser, isAuthenticated, refreshProfile, userProfile, claimedGuests } = useGuestAuth()
 
   const [session, setSession] = useState<Session | null>(null)
   const [guestCount, setGuestCount] = useState(0)
@@ -33,6 +35,13 @@ export default function RegisterPage() {
       fetchEvent()
     }
   }, [slug])
+
+  // Auto-fill name from user profile
+  useEffect(() => {
+    if (isAuthenticated && userProfile && !name) {
+      setName(userProfile.display_name)
+    }
+  }, [isAuthenticated, userProfile])
 
   const fetchEvent = async () => {
     try {
@@ -104,9 +113,15 @@ export default function RegisterPage() {
     setError(null)
 
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (firebaseUser) {
+        const token = await firebaseUser.getIdToken()
+        headers['Authorization'] = `Bearer ${token}`
+      }
+
       const response = await fetch(`/api/event/${slug}/guests`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           name: name.trim(),
           nights_count: nightsNum,
@@ -137,6 +152,11 @@ export default function RegisterPage() {
         name: guest.name,
         session_slug: slug
       })
+
+      // Refresh auth context if authenticated (to pick up the new claimed guest)
+      if (isAuthenticated) {
+        await refreshProfile()
+      }
 
       // Redirect based on whether hardware reservation is enabled
       if (session?.hardware_enabled !== false) {

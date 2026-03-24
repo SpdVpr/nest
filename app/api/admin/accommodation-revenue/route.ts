@@ -29,24 +29,40 @@ export async function GET(request: NextRequest) {
       if (sid) sessionIds.add(sid)
     })
 
-    const sessionsMap = new Map<string, number>() // session_id -> price_per_night
+    const sessionsMap = new Map<string, { price_per_night: number; surcharge_enabled: boolean }>()
     if (sessionIds.size > 0) {
       const sessionRefs = Array.from(sessionIds).map(id => db.collection('sessions').doc(id))
       const sessionDocs = await db.getAll(...sessionRefs)
       sessionDocs.forEach(doc => {
         if (doc.exists) {
-          sessionsMap.set(doc.id, doc.data()?.price_per_night || 0)
+          const data = doc.data()
+          sessionsMap.set(doc.id, {
+            price_per_night: data?.price_per_night || 0,
+            surcharge_enabled: data?.surcharge_enabled === true,
+          })
         }
       })
     }
 
-    // Calculate total revenue using cached session data
+    // Count guests per session for surcharge calculation
+    const guestsPerSession = new Map<string, number>()
+    guestsSnapshot.docs.forEach(doc => {
+      const sid = doc.data().session_id
+      guestsPerSession.set(sid, (guestsPerSession.get(sid) || 0) + 1)
+    })
+
+    // Calculate total revenue with surcharge
     let totalRevenue = 0
     guestsSnapshot.docs.forEach(doc => {
       const guestData = doc.data()
       const nightsCount = guestData.nights_count || 1
-      const pricePerNight = sessionsMap.get(guestData.session_id) || 0
-      totalRevenue += nightsCount * pricePerNight
+      const sessionInfo = sessionsMap.get(guestData.session_id)
+      if (!sessionInfo) return
+      const totalGuests = guestsPerSession.get(guestData.session_id) || 0
+      const missingGuests = sessionInfo.surcharge_enabled ? Math.max(0, 10 - totalGuests) : 0
+      const surchargePerNight = missingGuests * 150
+      const effectivePrice = sessionInfo.price_per_night + surchargePerNight
+      totalRevenue += nightsCount * effectivePrice
     })
 
     return NextResponse.json({ totalRevenue })

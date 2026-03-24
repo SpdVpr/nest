@@ -19,7 +19,8 @@ import {
   Copy,
   Shield,
   UserCog,
-  Trophy
+  Trophy,
+  UserCheck
 } from 'lucide-react'
 import { Session } from '@/types/database.types'
 import { formatDate, formatDateOnly } from '@/lib/utils'
@@ -484,7 +485,7 @@ export default function AdminDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Celkový obrat</p>
-                  <p className="text-2xl font-bold text-gray-900">{totalRevenue.toFixed(0)} Kč</p>
+                  <p className="text-2xl font-bold text-gray-900">{totalRevenue.toLocaleString('cs-CZ', { maximumFractionDigits: 0 })} Kč</p>
                 </div>
                 <DollarSign className="w-10 h-10 text-purple-500" />
               </div>
@@ -496,7 +497,7 @@ export default function AdminDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Spotřeba dnes</p>
-                  <p className="text-2xl font-bold text-gray-900">{todayConsumption.toFixed(0)} Kč</p>
+                  <p className="text-2xl font-bold text-gray-900">{todayConsumption.toLocaleString('cs-CZ', { maximumFractionDigits: 0 })} Kč</p>
                 </div>
                 <TrendingUp className="w-10 h-10 text-orange-500" />
               </div>
@@ -568,16 +569,7 @@ export default function AdminDashboard() {
             </Link>
           )}
 
-          <Link
-            href="/admin/guests"
-            className="bg-[#efefef] rounded-xl shadow hover:shadow-lg transition-shadow p-6 flex flex-col items-center text-center"
-          >
-            <div className="bg-green-100 p-4 rounded-full mb-4">
-              <Users className="w-8 h-8 text-green-600" />
-            </div>
-            <h3 className="font-semibold text-gray-900 mb-2">Správa hostů</h3>
-            <p className="text-sm text-gray-600">Přidat nebo upravit hosty</p>
-          </Link>
+          {/* Správa hostů skryta — nahrazena správou uživatelů */}
 
           <Link
             href="/admin/records"
@@ -611,8 +603,21 @@ export default function AdminDashboard() {
               <div className="bg-red-100 p-4 rounded-full mb-4">
                 <UserCog className="w-8 h-8 text-red-600" />
               </div>
+              <h3 className="font-semibold text-gray-900 mb-2">Správa brigádníků</h3>
+              <p className="text-sm text-gray-600">Role a oprávnění týmu</p>
+            </Link>
+          )}
+
+          {showUsers && (
+            <Link
+              href="/admin/registered-users"
+              className="bg-[#efefef] rounded-xl shadow hover:shadow-lg transition-shadow p-6 flex flex-col items-center text-center"
+            >
+              <div className="bg-green-100 p-4 rounded-full mb-4">
+                <UserCheck className="w-8 h-8 text-green-600" />
+              </div>
               <h3 className="font-semibold text-gray-900 mb-2">Správa uživatelů</h3>
-              <p className="text-sm text-gray-600">Role a oprávnění brigádníků</p>
+              <p className="text-sm text-gray-600">Registrace, účty a párování</p>
             </Link>
           )}
         </div>

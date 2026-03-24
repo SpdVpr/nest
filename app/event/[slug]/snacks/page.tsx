@@ -3,11 +3,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Plus, Minus, Trophy, Beer, Filter, Clock, CalendarOff } from 'lucide-react'
+import { Plus, Minus, Trophy, Beer, Filter, Clock, CalendarOff, Heart } from 'lucide-react'
 import { Session, Guest, Product } from '@/types/database.types'
 import { formatDate } from '@/lib/utils'
 import NestPage from '@/components/NestPage'
 import NestLoading from '@/components/NestLoading'
+import { useGuestAuth } from '@/lib/auth-context'
 
 interface GuestWithConsumption extends Guest {
   consumption: Array<{
@@ -20,10 +21,20 @@ interface GuestWithConsumption extends Guest {
   totalPrice: number
 }
 
+interface FavoriteProduct {
+  product_id: string
+  name: string
+  price: number
+  category: string | null
+  image_url: string | null
+  total_count: number
+}
+
 export default function EventSnacksPage() {
   const params = useParams()
   const router = useRouter()
   const slug = params?.slug as string
+  const { firebaseUser, isAuthenticated } = useGuestAuth()
 
   const [session, setSession] = useState<Session | null>(null)
   const [guests, setGuests] = useState<GuestWithConsumption[]>([])
@@ -34,6 +45,7 @@ export default function EventSnacksPage() {
   const [mounted, setMounted] = useState(false)
   const [justAdded, setJustAdded] = useState<string | null>(null)
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [userFavorites, setUserFavorites] = useState<FavoriteProduct[]>([])
 
   // Debounced fetch to prevent rapid-click flickering
   const syncTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -42,6 +54,24 @@ export default function EventSnacksPage() {
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  // Fetch cross-event favorites for authenticated users
+  useEffect(() => {
+    if (!isAuthenticated || !firebaseUser) return
+    const fetchFavorites = async () => {
+      try {
+        const token = await firebaseUser.getIdToken()
+        const res = await fetch('/api/auth/favorites', {
+          headers: { 'Authorization': `Bearer ${token}` },
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setUserFavorites(data.favorites || [])
+        }
+      } catch { }
+    }
+    fetchFavorites()
+  }, [isAuthenticated, firebaseUser])
 
   useEffect(() => {
     if (slug) {
@@ -628,6 +658,29 @@ export default function EventSnacksPage() {
                                 </button>
                               ))}
                             </div>
+
+                            {/* Moje oblíbené - cross-event favorites for authenticated users */}
+                            {!selectedCategory && isAuthenticated && userFavorites.length > 0 && (() => {
+                              const availableFavIds = new Set(products.map(p => p.id))
+                              const crossEventFavs = userFavorites.filter(f => availableFavIds.has(f.product_id))
+                              if (crossEventFavs.length === 0) return null
+                              return (
+                                <div>
+                                  <h3 className="text-sm font-bold mb-3 pb-2 border-b border-pink-500/30 flex items-center gap-2">
+                                    <Heart className="w-4 h-4 text-pink-400" />
+                                    <span className="text-pink-300">Moje oblíbené</span>
+                                    <span className="text-[10px] font-normal text-pink-400/60">ze všech eventů</span>
+                                  </h3>
+                                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                                    {crossEventFavs.map(fav => {
+                                      const product = products.find(p => p.id === fav.product_id)
+                                      if (!product) return null
+                                      return renderProductCard(product)
+                                    })}
+                                  </div>
+                                </div>
+                              )
+                            })()}
 
                             {/* Oblíbené - already consumed products (only when showing all) */}
                             {!selectedCategory && favoriteProducts.length > 0 && (

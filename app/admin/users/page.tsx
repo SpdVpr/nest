@@ -150,7 +150,7 @@ export default function AdminUsersPage() {
                                 <Users className="w-6 h-6" style={{ color: 'var(--nest-yellow)' }} />
                             </div>
                             <div>
-                                <h1 className="text-xl font-bold" style={{ color: 'var(--nest-text-primary)' }}>Správa uživatelů</h1>
+                                <h1 className="text-xl font-bold" style={{ color: 'var(--nest-text-primary)' }}>Správa brigádníků</h1>
                                 <p className="text-sm" style={{ color: 'var(--nest-text-secondary)' }}>{users.length} registrovaných</p>
                             </div>
                         </div>

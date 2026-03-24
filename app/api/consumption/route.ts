@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getFirebaseAdminDb } from '@/lib/firebase/admin'
-import { getActiveSession, getProductById } from '@/lib/firebase/queries'
+import { getActiveSession, getProductById, getGuestById } from '@/lib/firebase/queries'
 import { Timestamp } from 'firebase-admin/firestore'
 import { Consumption } from '@/types/database.types'
+import { verifyGuestRequest } from '@/lib/verify-guest'
 
 // POST /api/consumption - Add consumption record
 export async function POST(request: NextRequest) {
@@ -14,6 +15,19 @@ export async function POST(request: NextRequest) {
         { error: 'guest_id and product_id are required' },
         { status: 400 }
       )
+    }
+
+    // Optional auth: if authenticated, verify ownership of claimed guest
+    try {
+      const authUser = await verifyGuestRequest(request)
+      if (authUser) {
+        const guest = await getGuestById(guest_id)
+        if (guest?.user_id && guest.user_id !== authUser.uid) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
+      }
+    } catch {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
     let sessionToUse = session_id
@@ -124,6 +138,26 @@ export async function DELETE(request: NextRequest) {
         { error: 'id is required' },
         { status: 400 }
       )
+    }
+
+    // Optional auth: if authenticated, verify the consumption belongs to user's guest
+    try {
+      const authUser = await verifyGuestRequest(request)
+      if (authUser) {
+        const db2 = getFirebaseAdminDb()
+        const consumptionDoc = await db2.collection('consumption').doc(consumptionId).get()
+        if (consumptionDoc.exists) {
+          const guestId = consumptionDoc.data()?.guest_id
+          if (guestId) {
+            const guest = await getGuestById(guestId)
+            if (guest?.user_id && guest.user_id !== authUser.uid) {
+              return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+            }
+          }
+        }
+      }
+    } catch {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
     const db = getFirebaseAdminDb()

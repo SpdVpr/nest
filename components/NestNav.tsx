@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ArrowLeft, User, LogOut, Home } from 'lucide-react'
+import { ArrowLeft, User, LogOut, Home, LogIn } from 'lucide-react'
 import { guestStorage, StoredGuest } from '@/lib/guest-storage'
+import { useGuestAuth } from '@/lib/auth-context'
+import NotificationPanel from '@/components/NotificationPanel'
 
 interface NestNavProps {
     /** If set, shows guest avatar + name in nav */
@@ -21,6 +23,7 @@ export default function NestNav({ sessionSlug, backHref, title, onLogout }: Nest
     const [currentGuest, setCurrentGuest] = useState<StoredGuest | null>(null)
     const [mounted, setMounted] = useState(false)
     const pathname = usePathname()
+    const { userProfile, isAuthenticated, logout: authLogout, getClaimedGuestForSession, claimedGuests } = useGuestAuth()
 
     useEffect(() => {
         setMounted(true)
@@ -40,7 +43,15 @@ export default function NestNav({ sessionSlug, backHref, title, onLogout }: Nest
         }
     }, [sessionSlug])
 
-    const handleLogout = () => {
+    // Determine display name: prefer auth user, fallback to localStorage guest
+    const displayName = isAuthenticated
+        ? userProfile?.display_name
+        : currentGuest?.name
+
+    const handleLogout = async () => {
+        if (isAuthenticated) {
+            await authLogout()
+        }
         guestStorage.clearCurrentGuest()
         setCurrentGuest(null)
         onLogout?.()
@@ -78,18 +89,22 @@ export default function NestNav({ sessionSlug, backHref, title, onLogout }: Nest
                     </h1>
                 )}
 
-                {/* Right: Guest info or empty spacer */}
+                {/* Right: Guest info or login link */}
                 <div className="flex items-center gap-2 min-w-0 flex-shrink-0">
-                    {currentGuest ? (
+                    {displayName ? (
                         <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1.5 bg-[var(--nest-dark-3)] rounded-full px-3 py-1.5">
+                            {isAuthenticated && <NotificationPanel />}
+                            <Link
+                                href={isAuthenticated ? '/auth/profile' : '#'}
+                                className="flex items-center gap-1.5 bg-[var(--nest-dark-3)] rounded-full px-3 py-1.5"
+                            >
                                 <div className="w-5 h-5 rounded-full bg-[var(--nest-yellow)] flex items-center justify-center">
                                     <User className="w-3 h-3 text-[var(--nest-dark)]" />
                                 </div>
                                 <span className="text-xs font-medium text-[var(--nest-white)] max-w-[100px] truncate">
-                                    {currentGuest.name}
+                                    {displayName}
                                 </span>
-                            </div>
+                            </Link>
                             <button
                                 onClick={handleLogout}
                                 className="p-1.5 rounded-lg hover:bg-[var(--nest-dark-3)] transition-colors"
@@ -98,6 +113,14 @@ export default function NestNav({ sessionSlug, backHref, title, onLogout }: Nest
                                 <LogOut className="w-3.5 h-3.5 text-[var(--nest-white-40)] hover:text-[var(--nest-error)]" />
                             </button>
                         </div>
+                    ) : sessionSlug ? (
+                        <Link
+                            href={`/auth/login?redirect=/event/${sessionSlug}`}
+                            className="flex items-center gap-1.5 text-[var(--nest-white-60)] hover:text-[var(--nest-yellow)] transition-colors text-xs font-medium"
+                        >
+                            <LogIn className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Přihlásit se</span>
+                        </Link>
                     ) : (
                         <div className="w-8" /> /* spacer for centering */
                     )}

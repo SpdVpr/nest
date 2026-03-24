@@ -78,6 +78,7 @@ export interface Guest {
   dietary_restrictions?: string[]  // ['vegan', 'vegetarian', 'gluten-free', 'lactose-free']
   dietary_note?: string | null     // free text for custom allergies
   deposit?: number             // amount of deposit already paid (Kč)
+  user_id?: string | null      // Firebase Auth UID when claimed by a registered user
   is_active: boolean
   created_at: string
 }
@@ -318,4 +319,37 @@ export interface GameVote {
   guest_id: string
   session_id: string
   created_at: string
+}
+
+// =============================================
+// USER PROFILE TYPES (Firebase Auth users)
+// =============================================
+
+export interface AppNotification {
+  id: string
+  user_id: string
+  type: 'new_registration'
+  title: string
+  body: string
+  session_id: string
+  is_read: boolean
+  created_at: string
+}
+
+export interface LeaderboardEntry {
+  uid: string
+  display_name: string
+  avatar_url?: string | null
+  value: number
+}
+
+export interface UserProfile {
+  uid: string
+  email: string
+  display_name: string
+  auth_provider: 'email' | 'google' | 'apple'
+  avatar_url?: string | null
+  theme_settings?: Record<string, string> | null
+  created_at: string
+  updated_at: string
 }

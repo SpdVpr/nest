@@ -1,6 +1,8 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getFirebaseAdminDb } from '@/lib/firebase/admin'
 import { SeatReservation } from '@/types/database.types'
+import { verifyGuestRequest } from '@/lib/verify-guest'
+import { getGuestById } from '@/lib/firebase/queries'
 
 // Table pairs: each seat's partner (same table)
 function getPartnerSeat(seatId: string): string | null {
@@ -50,7 +52,7 @@ export async function GET(request: Request) {
 }
 
 // POST /api/seats/reservations
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { seat_id, guest_id, session_id, guest_name } = body
@@ -61,6 +63,19 @@ export async function POST(request: Request) {
       return NextResponse.json({
         error: 'seat_id, guest_id, session_id, and guest_name are required'
       }, { status: 400 })
+    }
+
+    // Optional auth: verify ownership of claimed guest
+    try {
+      const authUser = await verifyGuestRequest(request)
+      if (authUser) {
+        const guest = await getGuestById(guest_id)
+        if (guest?.user_id && guest.user_id !== authUser.uid) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
+      }
+    } catch {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
     const db = getFirebaseAdminDb()

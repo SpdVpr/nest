@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Users, Monitor, Utensils, TrendingUp, Loader2, Edit2, Check, X, Edit, UtensilsCrossed, Heart, Cpu, ChevronDown, ChevronUp, CheckCircle2, Circle, Trophy, Trash2 } from 'lucide-react'
+import { ArrowLeft, Users, Monitor, Utensils, TrendingUp, Loader2, Edit2, Check, X, Edit, UtensilsCrossed, Heart, Cpu, ChevronDown, ChevronUp, CheckCircle2, Circle, Trophy, Trash2, UserCheck, Megaphone, Send, Info, AlertTriangle, Gamepad2 } from 'lucide-react'
 import { Session, Guest, MenuItem, MealType, Game, GameLibraryItem, HardwareOverride, Product } from '@/types/database.types'
 import { HardwareItem } from '@/types/hardware.types'
 import { formatDate, formatDateOnly } from '@/lib/utils'
@@ -104,6 +104,13 @@ export default function EventDetailPage() {
   const [hwPrepared, setHwPrepared] = useState<Record<string, string>>({})
   const [gamesPrepared, setGamesPrepared] = useState<Record<string, string>>({})
   const [deletingGuestId, setDeletingGuestId] = useState<string | null>(null)
+  // Broadcast state
+  const [broadcastBody, setBroadcastBody] = useState('')
+  const [broadcastType, setBroadcastType] = useState<'info' | 'food' | 'urgent' | 'fun'>('info')
+  const [broadcastSending, setBroadcastSending] = useState(false)
+  const [broadcastHistory, setBroadcastHistory] = useState<any[]>([])
+  const [broadcastSuccess, setBroadcastSuccess] = useState('')
+  const [showBroadcastModal, setShowBroadcastModal] = useState(false)
 
   const handleDeleteGuest = async (guestId: string, guestName: string) => {
     if (!confirm(`Opravdu chcete smazat účastníka "${guestName}" z akce? Budou smazány všechny jeho rezervace, spotřeba a další data.`)) {
@@ -147,6 +154,54 @@ export default function EventDetailPage() {
       startEditEvent(session)
     }
   }, [session, searchParams, showEdit])
+
+  // Fetch broadcast history when page loads
+  useEffect(() => {
+    if (isAuthenticated && sessionId) {
+      fetchBroadcastHistory()
+    }
+  }, [isAuthenticated, sessionId])
+
+  const fetchBroadcastHistory = async () => {
+    try {
+      const token = localStorage.getItem('admin_token')
+      const res = await fetch(`/api/admin/broadcast?session_id=${sessionId}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setBroadcastHistory(data.broadcasts || [])
+      }
+    } catch { }
+  }
+
+  const handleSendBroadcast = async () => {
+    if (!broadcastBody.trim() || broadcastSending) return
+    setBroadcastSending(true)
+    setBroadcastSuccess('')
+    try {
+      const token = localStorage.getItem('admin_token')
+      const typeLabels = { info: 'Oznámení', food: 'Jídlo', urgent: 'Upozornění', fun: 'Zábava' }
+      const res = await fetch('/api/admin/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          session_id: sessionId,
+          type: broadcastType,
+          title: typeLabels[broadcastType],
+          body: broadcastBody.trim(),
+        }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setBroadcastBody('')
+        setBroadcastSuccess(`Odesláno! (${data.notified_users} registrovaných uživatelů)`)
+        fetchBroadcastHistory()
+        setTimeout(() => setBroadcastSuccess(''), 5000)
+      }
+    } catch { }
+    setBroadcastSending(false)
+  }
 
   const startEditEvent = (sessionToEdit: ExtendedSession) => {
     setEditingEvent(true)
@@ -415,9 +470,19 @@ export default function EventDetailPage() {
     return tips[guestId]?.amount || 0
   }
 
+  // Calculate effective price per night including surcharge
+  const getEffectivePricePerNight = () => {
+    const basePricePerNight = session?.price_per_night || 0
+    const isSurchargeEnabled = (session as any)?.surcharge_enabled === true
+    const totalGuests = guests.length
+    const missingGuests = isSurchargeEnabled ? Math.max(0, 10 - totalGuests) : 0
+    const surchargePerNight = missingGuests * 150
+    return basePricePerNight + surchargePerNight
+  }
+
   const getTotalPriceByGuest = (guestId: string) => {
     const nights = getGuestNights(guestId)
-    const nightsPrice = nights * (session?.price_per_night || 0)
+    const nightsPrice = nights * getEffectivePricePerNight()
     const hardwarePrice = getTotalHardwareByGuest(guestId)
     const foodPrice = getTotalConsumptionByGuest(guestId)
     const tip = getTipByGuest(guestId)
@@ -426,8 +491,9 @@ export default function EventDetailPage() {
 
   const getTotalRevenue = () => {
     let total = 0
-    // Add nights revenue
-    total += guests.reduce((sum, g) => sum + (g.nights_count * (session?.price_per_night || 0)), 0)
+    // Add nights revenue (with surcharge)
+    const effectivePrice = getEffectivePricePerNight()
+    total += guests.reduce((sum, g) => sum + (g.nights_count * effectivePrice), 0)
     // Add hardware revenue
     total += reservations.reduce((sum, r) => sum + r.total_price, 0)
     // Add consumption revenue
@@ -621,6 +687,15 @@ export default function EventDetailPage() {
               <Utensils className="w-4 h-4" />
               Jídelníček
             </Link>
+            {showEdit && (
+              <button
+                onClick={() => setShowBroadcastModal(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm"
+              >
+                <Megaphone className="w-4 h-4" />
+                Hromadná zpráva
+              </button>
+            )}
             <Link
               href={`/admin/sessions/${sessionId}/stock`}
               className="inline-flex items-center gap-1.5 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium text-sm"
@@ -1210,7 +1285,7 @@ export default function EventDetailPage() {
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 mt-2">
-                      <p className="text-3xl font-bold text-gray-900">{session.price_per_night} Kč</p>
+                      <p className="text-3xl font-bold text-gray-900">{Number(session.price_per_night).toLocaleString('cs-CZ')} Kč</p>
                       <button
                         onClick={() => setEditingPrice(true)}
                         className="p-2 text-gray-500 hover:text-blue-600"
@@ -1230,7 +1305,7 @@ export default function EventDetailPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Celkový obrat</p>
-                  <p className="text-3xl font-bold text-gray-900 mt-2">{totalRevenue} Kč</p>
+                  <p className="text-3xl font-bold text-gray-900 mt-2">{Number(totalRevenue).toLocaleString('cs-CZ')} Kč</p>
                 </div>
                 <TrendingUp className="w-12 h-12 text-purple-500 opacity-20" />
               </div>
@@ -1270,7 +1345,14 @@ export default function EventDetailPage() {
                     const guestHw = getGuestHardware(guest.id)
                     return (
                       <tr key={guest.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">{guest.name}</td>
+                        <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">
+                          {guest.user_id ? (
+                            <Link href={`/admin/registered-users/${guest.user_id}`} target="_blank" className="hover:text-blue-600 hover:underline transition-colors flex items-center gap-1.5" title="Zobrazit profil uživatele">
+                              {guest.name}
+                              <UserCheck className="w-3.5 h-3.5 text-green-500" />
+                            </Link>
+                          ) : guest.name}
+                        </td>
                         <td className="px-4 py-3">
                           {(() => {
                             const seats = seatReservations.filter(r => r.guest_id === guest.id).map(r => r.seat_id)
@@ -1308,14 +1390,14 @@ export default function EventDetailPage() {
                             )}
                           </div>
                         </td>
-                        {showFinances && <td className="px-4 py-3 text-sm font-medium text-gray-900">{hwPrice} Kč</td>}
-                        {showFinances && <td className="px-4 py-3 text-sm font-medium text-gray-900">{foodPrice} Kč</td>}
+                        {showFinances && <td className="px-4 py-3 text-sm font-medium text-gray-900">{Number(hwPrice).toLocaleString('cs-CZ')} Kč</td>}
+                        {showFinances && <td className="px-4 py-3 text-sm font-medium text-gray-900">{Number(foodPrice).toLocaleString('cs-CZ')} Kč</td>}
                         {showFinances && (
                           <td className="px-4 py-3 text-sm font-medium">
                             {getTipByGuest(guest.id) > 0 ? (
                               <span className="inline-flex items-center gap-1 text-purple-600 font-semibold">
                                 <Heart className="w-3.5 h-3.5 fill-purple-500" />
-                                {getTipByGuest(guest.id)} Kč
+                                {getTipByGuest(guest.id).toLocaleString('cs-CZ')} Kč
                                 {tips[guest.id]?.percentage && (
                                   <span className="text-xs text-purple-400">({tips[guest.id].percentage}%)</span>
                                 )}
@@ -1325,7 +1407,7 @@ export default function EventDetailPage() {
                             )}
                           </td>
                         )}
-                        {showFinances && <td className="px-4 py-3 font-bold text-blue-600">{totalPrice} Kč</td>}
+                        {showFinances && <td className="px-4 py-3 font-bold text-blue-600">{Number(totalPrice).toLocaleString('cs-CZ')} Kč</td>}
                         {showFinances && (
                           <td className="px-4 py-3">
                             <input
@@ -1358,7 +1440,7 @@ export default function EventDetailPage() {
                               const remaining = totalPrice - ((guest as any).deposit || 0)
                               return (
                                 <span className={remaining <= 0 ? 'text-green-600' : 'text-teal-600'}>
-                                  {remaining <= 0 ? '✅ 0' : remaining} Kč
+                                  {remaining <= 0 ? '✅ 0' : remaining.toLocaleString('cs-CZ')} Kč
                                 </span>
                               )
                             })()}
@@ -1461,7 +1543,7 @@ export default function EventDetailPage() {
                           </span>
                         ))}
                       </div>
-                      {showFinances && <span className="flex-shrink-0 font-bold text-gray-900 text-sm">{guestTotal} Kč</span>}
+                      {showFinances && <span className="flex-shrink-0 font-bold text-gray-900 text-sm">{Number(guestTotal).toLocaleString('cs-CZ')} Kč</span>}
                     </div>
                   )
                 })}
@@ -1782,7 +1864,131 @@ export default function EventDetailPage() {
             </div>
           )
         })()}
+
       </div>
+
+      {/* ═══════ BROADCAST MODAL ═══════ */}
+      {showBroadcastModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowBroadcastModal(false)}>
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+          <div className="relative w-full max-w-lg md:max-w-2xl lg:max-w-3xl bg-white rounded-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-700 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                  <Megaphone className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-white">Hromadná zpráva</h2>
+                  <p className="text-xs text-white/60">Odešli zprávu všem účastníkům eventu</p>
+                </div>
+              </div>
+              <button onClick={() => setShowBroadcastModal(false)} className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
+                <X className="w-4 h-4 text-white" />
+              </button>
+            </div>
+
+            <div className="p-6">
+              {/* Type selector — large colorful buttons */}
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Typ zprávy</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                {([
+                  { value: 'info', label: 'Info', icon: Info, activeBg: 'bg-blue-600', activeText: 'text-white', activeBorder: 'border-blue-600', emoji: 'ℹ️' },
+                  { value: 'food', label: 'Jídlo', icon: UtensilsCrossed, activeBg: 'bg-green-600', activeText: 'text-white', activeBorder: 'border-green-600', emoji: '🍽️' },
+                  { value: 'urgent', label: 'Urgent', icon: AlertTriangle, activeBg: 'bg-red-600', activeText: 'text-white', activeBorder: 'border-red-600', emoji: '🚨' },
+                  { value: 'fun', label: 'Zábava', icon: Gamepad2, activeBg: 'bg-yellow-500', activeText: 'text-white', activeBorder: 'border-yellow-500', emoji: '🎮' },
+                ] as const).map(t => {
+                  const active = broadcastType === t.value
+                  return (
+                    <button
+                      key={t.value}
+                      onClick={() => setBroadcastType(t.value)}
+                      className={`flex flex-col items-center gap-2 px-4 py-4 rounded-xl border-2 font-semibold transition-all ${active ? `${t.activeBg} ${t.activeText} ${t.activeBorder} shadow-lg scale-[1.02]` : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300 hover:bg-gray-50'}`}
+                    >
+                      <span className="text-2xl">{t.emoji}</span>
+                      <span className="text-sm">{t.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Quick templates */}
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Rychlé šablony</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-5">
+                {[
+                  { text: 'Večeře je ready! 🍽️', type: 'food' as const },
+                  { text: 'Snídaně je připravena! ☕', type: 'food' as const },
+                  { text: 'Oběd je připravený! 🍲', type: 'food' as const },
+                  { text: 'Turnaj začíná za 10 min! 🎮', type: 'fun' as const },
+                  { text: 'Hlasování o hře spuštěno!', type: 'fun' as const },
+                  { text: 'Důležité oznámení!', type: 'urgent' as const },
+                  { text: 'Ukliďte si místo prosím', type: 'info' as const },
+                ].map((tmpl, i) => (
+                  <button
+                    key={i}
+                    onClick={() => { setBroadcastBody(tmpl.text); setBroadcastType(tmpl.type) }}
+                    className="text-xs px-3 py-2 rounded-lg bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors text-left border border-gray-100"
+                  >
+                    {tmpl.text}
+                  </button>
+                ))}
+              </div>
+
+              {/* Message input */}
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Zpráva</p>
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  value={broadcastBody}
+                  onChange={e => setBroadcastBody(e.target.value)}
+                  placeholder="Napiš zprávu pro všechny účastníky..."
+                  className="flex-1 px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && broadcastBody.trim()) {
+                      handleSendBroadcast()
+                    }
+                  }}
+                  autoFocus
+                />
+                <button
+                  onClick={handleSendBroadcast}
+                  disabled={!broadcastBody.trim() || broadcastSending}
+                  className="px-6 py-3 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-lg shadow-blue-500/20"
+                >
+                  {broadcastSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  Odeslat
+                </button>
+              </div>
+
+              {broadcastSuccess && (
+                <div className="mt-3 px-4 py-2 rounded-lg bg-green-50 border border-green-200">
+                  <p className="text-xs text-green-700 font-medium">✅ {broadcastSuccess}</p>
+                </div>
+              )}
+
+              {/* Broadcast history */}
+              {broadcastHistory.length > 0 && (
+                <div className="mt-6 border-t pt-4">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Historie zpráv</h3>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {broadcastHistory.map(b => (
+                      <div key={b.id} className="flex items-center gap-3 px-4 py-2.5 rounded-lg bg-gray-50 text-sm border border-gray-100">
+                        <span className="text-lg flex-shrink-0">
+                          {b.type === 'food' ? '🍽️' : b.type === 'urgent' ? '🚨' : b.type === 'fun' ? '🎮' : 'ℹ️'}
+                        </span>
+                        <span className="flex-1 text-gray-700">{b.body}</span>
+                        <span className="text-xs text-gray-400 flex-shrink-0">
+                          {b.created_at ? new Date(b.created_at).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' }) : ''}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

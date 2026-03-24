@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getFirebaseAdminDb } from '@/lib/firebase/admin'
 import { getSessionBySlug } from '@/lib/firebase/queries'
 import { Guest } from '@/types/database.types'
+import { verifyGuestRequest } from '@/lib/verify-guest'
 
 // GET /api/event/[slug]/guests - Get guests for specific event
 export async function GET(
@@ -182,8 +183,19 @@ export async function POST(
       )
     }
 
+    // If authenticated, auto-link the guest to the user
+    let userId: string | null = null
+    try {
+      const authUser = await verifyGuestRequest(request)
+      if (authUser) {
+        userId = authUser.uid
+      }
+    } catch {
+      // Not authenticated — that's fine, continue without user_id
+    }
+
     // Create guest
-    const guestData = {
+    const guestData: Record<string, any> = {
       name: name.trim(),
       session_id: session.id,
       nights_count: nightsNum,
@@ -193,13 +205,56 @@ export async function POST(
       created_at: Timestamp.now(),
     }
 
+    if (userId) {
+      guestData.user_id = userId
+    }
+
     const docRef = await db.collection('guests').add(guestData)
-    const guest: Guest = {
+    const guest = {
       id: docRef.id,
-      ...guestData,
+      name: guestData.name,
+      session_id: guestData.session_id,
+      nights_count: guestData.nights_count,
+      is_active: guestData.is_active,
+      user_id: guestData.user_id || null,
       created_at: guestData.created_at.toDate().toISOString(),
       check_in_date: guestData.check_in_date?.toDate().toISOString() || null,
       check_out_date: guestData.check_out_date?.toDate().toISOString() || null,
+    } as Guest
+
+    // Trigger notifications for other registered users on this event
+    try {
+      const otherGuestsSnap = await db.collection('guests')
+        .where('session_id', '==', session.id)
+        .where('is_active', '==', true)
+        .get()
+
+      const notifyUserIds = new Set<string>()
+      otherGuestsSnap.docs.forEach(doc => {
+        const uid = doc.data().user_id
+        if (uid && uid !== userId) notifyUserIds.add(uid)
+      })
+
+      if (notifyUserIds.size > 0) {
+        const notifBatch = db.batch()
+        const now = Timestamp.now()
+        notifyUserIds.forEach(uid => {
+          const ref = db.collection('notifications').doc()
+          notifBatch.set(ref, {
+            user_id: uid,
+            type: 'new_registration',
+            title: 'Nová registrace',
+            body: `${name.trim()} se zaregistroval/a na ${session.name}`,
+            session_id: session.id,
+            is_read: false,
+            created_at: now,
+          })
+        })
+        await notifBatch.commit()
+      }
+    } catch (notifError) {
+      // Don't fail the registration if notifications fail
+      console.error('Failed to send notifications:', notifError)
     }
 
     return NextResponse.json({ guest }, { status: 201 })

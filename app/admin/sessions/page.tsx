@@ -262,6 +262,10 @@ function AdminSessionsPageInner() {
   const handleDateChange = (field: 'start' | 'end', value: string) => {
     if (field === 'start') {
       setNewSessionStartDate(value)
+      // Auto-fill end date if empty
+      if (!newSessionEndDate) {
+        setNewSessionEndDate(value)
+      }
     } else {
       setNewSessionEndDate(value)
     }
@@ -450,6 +454,8 @@ function AdminSessionsPageInner() {
       resetForm()
       setShowCreateForm(false)
       fetchSessions()
+      // Redirect to dashboard after successful creation
+      router.push('/admin/dashboard')
     } catch (error) {
       console.error('Error creating session:', error)
       alert('Nepodařilo se vytvořit session')
@@ -1500,19 +1506,21 @@ function AdminSessionsPageInner() {
                   .map((session) => (
                     <tr key={session.id} onClick={() => router.push(`/admin/sessions/${session.id}`)} className="cursor-pointer hover:bg-gray-100 transition-colors">
                       <td className="px-6 py-4 font-medium text-gray-900">
-                        {session.name}
-                        {session.menu_enabled && (
-                          <span className="ml-2 text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">🍽️ Menu</span>
-                        )}
-                        {session.hardware_pricing_enabled === false && (
-                          <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">🚫 HW cena</span>
-                        )}
-                        {session.hardware_overrides && Object.keys(session.hardware_overrides).length > 0 && (
-                          <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">🖥️ HW úpravy</span>
-                        )}
-                        {session.access_password && (
-                          <span className="ml-2 text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(255, 211, 105, 0.15)', color: '#FFD369' }}>🔑 {session.access_password}</span>
-                        )}
+                        <div>{session.name}</div>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {session.menu_enabled && (
+                            <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">🍽️ Menu</span>
+                          )}
+                          {session.hardware_pricing_enabled === false && (
+                            <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">🚫 HW cena</span>
+                          )}
+                          {session.hardware_overrides && Object.keys(session.hardware_overrides).length > 0 && (
+                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">🖥️ HW úpravy</span>
+                          )}
+                          {session.access_password && (
+                            <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(255, 211, 105, 0.15)', color: '#FFD369' }}>🔑 {session.access_password}</span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-sm" onClick={(e) => e.stopPropagation()}>
                         {session.slug ? (
@@ -1543,41 +1551,41 @@ function AdminSessionsPageInner() {
                         )}
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5" onClick={(e) => e.stopPropagation()}>
                           <Link
                             href={`/admin/sessions/${session.id}`}
-                            className="flex items-center text-purple-600 hover:text-purple-700 font-medium"
+                            className="flex items-center text-purple-600 hover:text-purple-700 font-medium text-sm"
                             title="Detail"
                           >
-                            <Eye className="w-4 h-4 mr-1" />
+                            <Eye className="w-4 h-4 mr-1 flex-shrink-0" />
                             Detail
                           </Link>
                           {showEdit && (
                             <button
                               onClick={() => startEditSession(session)}
-                              className="flex items-center text-blue-600 hover:text-blue-700"
+                              className="flex items-center text-blue-600 hover:text-blue-700 text-sm"
                               title="Upravit"
                             >
-                              <Edit className="w-4 h-4 mr-1" />
+                              <Edit className="w-4 h-4 mr-1 flex-shrink-0" />
                               Upravit
                             </button>
                           )}
                           {showEdit && (
                             <button
                               onClick={() => toggleSessionActive(session.id, session.is_active)}
-                              className={`flex items-center ${session.is_active
+                              className={`flex items-center text-sm ${session.is_active
                                 ? 'text-red-600 hover:text-red-700'
                                 : 'text-green-600 hover:text-green-700'
                                 }`}
                             >
                               {session.is_active ? (
                                 <>
-                                  <StopCircle className="w-4 h-4 mr-1" />
+                                  <StopCircle className="w-4 h-4 mr-1 flex-shrink-0" />
                                   Ukončit
                                 </>
                               ) : (
                                 <>
-                                  <PlayCircle className="w-4 h-4 mr-1" />
+                                  <PlayCircle className="w-4 h-4 mr-1 flex-shrink-0" />
                                   Aktivovat
                                 </>
                               )}
@@ -1592,10 +1600,10 @@ function AdminSessionsPageInner() {
                                 setEditingSession(null)
                                 window.scrollTo({ top: 0, behavior: 'smooth' })
                               }}
-                              className="flex items-center text-gray-500 hover:text-gray-700"
+                              className="flex items-center text-gray-500 hover:text-gray-700 text-sm"
                               title="Vytvořit nový event s nastavením tohoto"
                             >
-                              <Copy className="w-4 h-4 mr-1" />
+                              <Copy className="w-4 h-4 mr-1 flex-shrink-0" />
                               Kopírovat
                             </button>
                           )}
