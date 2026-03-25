@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import {
   Calendar, Pizza, MonitorSmartphone, Users, AlertCircle,
-  Armchair, UtensilsCrossed, Gamepad2, Wallet, UserPlus, ChevronRight, Trophy, LogIn, UserCheck
+  Armchair, UtensilsCrossed, Gamepad2, Wallet, UserPlus, ChevronRight, Trophy, LogIn, UserCheck, BedDouble
 } from 'lucide-react'
 import { Session, Guest } from '@/types/database.types'
 import { formatEventRange } from '@/lib/utils'
@@ -167,6 +167,12 @@ export default function EventPage() {
       label: 'Místa',
       desc: 'Zasedací pořádek',
     }] : []),
+    {
+      href: `/event/${slug}/accommodation`,
+      icon: BedDouble,
+      label: 'Ubytování',
+      desc: 'Výběr pokoje',
+    },
     ...(session.menu_enabled ? [{
       href: `/event/${slug}/menu`,
       icon: UtensilsCrossed,
@@ -254,6 +260,7 @@ export default function EventPage() {
           seatReserved={seatReserved}
           hwReserved={hwReserved}
           gamesVoted={gamesVoted}
+          roomSelected={!!currentGuest.room}
         />
       )}
 

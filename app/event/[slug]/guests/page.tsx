@@ -182,6 +182,7 @@ export default function GuestsPage() {
                   <thead>
                     <tr className="bg-[var(--nest-dark-3)] border-b border-[var(--nest-dark-4)]">
                       <th className="text-left py-2.5 px-3 font-semibold text-[var(--nest-white-60)] text-xs">Jméno</th>
+                      <th className="text-center py-2.5 px-3 font-semibold text-[var(--nest-white-60)] text-xs">Příjezd</th>
                       <th className="text-center py-2.5 px-3 font-semibold text-[var(--nest-white-60)] text-xs">Místo</th>
                       <th className="text-center py-2.5 px-3 font-semibold text-[var(--nest-white-60)] text-xs">Noci</th>
                       <th className="text-center py-2.5 px-3 font-semibold text-[var(--nest-white-60)] text-xs">Dny</th>
@@ -215,6 +216,9 @@ export default function GuestsPage() {
                                 <UserCheck className="w-3 h-3 text-[var(--nest-success)]" />
                               )}
                             </div>
+                          </td>
+                          <td className="py-2.5 px-3 text-center text-xs text-[var(--nest-white-60)]">
+                            {guest.check_in_date ? new Date(guest.check_in_date).toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' }) : '—'}
                           </td>
                           <td className="py-2.5 px-3 text-center">
                             {(() => {

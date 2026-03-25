@@ -107,6 +107,9 @@ export async function PATCH(
     if (body.seats_enabled !== undefined) {
       updateData.seats_enabled = Boolean(body.seats_enabled)
     }
+    if (body.accommodation_enabled !== undefined) {
+      updateData.accommodation_enabled = Boolean(body.accommodation_enabled)
+    }
     if (body.top_products !== undefined) {
       updateData.top_products = Array.isArray(body.top_products) ? body.top_products : []
     }

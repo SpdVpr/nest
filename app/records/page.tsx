@@ -214,12 +214,12 @@ function Podium({ entries, currentUid, unit, onUserClick }: { entries: RankEntry
                                         <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border border-[var(--nest-dark)]" title="Registrovaný" />
                                     )}
                                 </div>
-                                <span className={`text-[10px] font-semibold text-center truncate max-w-full transition-colors ${isMe ? 'text-[var(--nest-yellow)]' : clickable ? 'text-[var(--nest-white-60)] group-hover:text-[var(--nest-yellow)]' : 'text-[var(--nest-white-60)]'}`}>
+                                <Medal idx={realIdx} />
+                                <span className={`text-xs font-bold text-center truncate max-w-full transition-colors mt-0.5 mb-1 ${isMe ? 'text-[var(--nest-yellow)]' : realIdx === 0 ? 'text-[var(--nest-yellow)]' : clickable ? 'text-[var(--nest-white)] group-hover:text-[var(--nest-yellow)]' : 'text-[var(--nest-white)]'}`}>
                                     {entry.display_name}
                                 </span>
-                                <div className={`w-full ${podiumHeights[i]} ${podiumColors[i]} rounded-t-lg flex flex-col items-center justify-end pb-1 mt-1`}>
-                                    <Medal idx={realIdx} />
-                                    <span className="text-xs font-bold text-[var(--nest-white)]">{entry.value}{unit || '×'}</span>
+                                <div className={`w-full ${podiumHeights[i]} ${podiumColors[i]} rounded-t-lg flex items-center justify-center`}>
+                                    <span className={`font-bold ${realIdx === 0 ? 'text-lg text-[var(--nest-yellow)]' : 'text-sm text-[var(--nest-white)]'}`}>{entry.value}{unit || '×'}</span>
                                 </div>
                             </div>
                         )
@@ -343,26 +343,47 @@ export default function RecordsPage() {
                             {CATEGORIES.map(cat => {
                                 const catRecords = groupedRecords[cat.value] || []
                                 if (catRecords.length === 0) return null
+                                const top3 = catRecords.slice(0, 3)
+                                const podiumHeights = ['h-16', 'h-24', 'h-12']
+                                const podiumColors = ['bg-gray-400/20', 'bg-[var(--nest-yellow)]/20', 'bg-amber-700/20']
                                 return (
                                     <div key={cat.value} className="rounded-2xl overflow-hidden" style={{ backgroundColor: 'var(--nest-surface)', border: '1px solid var(--nest-border)' }}>
                                         <div className="px-4 py-3 flex items-center justify-center gap-2" style={{ borderBottom: '1px solid var(--nest-border)' }}>
                                             <span className="text-xl">{cat.emoji}</span>
                                             <span className="text-sm font-bold">{cat.label}</span>
                                         </div>
-                                        <div className="divide-y divide-[var(--nest-dark-4)]">
-                                            {catRecords.slice(0, 3).map((record: any, idx: number) => (
-                                                <div key={record.id} className={`px-4 py-2.5 flex items-center gap-3 ${idx === 0 ? 'bg-[var(--nest-yellow)]/5' : ''}`}>
-                                                    <div className="w-8 text-center flex-shrink-0"><Medal idx={idx} /></div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className={`font-semibold text-sm ${idx === 0 ? 'text-[var(--nest-white)]' : 'text-[var(--nest-white-60)]'}`}>{record.group_name}</p>
-                                                        {record.date && <p className="text-xs text-[var(--nest-white-40)]">{new Date(record.date).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'short', year: 'numeric' })}</p>}
+                                        {top3.length >= 3 ? (
+                                            <div className="flex items-end justify-center gap-2 px-4 pt-3 pb-3">
+                                                {[top3[1], top3[0], top3[2]].map((record: any, i: number) => {
+                                                    const realIdx = i === 0 ? 1 : i === 1 ? 0 : 2
+                                                    return (
+                                                        <div key={record.id} className="flex flex-col items-center flex-1 max-w-[140px]">
+                                                            <Medal idx={realIdx} />
+                                                            <span className={`text-xs font-bold text-center truncate max-w-full mt-0.5 mb-1 ${realIdx === 0 ? 'text-[var(--nest-yellow)]' : 'text-[var(--nest-white)]'}`}>
+                                                                {record.group_name}
+                                                            </span>
+                                                            <div className={`w-full ${podiumHeights[i]} ${podiumColors[i]} rounded-t-lg flex items-center justify-center`}>
+                                                                <span className={`font-bold ${realIdx === 0 ? 'text-lg text-[var(--nest-yellow)]' : 'text-sm text-[var(--nest-white)]'}`}>{record.count}×</span>
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <div className="divide-y divide-[var(--nest-dark-4)]">
+                                                {top3.map((record: any, idx: number) => (
+                                                    <div key={record.id} className={`px-4 py-2.5 flex items-center gap-3 ${idx === 0 ? 'bg-[var(--nest-yellow)]/5' : ''}`}>
+                                                        <div className="w-8 text-center flex-shrink-0"><Medal idx={idx} /></div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className={`font-semibold text-sm ${idx === 0 ? 'text-[var(--nest-white)]' : 'text-[var(--nest-white-60)]'}`}>{record.group_name}</p>
+                                                        </div>
+                                                        <div className={`font-bold px-2 py-0.5 rounded-lg flex-shrink-0 ${idx === 0 ? 'text-[var(--nest-yellow)] bg-[var(--nest-yellow)]/10 text-lg' : 'text-[var(--nest-white-60)] bg-[var(--nest-dark-4)] text-sm'}`}>
+                                                            {record.count}×
+                                                        </div>
                                                     </div>
-                                                    <div className={`font-bold px-2 py-0.5 rounded-lg flex-shrink-0 ${idx === 0 ? 'text-[var(--nest-yellow)] bg-[var(--nest-yellow)]/10 text-lg' : 'text-[var(--nest-white-60)] bg-[var(--nest-dark-4)] text-sm'}`}>
-                                                        {record.count}×
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 )
                             })}

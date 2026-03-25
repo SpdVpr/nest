@@ -47,7 +47,7 @@ export async function PATCH(
         }
 
         const body = await request.json()
-        const { check_in_date, check_out_date, nights_count } = body
+        const { check_in_date, check_out_date, nights_count, room } = body
 
         const updateData: Record<string, any> = {}
 
@@ -59,6 +59,9 @@ export async function PATCH(
         }
         if (nights_count !== undefined) {
             updateData.nights_count = parseInt(nights_count)
+        }
+        if (room !== undefined) {
+            updateData.room = room || null
         }
 
         if (Object.keys(updateData).length === 0) {

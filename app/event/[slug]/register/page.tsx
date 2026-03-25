@@ -247,7 +247,7 @@ export default function RegisterPage() {
                       Základní cena: <span className="font-medium text-[var(--nest-white-80)]">{basePrice} Kč</span> (platí od {MIN_GUESTS_FOR_BASE_PRICE} lidí)
                     </p>
                     <p className="text-xs text-[var(--nest-white-60)]">
-                      Aktuálně zaregistrováno: <span className="font-medium text-[var(--nest-white-80)]">{effectiveGuestCount} / {MIN_GUESTS_FOR_BASE_PRICE}</span>
+                      Aktuálně zaregistrováno: <span className="font-medium text-[var(--nest-white-80)]">{guestCount} / {MIN_GUESTS_FOR_BASE_PRICE}</span>
                     </p>
                     <p className="text-xs" style={{ color: '#fbbf24' }}>
                       Příplatek +{surcharge} Kč ({MIN_GUESTS_FOR_BASE_PRICE - effectiveGuestCount}× {SURCHARGE_PER_MISSING_GUEST} Kč za chybějící účastníky)
@@ -258,7 +258,7 @@ export default function RegisterPage() {
                   </div>
                 ) : (
                   <p className="text-xs text-[var(--nest-white-60)]">
-                    Registrováno {effectiveGuestCount} lidí — základní cena platí ✓
+                    Registrováno {guestCount} lidí — základní cena platí ✓
                   </p>
                 )}
 

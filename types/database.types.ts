@@ -23,6 +23,7 @@ export interface Session {
   hardware_pricing_enabled?: boolean  // if false, HW prices are hidden from guests (default true)
   hardware_enabled?: boolean   // if false, hardware reservation section is completely hidden (default true)
   seats_enabled?: boolean      // if false, seat reservation section is completely hidden (default true)
+  accommodation_enabled?: boolean  // if false, accommodation/room selection section is hidden (default false)
   hardware_overrides?: Record<string, HardwareOverride>  // per-item quantity overrides for this session
   top_products?: string[]   // product IDs that should have TOP leaderboard on the snacks page
   access_password?: string   // unique password for guests to access this event from the homepage
@@ -77,6 +78,7 @@ export interface Guest {
   check_out_date?: string | null
   dietary_restrictions?: string[]  // ['vegan', 'vegetarian', 'gluten-free', 'lactose-free']
   dietary_note?: string | null     // free text for custom allergies
+  room?: string | null         // room ID selected for accommodation (e.g. 'dolni', 'horni-vlevo')
   deposit?: number             // amount of deposit already paid (Kč)
   user_id?: string | null      // Firebase Auth UID when claimed by a registered user
   is_active: boolean

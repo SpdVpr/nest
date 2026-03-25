@@ -243,9 +243,9 @@ export default function EventSnacksPage() {
     }
   }
 
-  // Calculate top 3 eaters and beer drinkers
+  // Calculate top 3 consumers (all items) and beer drinkers
   const topEaters = [...guests]
-    .sort((a, b) => b.totalItems - a.totalItems)
+    .sort((a, b) => (b.totalItems + b.totalBeers) - (a.totalItems + a.totalBeers))
     .slice(0, 3)
 
   const topBeerDrinkers = [...guests]
@@ -334,7 +334,7 @@ export default function EventSnacksPage() {
                       <div className="nest-card p-3">
                         <div className="flex items-center gap-1 mb-2">
                           <Trophy className="w-4 h-4 text-[var(--nest-yellow)]" />
-                          <h3 className="text-sm font-bold">TOP Jedlíci</h3>
+                          <h3 className="text-sm font-bold">Největší spotřeba</h3>
                         </div>
                         <div className="space-y-1">
                           {topEaters.map((guest, index) => (
@@ -343,7 +343,7 @@ export default function EventSnacksPage() {
                                 <span className="text-lg">{index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}</span>
                                 <span className="font-semibold truncate text-xs">{guest.name}</span>
                               </div>
-                              <span className="font-bold text-[var(--nest-yellow)] whitespace-nowrap ml-1">{guest.totalItems}×</span>
+                              <span className="font-bold text-[var(--nest-yellow)] whitespace-nowrap ml-1">{guest.totalItems + guest.totalBeers}×</span>
                             </div>
                           ))}
                         </div>

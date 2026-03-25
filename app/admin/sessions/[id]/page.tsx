@@ -85,6 +85,7 @@ export default function EventDetailPage() {
   const [editHwPricingEnabled, setEditHwPricingEnabled] = useState(true)
   const [editHwEnabled, setEditHwEnabled] = useState(true)
   const [editSeatsEnabled, setEditSeatsEnabled] = useState(true)
+  const [editAccommodationEnabled, setEditAccommodationEnabled] = useState(false)
   const [editHwOverrides, setEditHwOverrides] = useState<Record<string, HardwareOverride>>({})
   const [allHardwareItemsForEdit, setAllHardwareItemsForEdit] = useState<AdminHardwareItemDetail[]>([])
   const [showHwConfigEdit, setShowHwConfigEdit] = useState(false)
@@ -221,6 +222,7 @@ export default function EventDetailPage() {
     setEditHwPricingEnabled(sessionToEdit.hardware_pricing_enabled !== false)
     setEditHwEnabled((sessionToEdit as any).hardware_enabled !== false)
     setEditSeatsEnabled((sessionToEdit as any).seats_enabled !== false)
+    setEditAccommodationEnabled((sessionToEdit as any).accommodation_enabled || false)
     setEditHwOverrides(sessionToEdit.hardware_overrides || {})
     setShowHwConfigEdit(false)
     setEditTopProducts((sessionToEdit as any).top_products || [])
@@ -305,6 +307,7 @@ export default function EventDetailPage() {
       eventData.hardware_pricing_enabled = editHwPricingEnabled
       eventData.hardware_enabled = editHwEnabled
       eventData.seats_enabled = editSeatsEnabled
+      eventData.accommodation_enabled = editAccommodationEnabled
       eventData.hardware_overrides = editHwOverrides
       eventData.top_products = editTopProducts
       eventData.access_password = editAccessPassword.trim() || null
@@ -989,6 +992,37 @@ export default function EventDetailPage() {
                     </div>
                   </label>
                   {!editSeatsEnabled && (
+                    <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ color: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.12)' }}>
+                      🚫 Vypnuto
+                    </span>
+                  )}
+                </div>
+
+                {/* Accommodation enabled toggle */}
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <div className="relative">
+                      <input
+                        type="checkbox"
+                        checked={editAccommodationEnabled}
+                        onChange={(e) => setEditAccommodationEnabled(e.target.checked)}
+                        className="sr-only"
+                      />
+                      <div
+                        className="block w-12 h-7 rounded-full transition-colors"
+                        style={{ backgroundColor: editAccommodationEnabled ? '#a78bfa' : 'var(--nest-border)' }}
+                      ></div>
+                      <div
+                        className={`absolute left-0.5 top-0.5 w-6 h-6 rounded-full transition-transform ${editAccommodationEnabled ? 'translate-x-5' : ''}`}
+                        style={{ backgroundColor: 'var(--nest-text-primary)' }}
+                      ></div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span style={{ fontSize: '1.2rem' }}>🛏️</span>
+                      <span className="font-semibold" style={{ color: 'var(--nest-text-primary)' }}>Ubytování (výběr pokojů)</span>
+                    </div>
+                  </label>
+                  {!editAccommodationEnabled && (
                     <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ color: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.12)' }}>
                       🚫 Vypnuto
                     </span>

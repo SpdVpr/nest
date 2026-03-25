@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import {
     UserPlus, Calendar, Armchair, MonitorSmartphone, Gamepad2,
-    Check, ChevronDown, ChevronUp
+    Check, ChevronDown, ChevronUp, BedDouble
 } from 'lucide-react'
 import { Session, Guest } from '@/types/database.types'
 
@@ -26,10 +26,11 @@ interface EventChecklistProps {
     seatReserved: boolean
     hwReserved: boolean
     gamesVoted: boolean
+    roomSelected?: boolean
 }
 
 export default function EventChecklist({
-    slug, session, guest, seatReserved, hwReserved, gamesVoted,
+    slug, session, guest, seatReserved, hwReserved, gamesVoted, roomSelected,
 }: EventChecklistProps) {
     const [collapsed, setCollapsed] = useState(false)
 
@@ -75,6 +76,16 @@ export default function EventChecklist({
                 hidden: session.hardware_enabled === false,
             },
             {
+                id: 'accommodation',
+                label: 'Ubytování',
+                description: roomSelected ? 'Máš vybraný pokoj ✓' : 'Vyber si kde budeš spát',
+                icon: BedDouble,
+                href: `/event/${slug}/accommodation`,
+                done: !!roomSelected,
+                optional: true,
+                hidden: !session.accommodation_enabled,
+            },
+            {
                 id: 'games',
                 label: 'Hry',
                 description: gamesVoted ? 'Hlasoval/a jsi ✓' : 'Hlasuj co budeme hrát',
@@ -84,7 +95,7 @@ export default function EventChecklist({
                 optional: true,
             },
         ].filter(s => !s.hidden)
-    }, [slug, session, guest, seatReserved, hwReserved, gamesVoted])
+    }, [slug, session, guest, seatReserved, hwReserved, gamesVoted, roomSelected])
 
     const completedCount = steps.filter(s => s.done).length
     const totalRequired = steps.filter(s => !s.optional).length
