@@ -106,12 +106,16 @@ export async function GET(
         const productDoc = await db.collection('products').doc(data.product_id).get()
         const productData = productDoc.exists ? productDoc.data() : null
 
-        // Only include if product is available
-        if (!productData || !productData.is_available) {
+        if (!productData) {
           return null
         }
 
         const realConsumed = consumptionMap[data.product_id] || 0
+
+        // Hide unavailable products only if they have no consumption
+        if (!productData.is_available && realConsumed === 0) {
+          return null
+        }
 
         return {
           id: doc.id,
@@ -132,8 +136,44 @@ export async function GET(
       })
     )
 
-    // Filter out null values and sort by product name
+    // Filter out null values
     const filteredStock = stock.filter(item => item !== null)
+
+    // Add products that have consumption but no session_stock entry
+    const stockProductIds = new Set(filteredStock.map(item => item.product_id))
+    const missingProductIds = Object.keys(consumptionMap).filter(pid => !stockProductIds.has(pid))
+
+    if (missingProductIds.length > 0) {
+      const missingItems = await Promise.all(
+        missingProductIds.map(async (productId) => {
+          const productDoc = await db.collection('products').doc(productId).get()
+          const productData = productDoc.exists ? productDoc.data() : null
+          if (!productData) return null
+
+          return {
+            id: `consumption-${productId}`,
+            session_id: sessionId,
+            product_id: productId,
+            initial_quantity: 0,
+            consumed_quantity: consumptionMap[productId],
+            remaining_quantity: -consumptionMap[productId],
+            created_at: null,
+            updated_at: null,
+            products: {
+              id: productDoc.id,
+              name: productData.name,
+              price: productData.price,
+              category: productData.category,
+              image_url: productData.image_url,
+              is_available: productData.is_available,
+            },
+          }
+        })
+      )
+      filteredStock.push(...missingItems.filter(item => item !== null))
+    }
+
+    // Sort by product name
     filteredStock.sort((a, b) => {
       const nameA = a.products?.name || ''
       const nameB = b.products?.name || ''
