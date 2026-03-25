@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Users, Calendar, ChevronRight, UserCheck, Sparkles, Loader2 } from 'lucide-react'
+import { Users, Calendar, ChevronRight, ChevronDown, UserCheck, Sparkles, Loader2 } from 'lucide-react'
 import { useGuestAuth } from '@/lib/auth-context'
 import { guestStorage } from '@/lib/guest-storage'
 
@@ -43,6 +43,7 @@ function ClaimPageContent() {
   const [claiming, setClaiming] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [claimedNames, setClaimedNames] = useState<string[]>([])
+  const [expandedSession, setExpandedSession] = useState<string | null>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirect = searchParams.get('redirect') || '/'
@@ -163,62 +164,85 @@ function ClaimPageContent() {
           </div>
         )}
 
-        {/* Sessions with unclaimed guests — 2-column grid */}
+        {/* Sessions with unclaimed guests — accordion */}
         {sessions.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-            {sessions.map(({ session, guests }) => (
-              <div
-                key={session.id}
-                className="rounded-2xl overflow-hidden"
-                style={{ backgroundColor: 'var(--nest-surface, #1a1d27)', border: '1px solid var(--nest-border, #2a2d37)' }}
-              >
-                {/* Session header */}
-                <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--nest-border)' }}>
-                  <h3 className="font-semibold text-sm" style={{ color: 'var(--nest-text-primary)' }}>
-                    {session.name}
-                  </h3>
-                  <div className="flex items-center gap-1 mt-1">
-                    <Calendar className="w-3 h-3" style={{ color: 'var(--nest-text-tertiary)' }} />
-                    <span className="text-xs" style={{ color: 'var(--nest-text-tertiary)' }}>
-                      {new Date(session.start_date).toLocaleDateString('cs-CZ')}
-                      {session.end_date && ` – ${new Date(session.end_date).toLocaleDateString('cs-CZ')}`}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Guest list */}
-                <div>
-                  {guests.map((guest, idx) => (
-                    <button
-                      key={guest.id}
-                      onClick={() => handleClaim(guest, session.slug)}
-                      disabled={claiming !== null}
-                      className="w-full flex items-center justify-between px-4 py-3 transition-colors hover:bg-[var(--nest-yellow)]/5 disabled:opacity-50"
-                      style={idx < guests.length - 1 ? { borderBottom: '1px solid var(--nest-border)' } : {}}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'var(--nest-dark-3, #2a2d37)' }}>
-                          <Users className="w-4 h-4" style={{ color: 'var(--nest-yellow)' }} />
-                        </div>
-                        <div className="text-left min-w-0">
-                          <span className="text-sm font-medium block truncate" style={{ color: 'var(--nest-text-primary)' }}>
-                            {guest.name}
-                          </span>
-                          <span className="block text-xs" style={{ color: 'var(--nest-text-tertiary)' }}>
-                            {guest.nights_count} {guest.nights_count === 1 ? 'noc' : guest.nights_count < 5 ? 'noci' : 'nocí'}
-                          </span>
-                        </div>
+          <div className="space-y-2 mb-8">
+            {sessions.map(({ session, guests }) => {
+              const isExpanded = expandedSession === session.id
+              return (
+                <div
+                  key={session.id}
+                  className="rounded-2xl overflow-hidden"
+                  style={{ backgroundColor: 'var(--nest-surface, #1a1d27)', border: '1px solid var(--nest-border, #2a2d37)' }}
+                >
+                  {/* Session header — clickable */}
+                  <button
+                    onClick={() => setExpandedSession(isExpanded ? null : session.id)}
+                    className="w-full px-4 py-3.5 flex items-center justify-between transition-colors hover:bg-white/[0.02]"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)' }}>
+                        <Calendar className="w-4 h-4" style={{ color: 'var(--nest-yellow)' }} />
                       </div>
-                      {claiming === guest.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" style={{ color: 'var(--nest-yellow)' }} />
-                      ) : (
-                        <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--nest-text-tertiary)' }} />
-                      )}
-                    </button>
-                  ))}
+                      <div className="text-left min-w-0">
+                        <h3 className="font-semibold text-sm truncate" style={{ color: 'var(--nest-text-primary)' }}>
+                          {session.name}
+                        </h3>
+                        <span className="text-xs" style={{ color: 'var(--nest-text-tertiary)' }}>
+                          {new Date(session.start_date).toLocaleDateString('cs-CZ')}
+                          {session.end_date && ` – ${new Date(session.end_date).toLocaleDateString('cs-CZ')}`}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)', color: 'var(--nest-yellow)' }}>
+                        {guests.length} {guests.length === 1 ? 'jméno' : guests.length < 5 ? 'jména' : 'jmen'}
+                      </span>
+                      <ChevronDown
+                        className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                        style={{ color: 'var(--nest-text-tertiary)' }}
+                      />
+                    </div>
+                  </button>
+
+                  {/* Guest list — collapsed by default */}
+                  {isExpanded && (
+                    <div style={{ borderTop: '1px solid var(--nest-border)' }}>
+                      {guests.map((guest, idx) => (
+                        <button
+                          key={guest.id}
+                          onClick={() => handleClaim(guest, session.slug)}
+                          disabled={claiming !== null}
+                          className="w-full flex items-center justify-between px-4 py-3 transition-colors hover:bg-[var(--nest-yellow)]/5 disabled:opacity-50"
+                          style={idx < guests.length - 1 ? { borderBottom: '1px solid var(--nest-border)' } : {}}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'var(--nest-dark-3, #2a2d37)' }}>
+                              <Users className="w-4 h-4" style={{ color: 'var(--nest-yellow)' }} />
+                            </div>
+                            <div className="text-left min-w-0">
+                              <span className="text-sm font-medium block truncate" style={{ color: 'var(--nest-text-primary)' }}>
+                                {guest.name}
+                              </span>
+                              <span className="block text-xs" style={{ color: 'var(--nest-text-tertiary)' }}>
+                                {guest.nights_count} {guest.nights_count === 1 ? 'noc' : guest.nights_count < 5 ? 'noci' : 'nocí'}
+                              </span>
+                            </div>
+                          </div>
+                          {claiming === guest.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" style={{ color: 'var(--nest-yellow)' }} />
+                          ) : (
+                            <span className="text-xs font-medium px-2.5 py-1 rounded-lg transition-colors" style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)', color: 'var(--nest-yellow)' }}>
+                              Spárovat
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         ) : (
           <div className="text-center py-8 mb-8 rounded-2xl" style={{ backgroundColor: 'var(--nest-surface)', border: '1px solid var(--nest-border)' }}>

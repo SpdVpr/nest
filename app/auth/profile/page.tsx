@@ -6,7 +6,7 @@ import {
   User, Mail, Calendar, Pizza, MonitorSmartphone, LogOut, ArrowLeft,
   Loader2, UserCheck, ChevronRight, ChevronDown, Wallet, Gamepad2,
   Armchair, CreditCard, CircleDollarSign, CheckCircle2, Clock,
-  Beer, Moon, Trophy, Award, Zap, Star, Download, Lock
+  Beer, Moon, Trophy, Award, Zap, Star, Download, Lock, Pencil, Check, X
 } from 'lucide-react'
 import { useGuestAuth } from '@/lib/auth-context'
 
@@ -60,10 +60,13 @@ interface EventHistory {
 
 export default function ProfilePage() {
   const router = useRouter()
-  const { firebaseUser, userProfile, claimedGuests, isAuthenticated, loading: authLoading, logout } = useGuestAuth()
+  const { firebaseUser, userProfile, claimedGuests, isAuthenticated, loading: authLoading, logout, refreshProfile } = useGuestAuth()
   const [events, setEvents] = useState<EventHistory[]>([])
   const [loadingHistory, setLoadingHistory] = useState(true)
   const [expandedEvents, setExpandedEvents] = useState<Set<string>>(new Set())
+  const [editingName, setEditingName] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [savingName, setSavingName] = useState(false)
 
   useEffect(() => {
     if (authLoading) return
@@ -115,6 +118,30 @@ export default function ProfilePage() {
   const handleLogout = async () => {
     await logout()
     router.push('/')
+  }
+
+  const handleSaveName = async () => {
+    if (!editName.trim() || !firebaseUser) return
+    setSavingName(true)
+    try {
+      const token = await firebaseUser.getIdToken()
+      const res = await fetch('/api/auth/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ display_name: editName.trim() }),
+      })
+      if (res.ok) {
+        await refreshProfile()
+        setEditingName(false)
+      } else {
+        const data = await res.json()
+        alert(data.error || 'Chyba při ukládání')
+      }
+    } catch {
+      alert('Chyba při ukládání')
+    } finally {
+      setSavingName(false)
+    }
   }
 
   const formatCurrency = (amount: number) => `${amount.toLocaleString('cs-CZ')} Kč`
@@ -221,10 +248,39 @@ export default function ProfilePage() {
                   <User className="w-8 h-8" style={{ color: 'var(--nest-yellow)' }} />
                 )}
               </div>
-              <div className="min-w-0">
-                <h1 className="text-xl font-bold truncate" style={{ color: 'var(--nest-text-primary)' }}>
-                  {userProfile.display_name}
-                </h1>
+              <div className="min-w-0 flex-1">
+                {editingName ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="flex-1 px-3 py-1.5 bg-[var(--nest-bg)] border border-[var(--nest-yellow)]/50 rounded-lg text-sm font-bold outline-none focus:ring-2 focus:ring-[var(--nest-yellow)]/30"
+                      style={{ color: 'var(--nest-text-primary)' }}
+                      autoFocus
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') setEditingName(false) }}
+                    />
+                    <button onClick={handleSaveName} disabled={savingName || !editName.trim()} className="p-1.5 rounded-lg hover:bg-green-500/10 transition-colors disabled:opacity-40">
+                      {savingName ? <Loader2 className="w-4 h-4 animate-spin text-green-400" /> : <Check className="w-4 h-4 text-green-400" />}
+                    </button>
+                    <button onClick={() => setEditingName(false)} className="p-1.5 rounded-lg hover:bg-white/5 transition-colors">
+                      <X className="w-4 h-4" style={{ color: 'var(--nest-text-tertiary)' }} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-xl font-bold truncate" style={{ color: 'var(--nest-text-primary)' }}>
+                      {userProfile.display_name}
+                    </h1>
+                    <button
+                      onClick={() => { setEditName(userProfile.display_name); setEditingName(true) }}
+                      className="p-1 rounded-lg hover:bg-white/5 transition-colors flex-shrink-0"
+                      title="Změnit jméno"
+                    >
+                      <Pencil className="w-3.5 h-3.5" style={{ color: 'var(--nest-text-tertiary)' }} />
+                    </button>
+                  </div>
+                )}
                 <div className="flex items-center gap-1.5 mt-1">
                   <Mail className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--nest-text-tertiary)' }} />
                   <span className="text-sm truncate" style={{ color: 'var(--nest-text-secondary)' }}>

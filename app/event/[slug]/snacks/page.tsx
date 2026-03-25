@@ -338,12 +338,12 @@ export default function EventSnacksPage() {
                         </div>
                         <div className="space-y-1">
                           {topEaters.map((guest, index) => (
-                            <div key={guest.id} className="bg-[var(--nest-dark-3)] rounded p-1.5 flex items-center justify-between text-xs">
-                              <div className="flex items-center gap-1">
-                                <span className="text-lg">{index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}</span>
+                            <div key={guest.id} className="bg-[var(--nest-dark-3)] rounded p-1.5 flex items-center justify-between text-xs overflow-hidden">
+                              <div className="flex items-center gap-1 min-w-0 overflow-hidden">
+                                <span className="text-lg flex-shrink-0">{index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}</span>
                                 <span className="font-semibold truncate text-xs">{guest.name}</span>
                               </div>
-                              <span className="font-bold text-[var(--nest-yellow)] whitespace-nowrap ml-1">{guest.totalItems + guest.totalBeers}×</span>
+                              <span className="font-bold text-[var(--nest-yellow)] whitespace-nowrap ml-1 flex-shrink-0">{guest.totalItems + guest.totalBeers}×</span>
                             </div>
                           ))}
                         </div>
@@ -358,12 +358,12 @@ export default function EventSnacksPage() {
                         <div className="space-y-1">
                           {topBeerDrinkers.length > 0 ? (
                             topBeerDrinkers.map((guest, index) => (
-                              <div key={guest.id} className="bg-[var(--nest-dark-3)] rounded p-1.5 flex items-center justify-between text-xs">
-                                <div className="flex items-center gap-1">
-                                  <span className="text-lg">{index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}</span>
+                              <div key={guest.id} className="bg-[var(--nest-dark-3)] rounded p-1.5 flex items-center justify-between text-xs overflow-hidden">
+                                <div className="flex items-center gap-1 min-w-0 overflow-hidden">
+                                  <span className="text-lg flex-shrink-0">{index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}</span>
                                   <span className="font-semibold truncate text-xs">{guest.name}</span>
                                 </div>
-                                <span className="font-bold text-[var(--nest-info)] whitespace-nowrap ml-1">{guest.totalBeers}×</span>
+                                <span className="font-bold text-[var(--nest-info)] whitespace-nowrap ml-1 flex-shrink-0">{guest.totalBeers}×</span>
                               </div>
                             ))
                           ) : (

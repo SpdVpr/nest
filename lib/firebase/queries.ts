@@ -224,6 +224,7 @@ export async function getGuestsByUserId(userId: string): Promise<Guest[]> {
   const db = getFirebaseAdminDb()
   const snapshot = await db.collection('guests')
     .where('user_id', '==', userId)
+    .where('is_active', '==', true)
     .get()
 
   const guests = snapshot.docs.map(doc => docToObject<Guest>(doc.data(), doc.id))

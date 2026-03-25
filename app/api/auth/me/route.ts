@@ -31,3 +31,47 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Failed to fetch user' }, { status: 500 })
     }
 }
+
+// PATCH /api/auth/me - Update user profile (display_name)
+export async function PATCH(request: NextRequest) {
+    try {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
+        const token = authHeader.split('Bearer ')[1]
+        const app = getFirebaseAdminApp()
+        const auth = getAuth(app)
+        const decodedToken = await auth.verifyIdToken(token)
+
+        const body = await request.json()
+        const { display_name } = body
+
+        if (!display_name || typeof display_name !== 'string' || !display_name.trim()) {
+            return NextResponse.json({ error: 'Jméno je povinné' }, { status: 400 })
+        }
+
+        const db = getFirebaseAdminDb()
+        const trimmedName = display_name.trim()
+
+        // Update Firestore user profile
+        await db.collection('users').doc(decodedToken.uid).update({
+            display_name: trimmedName,
+            updated_at: new Date(),
+        })
+
+        // Update Firebase Auth display name
+        await auth.updateUser(decodedToken.uid, { displayName: trimmedName })
+
+        const updatedUser = await getUserProfile(decodedToken.uid)
+
+        return NextResponse.json({ user: updatedUser })
+    } catch (error: any) {
+        console.error('Auth me PATCH error:', error)
+        if (error.code === 'auth/id-token-expired' || error.code === 'auth/argument-error') {
+            return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+        }
+        return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 })
+    }
+}
