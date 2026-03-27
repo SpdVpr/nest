@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import {
   Calendar, Pizza, MonitorSmartphone, Users, AlertCircle,
-  Armchair, UtensilsCrossed, Gamepad2, Wallet, UserPlus, ChevronRight, Trophy, LogIn, UserCheck, BedDouble
+  Armchair, UtensilsCrossed, Gamepad2, Wallet, UserPlus, ChevronRight, Trophy, LogIn, UserCheck, BedDouble, Loader2, Sparkles
 } from 'lucide-react'
 import { Session, Guest } from '@/types/database.types'
 import { formatEventRange } from '@/lib/utils'
@@ -19,7 +19,7 @@ export default function EventPage() {
   const params = useParams()
   const router = useRouter()
   const slug = params?.slug as string
-  const { isAuthenticated, userProfile, getClaimedGuestForSession } = useGuestAuth()
+  const { isAuthenticated, userProfile, getClaimedGuestForSession, firebaseUser, refreshProfile } = useGuestAuth()
 
   const [session, setSession] = useState<Session | null>(null)
   const [guestCount, setGuestCount] = useState(0)
@@ -31,6 +31,42 @@ export default function EventPage() {
   const [seatReserved, setSeatReserved] = useState(false)
   const [hwReserved, setHwReserved] = useState(false)
   const [gamesVoted, setGamesVoted] = useState(false)
+
+  // Inline claim state
+  interface UnclaimedGuest {
+    id: string
+    name: string
+    nights_count: number
+    check_in_date?: string | null
+    check_out_date?: string | null
+  }
+  const [unclaimedGuests, setUnclaimedGuests] = useState<UnclaimedGuest[]>([])
+  const [claimingId, setClaimingId] = useState<string | null>(null)
+  const [claimError, setClaimError] = useState('')
+  const [claimedName, setClaimedName] = useState<string | null>(null)
+  const [claimDismissed, setClaimDismissed] = useState(false)
+
+  // Check localStorage for dismissed claim on this event
+  useEffect(() => {
+    if (typeof window === 'undefined' || !slug) return
+    try {
+      const dismissed = JSON.parse(localStorage.getItem('claim_dismissed') || '[]') as string[]
+      if (dismissed.includes(slug)) {
+        setClaimDismissed(true)
+      }
+    } catch { }
+  }, [slug])
+
+  const handleDismissClaim = () => {
+    setClaimDismissed(true)
+    try {
+      const dismissed = JSON.parse(localStorage.getItem('claim_dismissed') || '[]') as string[]
+      if (!dismissed.includes(slug)) {
+        dismissed.push(slug)
+        localStorage.setItem('claim_dismissed', JSON.stringify(dismissed))
+      }
+    } catch { }
+  }
 
   useEffect(() => {
     if (slug) {
@@ -65,7 +101,17 @@ export default function EventPage() {
 
       // Determine current guest (from auth context or local storage)
       const storedGuest = guestStorage.getCurrentGuest(slug)
-      const myGuest = allGuests.find((g: Guest) => g.id === storedGuest?.id) || null
+      let myGuest: Guest | null = null
+      if (storedGuest) {
+        const candidate = allGuests.find((g: Guest) => g.id === storedGuest.id) || null
+        // If user is authenticated, verify the stored guest actually belongs to them
+        if (candidate && firebaseUser && candidate.user_id && candidate.user_id !== firebaseUser.uid) {
+          // Stored guest was unclaimed or claimed by someone else — clear stale storage
+          guestStorage.clearIfMatches(storedGuest.id)
+        } else {
+          myGuest = candidate
+        }
+      }
       setCurrentGuest(myGuest)
 
       // Fetch checklist data if we have a guest and a session
@@ -105,6 +151,72 @@ export default function EventPage() {
       setError('Chyba při načítání eventu')
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Fetch unclaimed guests when authenticated user has no claimed guest for this event
+  useEffect(() => {
+    if (!isAuthenticated || !firebaseUser || !session) return
+    const claimed = getClaimedGuestForSession(session.id)
+    if (claimed || currentGuest) return
+
+    const fetchUnclaimed = async () => {
+      try {
+        const token = await firebaseUser.getIdToken()
+        const res = await fetch(`/api/event/${slug}/unclaimed-guests`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setUnclaimedGuests(data.guests || [])
+        }
+      } catch (err) {
+        console.error('Failed to fetch unclaimed guests:', err)
+      }
+    }
+    fetchUnclaimed()
+  }, [isAuthenticated, firebaseUser, session, currentGuest])
+
+  const handleClaim = async (guest: UnclaimedGuest) => {
+    if (!firebaseUser) return
+    setClaimingId(guest.id)
+    setClaimError('')
+
+    try {
+      const token = await firebaseUser.getIdToken()
+      const res = await fetch('/api/auth/claim', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ guest_id: guest.id }),
+      })
+
+      if (res.ok) {
+        setClaimedName(guest.name)
+        setUnclaimedGuests([])
+
+        guestStorage.setCurrentGuest({
+          id: guest.id,
+          name: guest.name,
+          session_slug: slug,
+        })
+
+        await refreshProfile()
+        // Re-fetch event data to update currentGuest and checklist
+        await fetchData()
+      } else if (res.status === 409) {
+        setClaimError('Tento účastník už byl spárován s jiným uživatelem.')
+        // Refresh the unclaimed list
+        setUnclaimedGuests(prev => prev.filter(g => g.id !== guest.id))
+      } else {
+        setClaimError('Párování selhalo. Zkus to znovu.')
+      }
+    } catch {
+      setClaimError('Chyba při párování.')
+    } finally {
+      setClaimingId(null)
     }
   }
 
@@ -248,6 +360,76 @@ export default function EventPage() {
             <span className="text-sm text-green-300">Přihlášen/a jako </span>
             <span className="text-sm font-semibold text-green-200">{claimedGuest.name}</span>
           </div>
+        </div>
+      )}
+
+      {/* Inline Claim — for authenticated users who aren't paired with a guest on this event */}
+      {isAuthenticated && !claimedGuest && !currentGuest && !claimDismissed && unclaimedGuests.length > 0 && (
+        <div className="mb-4 rounded-2xl overflow-hidden" style={{ backgroundColor: 'var(--nest-surface)', border: '1px solid var(--nest-border)' }}>
+          <div className="px-4 py-3 flex items-center gap-3" style={{ borderBottom: '1px solid var(--nest-border)' }}>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)' }}>
+              <UserCheck className="w-4 h-4" style={{ color: 'var(--nest-yellow)' }} />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--nest-text-primary, #fff)' }}>
+                Spáruj svůj účet
+              </h3>
+              <p className="text-xs" style={{ color: 'var(--nest-text-tertiary, #666)' }}>
+                Byl/a jsi na této akci? Najdi své jméno a spáruj ho.
+              </p>
+            </div>
+          </div>
+
+          {claimError && (
+            <div className="mx-4 mt-3 px-3 py-2 rounded-lg text-xs" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#ef4444' }}>
+              {claimError}
+            </div>
+          )}
+
+          {unclaimedGuests.map((guest, idx) => (
+            <button
+              key={guest.id}
+              onClick={() => handleClaim(guest)}
+              disabled={claimingId !== null}
+              className="w-full flex items-center justify-between px-4 py-3 transition-colors hover:bg-[var(--nest-yellow)]/5 disabled:opacity-50"
+              style={idx < unclaimedGuests.length - 1 ? { borderBottom: '1px solid var(--nest-border)' } : {}}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'var(--nest-dark-3, #2a2d37)' }}>
+                  <Users className="w-4 h-4" style={{ color: 'var(--nest-yellow)' }} />
+                </div>
+                <span className="text-sm font-medium" style={{ color: 'var(--nest-text-primary, #fff)' }}>
+                  {guest.name}
+                </span>
+              </div>
+              {claimingId === guest.id ? (
+                <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" style={{ color: 'var(--nest-yellow)' }} />
+              ) : (
+                <span className="text-xs font-medium px-2.5 py-1 rounded-lg" style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)', color: 'var(--nest-yellow)' }}>
+                  Spárovat
+                </span>
+              )}
+            </button>
+          ))}
+
+          {/* Dismiss button */}
+          <button
+            onClick={handleDismissClaim}
+            className="w-full px-4 py-3.5 text-center transition-colors hover:bg-white/[0.05]"
+            style={{ borderTop: '1px solid var(--nest-border)' }}
+          >
+            <span className="text-sm font-medium" style={{ color: 'var(--nest-text-secondary, #999)' }}>
+              ✕ Nejsem nikdo z nich
+            </span>
+          </button>
+        </div>
+      )}
+
+      {/* Claim success message */}
+      {claimedName && (
+        <div className="mb-4 px-4 py-3 rounded-xl text-sm" style={{ backgroundColor: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34, 197, 94, 0.3)', color: '#22c55e' }}>
+          <Sparkles className="w-4 h-4 inline mr-2" />
+          Účet spárován s {claimedName}
         </div>
       )}
 

@@ -6,9 +6,10 @@ import {
   User, Mail, Calendar, Pizza, MonitorSmartphone, LogOut, ArrowLeft,
   Loader2, UserCheck, ChevronRight, ChevronDown, Wallet, Gamepad2,
   Armchair, CreditCard, CircleDollarSign, CheckCircle2, Clock,
-  Beer, Moon, Trophy, Award, Zap, Star, Download, Lock, Pencil, Check, X
+  Beer, Moon, Trophy, Award, Zap, Star, Download, Lock, Pencil, Check, X, Unlink
 } from 'lucide-react'
 import { useGuestAuth } from '@/lib/auth-context'
+import { guestStorage } from '@/lib/guest-storage'
 
 interface ConsumptionItem {
   name: string
@@ -67,6 +68,8 @@ export default function ProfilePage() {
   const [editingName, setEditingName] = useState(false)
   const [editName, setEditName] = useState('')
   const [savingName, setSavingName] = useState(false)
+  const [unclaimingId, setUnclaimingId] = useState<string | null>(null)
+  const [confirmUnclaimId, setConfirmUnclaimId] = useState<string | null>(null)
 
   useEffect(() => {
     if (authLoading) return
@@ -141,6 +144,35 @@ export default function ProfilePage() {
       alert('Chyba při ukládání')
     } finally {
       setSavingName(false)
+    }
+  }
+
+  const handleUnclaim = async (guestId: string) => {
+    if (!firebaseUser) return
+    setUnclaimingId(guestId)
+    try {
+      const token = await firebaseUser.getIdToken()
+      const res = await fetch('/api/auth/unclaim', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ guest_id: guestId }),
+      })
+      if (res.ok) {
+        // Clear localStorage if this guest was stored as current
+        guestStorage.clearIfMatches(guestId)
+        await refreshProfile()
+        await fetchHistory()
+        setConfirmUnclaimId(null)
+      } else {
+        alert('Odpárování selhalo.')
+      }
+    } catch {
+      alert('Chyba při odpárování.')
+    } finally {
+      setUnclaimingId(null)
     }
   }
 
@@ -297,21 +329,78 @@ export default function ProfilePage() {
 
             <div className="flex gap-2 mt-4">
               <button
-                onClick={() => router.push('/auth/claim')}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-medium transition-colors"
-                style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)', color: 'var(--nest-text-secondary)' }}
-              >
-                <UserCheck className="w-3.5 h-3.5" />
-                Spárovat jméno
-              </button>
-              <button
                 onClick={handleLogout}
                 className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-medium transition-colors"
                 style={{ border: '1px solid rgba(239, 68, 68, 0.3)', color: '#ef4444' }}
               >
                 <LogOut className="w-3.5 h-3.5" />
+                Odhlásit se
               </button>
             </div>
+
+            {/* Paired names */}
+            {claimedGuests.length > 0 && (
+              <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--nest-border)' }}>
+                <div className="flex items-center gap-1.5 mb-3">
+                  <UserCheck className="w-3.5 h-3.5" style={{ color: 'var(--nest-yellow)' }} />
+                  <span className="text-xs font-semibold" style={{ color: 'var(--nest-text-secondary)' }}>Spárovaná jména</span>
+                </div>
+                <div className="space-y-2">
+                  {claimedGuests.map((guest) => {
+                    const eventName = events.find(e => e.session.id === guest.session_id)?.session.name
+                    const isConfirming = confirmUnclaimId === guest.id
+                    return (
+                      <div
+                        key={guest.id}
+                        className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg"
+                        style={{ backgroundColor: 'var(--nest-bg)', border: '1px solid var(--nest-border)' }}
+                      >
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium truncate" style={{ color: 'var(--nest-text-primary)' }}>
+                            {guest.name}
+                          </div>
+                          {eventName && (
+                            <div className="text-xs truncate" style={{ color: 'var(--nest-text-tertiary)' }}>
+                              {eventName}
+                            </div>
+                          )}
+                        </div>
+                        {isConfirming ? (
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button
+                              onClick={() => handleUnclaim(guest.id)}
+                              disabled={unclaimingId === guest.id}
+                              className="px-2 py-1 rounded text-xs font-medium transition-colors"
+                              style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' }}
+                            >
+                              {unclaimingId === guest.id ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                'Potvrdit'
+                              )}
+                            </button>
+                            <button
+                              onClick={() => setConfirmUnclaimId(null)}
+                              className="p-1 rounded hover:bg-white/5 transition-colors"
+                            >
+                              <X className="w-3.5 h-3.5" style={{ color: 'var(--nest-text-tertiary)' }} />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmUnclaimId(guest.id)}
+                            className="p-1.5 rounded-lg hover:bg-white/5 transition-colors flex-shrink-0"
+                            title="Odpárovat"
+                          >
+                            <Unlink className="w-3.5 h-3.5" style={{ color: 'var(--nest-text-tertiary)' }} />
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Stats grid */}

@@ -40,5 +40,17 @@ export const guestStorage = {
   clearCurrentGuest: () => {
     if (typeof window === 'undefined') return
     localStorage.removeItem(GUEST_KEY)
+  },
+
+  clearIfMatches: (guestId: string) => {
+    if (typeof window === 'undefined') return
+    try {
+      const stored = localStorage.getItem(GUEST_KEY)
+      if (!stored) return
+      const guest: StoredGuest = JSON.parse(stored)
+      if (guest.id === guestId) {
+        localStorage.removeItem(GUEST_KEY)
+      }
+    } catch { }
   }
 }

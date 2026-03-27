@@ -52,29 +52,10 @@ function AuthLoginContent() {
     return res.ok
   }
 
-  // Decide where to go after login: claim page (if no guests) or redirect (if already has guests)
-  const resolvePostLoginRedirect = async (token: string, isNewUser: boolean): Promise<string> => {
-    if (isNewUser) {
-      // New registration — always show claim page
-      return `/auth/claim?redirect=${encodeURIComponent(redirect)}`
-    }
-
-    // Existing user — check if they already have claimed guests
-    try {
-      const meRes = await fetch('/api/auth/me', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-      if (meRes.ok) {
-        const data = await meRes.json()
-        if (data.guests && data.guests.length > 0) {
-          // Already has claimed guests — skip claim, go to redirect
-          return redirect
-        }
-      }
-    } catch { }
-
-    // No claimed guests — show claim page
-    return `/auth/claim?redirect=${encodeURIComponent(redirect)}`
+  // After login, always go to the original redirect target.
+  // Claiming now happens inline on the event page, not on a separate global claim page.
+  const resolvePostLoginRedirect = async (_token: string, _isNewUser: boolean): Promise<string> => {
+    return redirect
   }
 
   const handleEmailLogin = async (e: React.FormEvent) => {
