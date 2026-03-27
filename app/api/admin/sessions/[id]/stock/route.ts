@@ -112,8 +112,8 @@ export async function GET(
 
         const realConsumed = consumptionMap[data.product_id] || 0
 
-        // Hide unavailable products only if they have no consumption
-        if (!productData.is_available && realConsumed === 0) {
+        // Hide products with no consumption
+        if (realConsumed === 0) {
           return null
         }
 
