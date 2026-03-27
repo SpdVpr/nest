@@ -412,16 +412,16 @@ export default function EventPage() {
             </button>
           ))}
 
-          {/* Dismiss button */}
-          <button
-            onClick={handleDismissClaim}
-            className="w-full px-4 py-3.5 text-center transition-colors hover:bg-white/[0.05]"
-            style={{ borderTop: '1px solid var(--nest-border)' }}
-          >
-            <span className="text-sm font-medium" style={{ color: 'var(--nest-text-secondary, #999)' }}>
-              ✕ Nejsem nikdo z nich
-            </span>
-          </button>
+          {/* Dismiss button — prominent so users don't miss it */}
+          <div className="px-4 pb-4 pt-3" style={{ borderTop: '1px solid var(--nest-border)' }}>
+            <button
+              onClick={handleDismissClaim}
+              className="w-full py-3 rounded-xl text-center font-semibold text-base transition-colors hover:bg-white/[0.08]"
+              style={{ border: '1px solid var(--nest-border)', color: 'var(--nest-text-primary, #fff)' }}
+            >
+              Nejsem nikdo z nich
+            </button>
+          </div>
         </div>
       )}
 

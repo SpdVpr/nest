@@ -1,12 +1,14 @@
 'use client'
 
-import { useState, Suspense } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Lock, Mail, User, ArrowLeft, LogIn, Loader2 } from 'lucide-react'
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
   OAuthProvider,
   sendPasswordResetEmail,
@@ -39,6 +41,64 @@ function AuthLoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirect = searchParams.get('redirect') || '/'
+
+  // Detect mobile/tablet browsers where popups don't work well (iOS Safari, etc.)
+  const isMobile = typeof window !== 'undefined' && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+  const redirectProcessed = useRef(false)
+
+  // Save redirect target before OAuth redirect (so it survives the round-trip)
+  const saveRedirectTarget = () => {
+    if (typeof window !== 'undefined' && redirect) {
+      sessionStorage.setItem('auth_redirect', redirect)
+    }
+  }
+
+  // Restore redirect target after returning from OAuth
+  const getSavedRedirect = (): string => {
+    if (typeof window !== 'undefined') {
+      const saved = sessionStorage.getItem('auth_redirect')
+      if (saved) {
+        sessionStorage.removeItem('auth_redirect')
+        return saved
+      }
+    }
+    return redirect
+  }
+
+  // Handle redirect result when returning from OAuth provider (mobile flow)
+  useEffect(() => {
+    if (redirectProcessed.current) return
+    redirectProcessed.current = true
+
+    const handleRedirectResult = async () => {
+      try {
+        const auth = getFirebaseAuth()
+        const result = await getRedirectResult(auth)
+        if (!result) return // No redirect result — normal page load
+
+        setLoading(true)
+        const token = await result.user.getIdToken()
+        const providerName = result.providerId?.includes('apple') ? 'apple' : 'google'
+
+        // Create or get user profile
+        await registerUserProfile(
+          token,
+          result.user.displayName || result.user.email?.split('@')[0] || 'User',
+          providerName
+        )
+        const savedRedirect = getSavedRedirect()
+        router.push(savedRedirect)
+      } catch (err: any) {
+        if (err.code !== 'auth/popup-closed-by-user') {
+          console.error('Redirect result error:', err)
+          setError(err.message || 'Přihlášení selhalo.')
+        }
+        setLoading(false)
+      }
+    }
+
+    handleRedirectResult()
+  }, [])
 
   const registerUserProfile = async (token: string, displayName: string, provider: string) => {
     const res = await fetch('/api/auth/register', {
@@ -135,6 +195,16 @@ function AuthLoginContent() {
     try {
       const auth = getFirebaseAuth()
       const provider = new GoogleAuthProvider()
+
+      if (isMobile) {
+        // Mobile: use redirect flow (works on iOS Safari)
+        saveRedirectTarget()
+        await signInWithRedirect(auth, provider)
+        // Page will redirect — no code after this runs
+        return
+      }
+
+      // Desktop: use popup flow
       const result = await signInWithPopup(auth, provider)
       const token = await result.user.getIdToken()
 
@@ -150,7 +220,16 @@ function AuthLoginContent() {
       if (err.code === 'auth/popup-closed-by-user') {
         // User closed popup, not an error
       } else if (err.code === 'auth/popup-blocked') {
-        setError('Popup byl zablokován. Povol vyskakovací okna v prohlížeči.')
+        // Popup blocked — fall back to redirect
+        try {
+          const auth = getFirebaseAuth()
+          const provider = new GoogleAuthProvider()
+          saveRedirectTarget()
+          await signInWithRedirect(auth, provider)
+          return
+        } catch {
+          setError('Přihlášení přes Google selhalo. Zkus to znovu.')
+        }
       } else {
         setError(err.message || 'Přihlášení přes Google selhalo.')
       }
@@ -168,6 +247,15 @@ function AuthLoginContent() {
       const provider = new OAuthProvider('apple.com')
       provider.addScope('email')
       provider.addScope('name')
+
+      if (isMobile) {
+        // Mobile: use redirect flow (works on iOS Safari)
+        saveRedirectTarget()
+        await signInWithRedirect(auth, provider)
+        return
+      }
+
+      // Desktop: use popup flow
       const result = await signInWithPopup(auth, provider)
       const token = await result.user.getIdToken()
 
@@ -181,6 +269,18 @@ function AuthLoginContent() {
     } catch (err: any) {
       if (err.code === 'auth/popup-closed-by-user') {
         // User closed popup
+      } else if (err.code === 'auth/popup-blocked') {
+        try {
+          const auth = getFirebaseAuth()
+          const provider = new OAuthProvider('apple.com')
+          provider.addScope('email')
+          provider.addScope('name')
+          saveRedirectTarget()
+          await signInWithRedirect(auth, provider)
+          return
+        } catch {
+          setError('Přihlášení přes Apple selhalo. Zkus to znovu.')
+        }
       } else {
         setError(err.message || 'Přihlášení přes Apple selhalo.')
       }
