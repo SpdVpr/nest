@@ -355,3 +355,28 @@ export interface UserProfile {
   created_at: string
   updated_at: string
 }
+
+// =============================================
+// SHARED RIDES TYPES
+// =============================================
+
+export interface Ride {
+  id: string
+  session_id: string
+  driver_guest_id: string
+  driver_name: string
+  departure_date: string     // "YYYY-MM-DD"
+  departure_time: string     // "HH:MM"
+  origin: string
+  total_seats: number
+  created_at: string
+}
+
+export interface RidePassenger {
+  id: string
+  ride_id: string
+  guest_id: string
+  guest_name: string
+  session_id: string
+  created_at: string
+}

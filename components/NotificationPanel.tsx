@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Bell, Check, X, UserPlus, Megaphone, UtensilsCrossed, AlertTriangle, Gamepad2, Info } from 'lucide-react'
+import { Bell, Check, X, UserPlus, Megaphone, UtensilsCrossed, AlertTriangle, Gamepad2, Info, Car } from 'lucide-react'
 import { useGuestAuth } from '@/lib/auth-context'
 
 interface Notification {
@@ -253,8 +253,8 @@ export default function NotificationPanel() {
                                             backgroundColor: n.is_read ? 'transparent' : 'rgba(245, 158, 11, 0.03)',
                                         }}
                                     >
-                                        <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: n.type === 'broadcast' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(34, 197, 94, 0.1)' }}>
-                                            {n.type === 'broadcast' ? <Megaphone className="w-3.5 h-3.5 text-blue-400" /> : <UserPlus className="w-3.5 h-3.5 text-green-400" />}
+                                        <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: n.type === 'broadcast' ? 'rgba(59, 130, 246, 0.1)' : n.type === 'ride_join' ? 'rgba(168, 85, 247, 0.1)' : 'rgba(34, 197, 94, 0.1)' }}>
+                                            {n.type === 'broadcast' ? <Megaphone className="w-3.5 h-3.5 text-blue-400" /> : n.type === 'ride_join' ? <Car className="w-3.5 h-3.5 text-purple-400" /> : <UserPlus className="w-3.5 h-3.5 text-green-400" />}
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2">
