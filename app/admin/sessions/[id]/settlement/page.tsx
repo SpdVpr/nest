@@ -172,7 +172,8 @@ export default function SettlementPage() {
     }
 
     const getSettlement = (guestId: string): Settlement => {
-        return settlements[guestId] || {
+        const s = settlements[guestId]
+        if (!s) return {
             status: 'draft',
             adjustments: [],
             custom_items: [],
@@ -182,11 +183,20 @@ export default function SettlementPage() {
             qr_generated_at: null,
             paid_at: null,
         }
+        // Ensure arrays/objects are never undefined (Firestore may omit empty fields)
+        return {
+            ...s,
+            adjustments: s.adjustments || [],
+            custom_items: s.custom_items || [],
+            overrides: s.overrides || {},
+            notes: s.notes || '',
+            variable_symbol: s.variable_symbol || '',
+        }
     }
 
     const getAdjustmentsTotal = (guestId: string): number => {
         const s = getSettlement(guestId)
-        return s.adjustments.reduce((sum, a) => sum + a.amount, 0)
+        return (s.adjustments || []).reduce((sum, a) => sum + a.amount, 0)
     }
 
     // Get the effective value for a line item (override or original)
@@ -469,7 +479,7 @@ export default function SettlementPage() {
         if (!adjLabel.trim() || isNaN(amount)) return
 
         const settlement = getSettlement(guestId)
-        const newAdjustments = [...settlement.adjustments, { label: adjLabel, amount }]
+        const newAdjustments = [...(settlement.adjustments || []), { label: adjLabel, amount }]
 
         await settlementAction(guestId, 'update', { adjustments: newAdjustments })
         setAddingAdjustment(null)
@@ -480,7 +490,7 @@ export default function SettlementPage() {
     // Remove adjustment
     const removeAdjustment = async (guestId: string, index: number) => {
         const settlement = getSettlement(guestId)
-        const newAdjustments = settlement.adjustments.filter((_, i) => i !== index)
+        const newAdjustments = (settlement.adjustments || []).filter((_, i) => i !== index)
         await settlementAction(guestId, 'update', { adjustments: newAdjustments })
     }
 
@@ -1341,7 +1351,7 @@ export default function SettlementPage() {
                                                 </button>
                                             </h4>
 
-                                            {settlement.adjustments.map((adj, idx) => (
+                                            {(settlement.adjustments || []).map((adj, idx) => (
                                                 <div key={idx} className="flex items-center justify-between py-1 text-sm">
                                                     <span className={adj.amount < 0 ? 'text-green-700' : 'text-red-700'}>{adj.label}</span>
                                                     <div className="flex items-center gap-2">
@@ -1358,7 +1368,7 @@ export default function SettlementPage() {
                                                 </div>
                                             ))}
 
-                                            {settlement.adjustments.length === 0 && addingAdjustment !== guest.id && (
+                                            {(settlement.adjustments || []).length === 0 && addingAdjustment !== guest.id && (
                                                 <p className="text-xs text-gray-400 italic">Žádné úpravy</p>
                                             )}
 
