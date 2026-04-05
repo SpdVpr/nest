@@ -2,7 +2,7 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app'
 import { getFirestore, Firestore } from 'firebase/firestore'
 import { getStorage, FirebaseStorage } from 'firebase/storage'
-import { getAuth, Auth } from 'firebase/auth'
+import { getAuth, Auth, setPersistence, browserLocalPersistence } from 'firebase/auth'
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -42,6 +42,9 @@ export function getFirebaseStorage() {
 export function getFirebaseAuth() {
   if (!auth) {
     auth = getAuth(getFirebaseApp())
+    // Explicitly set persistence — iOS Safari may not default to local persistence
+    // due to ITP (Intelligent Tracking Prevention) restrictions
+    setPersistence(auth, browserLocalPersistence).catch(() => {})
   }
   return auth
 }

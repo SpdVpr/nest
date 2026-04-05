@@ -14,6 +14,7 @@ import {
   sendPasswordResetEmail,
 } from 'firebase/auth'
 import { getFirebaseAuth } from '@/lib/firebase/client'
+import { useGuestAuth } from '@/lib/auth-context'
 
 type Mode = 'login' | 'register' | 'forgot_password'
 
@@ -41,6 +42,7 @@ function AuthLoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirect = searchParams.get('redirect') || '/'
+  const { refreshProfile } = useGuestAuth()
 
   // Detect mobile/tablet browsers where popups don't work well (iOS Safari, etc.)
   const isMobile = typeof window !== 'undefined' && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
@@ -86,6 +88,9 @@ function AuthLoginContent() {
           result.user.displayName || result.user.email?.split('@')[0] || 'User',
           providerName
         )
+        // Refresh auth context profile — onAuthStateChanged may have already
+        // fired with a 404 before registration completed (race condition on iOS Safari)
+        await refreshProfile()
         const savedRedirect = getSavedRedirect()
         router.push(savedRedirect)
       } catch (err: any) {

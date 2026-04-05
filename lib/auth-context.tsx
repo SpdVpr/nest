@@ -79,8 +79,10 @@ export function GuestAuthProvider({ children }: { children: ReactNode }) {
     }, [])
 
     const refreshProfile = useCallback(async () => {
-        if (firebaseUser) {
-            await fetchProfile(firebaseUser)
+        const user = firebaseUser || getFirebaseAuth().currentUser
+        if (user) {
+            setFirebaseUser(user)
+            await fetchProfile(user)
         }
     }, [firebaseUser, fetchProfile])
 
