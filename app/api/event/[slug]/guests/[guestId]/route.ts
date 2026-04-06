@@ -28,7 +28,7 @@ export async function PATCH(
             return NextResponse.json({ error: 'Guest does not belong to this event' }, { status: 403 })
         }
 
-        // Authorization: either the guest's linked user, or admin
+        // Authorization: admin, linked user, or unlinked guest (self-service)
         let isAuthorized = false
         const adminRole = request.headers.get('x-admin-role')
         if (adminRole === 'super_admin' || adminRole === 'admin') {
@@ -40,6 +40,12 @@ export async function PATCH(
                     isAuthorized = true
                 }
             } catch { /* not authenticated */ }
+
+            // Allow self-service for guests not linked to any user account
+            // (e.g. accessing via Messenger in-app browser where Firebase auth doesn't work)
+            if (!isAuthorized && !guestData?.user_id) {
+                isAuthorized = true
+            }
         }
 
         if (!isAuthorized) {
