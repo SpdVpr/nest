@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { X, Megaphone, UtensilsCrossed, AlertTriangle, Gamepad2, Info } from 'lucide-react'
+import { useGuestAuth } from '@/lib/auth-context'
 
 interface Broadcast {
     id: string
@@ -40,6 +41,10 @@ const TYPE_CONFIG = {
 }
 
 export default function LiveBroadcast({ sessionId, slug }: { sessionId?: string; slug?: string }) {
+    // Authenticated users receive broadcasts via NotificationPanel (which also
+    // marks them read). Skip here to avoid a double-overlay where dismissing
+    // one leaves an identical copy underneath.
+    const { isAuthenticated } = useGuestAuth()
     const [broadcast, setBroadcast] = useState<Broadcast | null>(null)
     const [dismissed, setDismissed] = useState<Set<string>>(new Set())
     const [isAnimating, setIsAnimating] = useState(false)
@@ -105,6 +110,7 @@ export default function LiveBroadcast({ sessionId, slug }: { sessionId?: string;
 
     // Poll for broadcasts every 5 seconds
     useEffect(() => {
+        if (isAuthenticated) return
         if (!sessionId && !slug) return
 
         const poll = async () => {
@@ -137,7 +143,7 @@ export default function LiveBroadcast({ sessionId, slug }: { sessionId?: string;
         poll()
         const interval = setInterval(poll, 5000)
         return () => clearInterval(interval)
-    }, [sessionId, slug, dismissed, broadcast?.id, playPing, startTitleBlink])
+    }, [isAuthenticated, sessionId, slug, dismissed, broadcast?.id, playPing, startTitleBlink])
 
     const handleDismiss = () => {
         if (broadcast) {
@@ -148,6 +154,7 @@ export default function LiveBroadcast({ sessionId, slug }: { sessionId?: string;
         }
     }
 
+    if (isAuthenticated) return null
     if (!broadcast || dismissed.has(broadcast.id)) return null
 
     const config = TYPE_CONFIG[broadcast.type] || TYPE_CONFIG.info
