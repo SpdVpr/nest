@@ -6,7 +6,7 @@ import { useParams } from 'next/navigation'
 import { ArrowLeft, UtensilsCrossed, Loader2, Check, AlertCircle, X } from 'lucide-react'
 import { Session, MenuItem, MealType } from '@/types/database.types'
 import { formatDateOnly } from '@/lib/utils'
-import { guestStorage } from '@/lib/guest-storage'
+import { useCurrentGuest } from '@/lib/auth-context'
 import NestLoading from '@/components/NestLoading'
 import NestPage from '@/components/NestPage'
 
@@ -40,9 +40,10 @@ export default function EventMenuPage() {
     const [saving, setSaving] = useState(false)
     const [saved, setSaved] = useState(false)
 
-    // Guest state
-    const [guestId, setGuestId] = useState<string | null>(null)
-    const [guestName, setGuestName] = useState<string | null>(null)
+    // Guest state (derived from auth context + localStorage)
+    const storedGuest = useCurrentGuest(slug)
+    const guestId = storedGuest?.id || null
+    const guestName = storedGuest?.name || null
 
     // Meal selections: meal.id -> true (will eat) / false (won't eat)
     const [selections, setSelections] = useState<Record<string, boolean>>({})
@@ -53,14 +54,9 @@ export default function EventMenuPage() {
 
     useEffect(() => {
         if (slug) {
-            const guest = guestStorage.getCurrentGuest(slug)
-            if (guest) {
-                setGuestId(guest.id)
-                setGuestName(guest.name)
-            }
             fetchData()
         }
-    }, [slug])
+    }, [slug, guestId])
 
     // Initialize all meals as "will eat" (true) by default when items load,
     // but only for meals that don't have a saved selection
@@ -88,12 +84,8 @@ export default function EventMenuPage() {
                 setSession(eventData.session)
             }
 
-            // Get guest info for the query param
-            const guest = guestStorage.getCurrentGuest(slug)
-            const gId = guest?.id
-
-            const menuUrl = gId
-                ? `/api/event/${slug}/menu?guest_id=${gId}`
+            const menuUrl = guestId
+                ? `/api/event/${slug}/menu?guest_id=${guestId}`
                 : `/api/event/${slug}/menu`
             const menuRes = await fetch(menuUrl)
             if (menuRes.ok) {

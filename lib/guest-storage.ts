@@ -6,15 +6,25 @@ export interface StoredGuest {
 
 const GUEST_KEY = 'current_guest'
 
+const GUEST_EVENT = 'nest:current-guest-changed'
+
+function emitChange() {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new Event(GUEST_EVENT))
+}
+
+export const GUEST_STORAGE_EVENT = GUEST_EVENT
+
 export const guestStorage = {
   setCurrentGuest: (guest: StoredGuest | null) => {
     if (typeof window === 'undefined') return
-    
+
     if (guest) {
       localStorage.setItem(GUEST_KEY, JSON.stringify(guest))
     } else {
       localStorage.removeItem(GUEST_KEY)
     }
+    emitChange()
   },
 
   getCurrentGuest: (session_slug: string): StoredGuest | null => {
@@ -40,6 +50,7 @@ export const guestStorage = {
   clearCurrentGuest: () => {
     if (typeof window === 'undefined') return
     localStorage.removeItem(GUEST_KEY)
+    emitChange()
   },
 
   clearIfMatches: (guestId: string) => {
@@ -50,6 +61,7 @@ export const guestStorage = {
       const guest: StoredGuest = JSON.parse(stored)
       if (guest.id === guestId) {
         localStorage.removeItem(GUEST_KEY)
+        emitChange()
       }
     } catch { }
   }

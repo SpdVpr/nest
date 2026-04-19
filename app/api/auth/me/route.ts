@@ -22,7 +22,24 @@ export async function GET(request: NextRequest) {
 
         const guests = await getGuestsByUserId(decodedToken.uid)
 
-        return NextResponse.json({ user, guests })
+        // Attach session_slug to each guest so the client can map guests to URLs
+        // without an extra round-trip per event.
+        let guestsWithSlug: any[] = guests
+        if (guests.length > 0) {
+            const db = getFirebaseAdminDb()
+            const sessionIds = Array.from(new Set(guests.map(g => g.session_id).filter(Boolean)))
+            if (sessionIds.length > 0) {
+                const refs = sessionIds.map(id => db.collection('sessions').doc(id))
+                const docs = await db.getAll(...refs)
+                const slugById = new Map<string, string>()
+                docs.forEach(doc => {
+                    if (doc.exists) slugById.set(doc.id, (doc.data() as any)?.slug || '')
+                })
+                guestsWithSlug = guests.map(g => ({ ...g, session_slug: slugById.get(g.session_id) || '' }))
+            }
+        }
+
+        return NextResponse.json({ user, guests: guestsWithSlug })
     } catch (error: any) {
         console.error('Auth me error:', error)
         if (error.code === 'auth/id-token-expired' || error.code === 'auth/argument-error') {

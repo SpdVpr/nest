@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Receipt, ChevronDown, ChevronUp, AlertTriangle, RefreshCw, Heart, CreditCard, CheckCircle2, Download, QrCode, Copy } from 'lucide-react'
 import NestPage from '@/components/NestPage'
-import { guestStorage } from '@/lib/guest-storage'
+import { useCurrentGuest } from '@/lib/auth-context'
 
 interface ConsumptionItem {
     name: string
@@ -66,21 +66,13 @@ export default function CostsPage() {
     const [tipEditGuest, setTipEditGuest] = useState<string | null>(null)
     const [tipAmount, setTipAmount] = useState('')
     const [tipSaving, setTipSaving] = useState(false)
-    const [currentGuestId, setCurrentGuestId] = useState<string | null>(null)
+    const storedGuest = useCurrentGuest(slug)
+    const currentGuestId = storedGuest?.id || null
     const [bankSettings, setBankSettings] = useState<BankSettings | null>(null)
     const [isPreliminary, setIsPreliminary] = useState(true)
     const [copiedVS, setCopiedVS] = useState<string | null>(null)
     const [hardwarePricingEnabled, setHardwarePricingEnabled] = useState(true)
     const [sessionName, setSessionName] = useState('')
-
-    useEffect(() => {
-        if (slug) {
-            const stored = guestStorage.getCurrentGuest(slug)
-            if (stored) {
-                setCurrentGuestId(stored.id)
-            }
-        }
-    }, [slug])
 
     const fetchCosts = async () => {
         try {

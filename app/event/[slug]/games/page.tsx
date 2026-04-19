@@ -6,7 +6,7 @@ import { useParams } from 'next/navigation'
 import { ArrowLeft, Gamepad2, Plus, ThumbsUp, Loader2, Trophy, Sparkles, Library, Monitor, ChevronRight } from 'lucide-react'
 import NestPage from '@/components/NestPage'
 import { Session, Game, GameVote, GameLibraryItem } from '@/types/database.types'
-import { guestStorage } from '@/lib/guest-storage'
+import { useCurrentGuest } from '@/lib/auth-context'
 import NestLoading from '@/components/NestLoading'
 
 export default function EventGamesPage() {
@@ -22,7 +22,7 @@ export default function EventGamesPage() {
     const [submitting, setSubmitting] = useState(false)
     const [votingId, setVotingId] = useState<string | null>(null)
 
-    const currentGuest = typeof window !== 'undefined' ? guestStorage.getCurrentGuest(slug) : null
+    const currentGuest = useCurrentGuest(slug)
 
     useEffect(() => {
         if (slug) fetchData()

@@ -6,7 +6,7 @@ import { useParams } from 'next/navigation'
 import { Car, Plus, Loader2, Trash2, UserPlus, UserMinus, MapPin, Clock, Users, Calendar } from 'lucide-react'
 import NestPage from '@/components/NestPage'
 import { Session, Ride, RidePassenger } from '@/types/database.types'
-import { guestStorage } from '@/lib/guest-storage'
+import { useCurrentGuest } from '@/lib/auth-context'
 import NestLoading from '@/components/NestLoading'
 
 export default function EventRidesPage() {
@@ -28,7 +28,7 @@ export default function EventRidesPage() {
     const [totalSeats, setTotalSeats] = useState(3)
     const [formError, setFormError] = useState('')
 
-    const currentGuest = typeof window !== 'undefined' ? guestStorage.getCurrentGuest(slug) : null
+    const currentGuest = useCurrentGuest(slug)
 
     useEffect(() => {
         if (slug) fetchData()

@@ -9,6 +9,7 @@ import { Session, Guest, GameLibraryItem } from '@/types/database.types'
 import { HardwareItem } from '@/types/hardware.types'
 import { formatDate } from '@/lib/utils'
 import { guestStorage } from '@/lib/guest-storage'
+import { useCurrentGuest } from '@/lib/auth-context'
 import NestLoading from '@/components/NestLoading'
 import GuestSelectionModal from '@/components/GuestSelectionModal'
 
@@ -79,6 +80,8 @@ export default function EventHardwarePage() {
   const [existingGameInstalls, setExistingGameInstalls] = useState<string[]>([])
   const [customGameName, setCustomGameName] = useState('')
 
+  const storedGuest = useCurrentGuest(slug)
+
   useEffect(() => {
     setMounted(true)
   }, [])
@@ -90,18 +93,15 @@ export default function EventHardwarePage() {
   }, [slug])
 
   useEffect(() => {
-    if (mounted && guests.length > 0) {
-      const currentGuest = guestStorage.getCurrentGuest(slug)
-      if (currentGuest) {
-        const guestToSelect = guests.find(g => g.id === currentGuest.id)
-        if (guestToSelect) {
-          setSelectedGuest(guestToSelect)
-          setNightsCount(guestToSelect.nights_count || 1)
-        }
+    if (mounted && guests.length > 0 && storedGuest) {
+      const guestToSelect = guests.find(g => g.id === storedGuest.id)
+      if (guestToSelect) {
+        setSelectedGuest(guestToSelect)
+        setNightsCount(guestToSelect.nights_count || 1)
       }
       // Don't force guest selection — let users browse freely
     }
-  }, [guests, slug, mounted])
+  }, [guests, mounted, storedGuest])
 
   const fetchData = async () => {
     try {
@@ -152,10 +152,9 @@ export default function EventHardwarePage() {
           setAllGameInstalls(installMap)
 
           // Set current guest's installs
-          const currentGuest = guestStorage.getCurrentGuest(slug)
-          if (currentGuest && installMap[currentGuest.id]) {
-            setExistingGameInstalls(installMap[currentGuest.id])
-            setSelectedGameInstalls(new Set(installMap[currentGuest.id]))
+          if (storedGuest && installMap[storedGuest.id]) {
+            setExistingGameInstalls(installMap[storedGuest.id])
+            setSelectedGameInstalls(new Set(installMap[storedGuest.id]))
           }
         }
       }

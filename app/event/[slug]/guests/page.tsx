@@ -7,7 +7,7 @@ import { Users, UserCheck, Calendar, Moon, Armchair, LogOut, Pencil, X, Check } 
 import { Session, Guest } from '@/types/database.types'
 import { formatDate } from '@/lib/utils'
 import { guestStorage } from '@/lib/guest-storage'
-import { useGuestAuth } from '@/lib/auth-context'
+import { useGuestAuth, useCurrentGuest } from '@/lib/auth-context'
 import NestPage from '@/components/NestPage'
 import NestLoading from '@/components/NestLoading'
 import DateRangeCalendar from '@/components/DateRangeCalendar'
@@ -17,10 +17,12 @@ export default function GuestsPage() {
   const router = useRouter()
   const slug = params?.slug as string
 
+  const storedGuest = useCurrentGuest(slug)
+  const currentGuest = storedGuest?.id || null
+
   const [session, setSession] = useState<Session | null>(null)
   const [guests, setGuests] = useState<Guest[]>([])
   const [loading, setLoading] = useState(true)
-  const [currentGuest, setCurrentGuest] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
   const [seatReservations, setSeatReservations] = useState<{ id: string, seat_id: string, guest_id: string, guest_name: string }[]>([])
   const [unregistering, setUnregistering] = useState(false)
@@ -41,13 +43,6 @@ export default function GuestsPage() {
       fetchData()
     }
   }, [slug])
-
-  useEffect(() => {
-    if (mounted && slug) {
-      const guest = guestStorage.getCurrentGuest(slug)
-      setCurrentGuest(guest?.id || null)
-    }
-  }, [mounted, slug])
 
   const fetchData = async () => {
     try {
@@ -86,7 +81,6 @@ export default function GuestsPage() {
       name: guest.name,
       session_slug: slug
     })
-    setCurrentGuest(guest.id)
   }
 
   const openEditDays = (guest: Guest) => {
@@ -341,7 +335,6 @@ export default function GuestsPage() {
                               const res = await fetch(`/api/event/${slug}/guests/${guest.id}`, { method: 'DELETE' })
                               if (res.ok) {
                                 guestStorage.clearCurrentGuest()
-                                setCurrentGuest(null)
                                 alert('Byl/a jsi odhlášen/a z akce. Všechny rezervace byly zrušeny.')
                                 fetchData()
                               } else {

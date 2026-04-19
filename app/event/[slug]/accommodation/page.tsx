@@ -4,8 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { BedDouble, Users, UserCheck, Loader2 } from 'lucide-react'
 import { Session, Guest } from '@/types/database.types'
-import { guestStorage } from '@/lib/guest-storage'
-import { useGuestAuth } from '@/lib/auth-context'
+import { useGuestAuth, useCurrentGuest } from '@/lib/auth-context'
 import NestPage from '@/components/NestPage'
 import NestLoading from '@/components/NestLoading'
 
@@ -20,18 +19,17 @@ export default function AccommodationPage() {
   const params = useParams()
   const slug = params?.slug as string
   const { firebaseUser, isAuthenticated, userProfile } = useGuestAuth()
+  const storedGuest = useCurrentGuest(slug)
 
   const [session, setSession] = useState<Session | null>(null)
   const [guests, setGuests] = useState<Guest[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [currentGuestId, setCurrentGuestId] = useState<string | null>(null)
+  const currentGuestId = storedGuest?.id || null
 
   useEffect(() => {
     if (slug) {
       fetchData()
-      const stored = guestStorage.getCurrentGuest(slug)
-      setCurrentGuestId(stored?.id || null)
     }
   }, [slug])
 

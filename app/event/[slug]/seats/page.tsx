@@ -8,6 +8,7 @@ import NestPage from '@/components/NestPage'
 import { Session, Guest, SeatReservation } from '@/types/database.types'
 import { formatDate } from '@/lib/utils'
 import { guestStorage } from '@/lib/guest-storage'
+import { useCurrentGuest } from '@/lib/auth-context'
 import NestLoading from '@/components/NestLoading'
 
 const ALL_SEATS = [
@@ -39,9 +40,10 @@ export default function EventSeatsPage() {
   const planContainerRef = useRef<HTMLDivElement>(null)
   const planContentRef = useRef<HTMLDivElement>(null)
   const [isMobile, setIsMobile] = useState(false)
+  const storedGuestForSession = useCurrentGuest(slug)
 
   useEffect(() => { setMounted(true) }, [])
-  useEffect(() => { if (slug && mounted) fetchData() }, [slug, mounted])
+  useEffect(() => { if (slug && mounted) fetchData() }, [slug, mounted, storedGuestForSession?.id])
 
   // Detect mobile
   useEffect(() => {
@@ -109,9 +111,8 @@ export default function EventSeatsPage() {
         setGameInstalls(installMap)
       }
 
-      const storedGuest = guestStorage.getCurrentGuest(slug)
-      if (storedGuest && guestsData.guests) {
-        const guest = guestsData.guests.find((g: Guest) => g.id === storedGuest.id)
+      if (storedGuestForSession && guestsData.guests) {
+        const guest = guestsData.guests.find((g: Guest) => g.id === storedGuestForSession.id)
         if (guest) setSelectedGuest(guest)
       }
     } catch (error) {
