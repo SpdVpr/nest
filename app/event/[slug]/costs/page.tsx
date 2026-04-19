@@ -47,6 +47,7 @@ interface GuestCost {
     hwTotal: number
     tip: number
     tipPercentage: number | null
+    deposit: number
     grandTotal: number
     settlement: SettlementInfo | null
 }
@@ -338,8 +339,8 @@ export default function CostsPage() {
                                         </div>
 
                                         <div className="flex items-center gap-3 flex-shrink-0">
-                                            <span className={`text-xl font-bold ${(guest.settlement ? guest.settlement.finalTotal : guest.grandTotal) > 0 ? 'text-emerald-400' : 'text-[var(--nest-text-tertiary)]'}`}>
-                                                {(guest.settlement ? guest.settlement.finalTotal : guest.grandTotal).toLocaleString('cs-CZ')} Kč
+                                            <span className={`text-xl font-bold ${(guest.settlement ? guest.settlement.finalTotal : Math.max(0, guest.grandTotal - (guest.deposit || 0))) > 0 ? 'text-emerald-400' : 'text-[var(--nest-text-tertiary)]'}`}>
+                                                {(guest.settlement ? guest.settlement.finalTotal : Math.max(0, guest.grandTotal - (guest.deposit || 0))).toLocaleString('cs-CZ')} Kč
                                             </span>
                                             {isExpanded
                                                 ? <ChevronUp className="w-5 h-5 text-[var(--nest-text-tertiary)]" />
@@ -551,11 +552,23 @@ export default function CostsPage() {
                                                 )}
                                             </div>
 
+                                            {/* Deposit — shown as a discount, mirroring admin settlement */}
+                                            {(guest.deposit || 0) > 0 && (
+                                                <div className="mt-4 pt-3 border-t border-emerald-800/30 flex items-center justify-between">
+                                                    <span className="font-medium text-emerald-300 flex items-center gap-1.5">
+                                                        💰 Zaplacená záloha
+                                                    </span>
+                                                    <span className="font-bold text-emerald-400">
+                                                        −{guest.deposit.toLocaleString('cs-CZ')} Kč
+                                                    </span>
+                                                </div>
+                                            )}
+
                                             {/* Guest total */}
                                             <div className="mt-4 pt-3 border-t-2 border-emerald-800/50 flex items-center justify-between">
                                                 <span className="font-semibold text-[var(--nest-text-primary)]">Celkem za {guest.name}</span>
                                                 <span className="text-xl font-bold text-emerald-400">
-                                                    {(guest.settlement ? guest.settlement.finalTotal : guest.grandTotal).toLocaleString('cs-CZ')} Kč
+                                                    {(guest.settlement ? guest.settlement.finalTotal : Math.max(0, guest.grandTotal - (guest.deposit || 0))).toLocaleString('cs-CZ')} Kč
                                                 </span>
                                             </div>
 

@@ -161,7 +161,8 @@ export async function GET(
                 const settlement = settlementsMap[guestId] || null
 
                 // Calculate final total with overrides and custom items (same logic as admin)
-                let finalTotal = nightsTotal + snacksTotal + hwTotal + tip.amount
+                const depositAmount = guestData.deposit || 0
+                let finalTotal = Math.max(0, nightsTotal + snacksTotal + hwTotal + tip.amount - depositAmount)
                 if (settlement && settlement.qr_generated_at) {
                     const overrides = settlement.overrides || {}
                     const nightsVal = 'accommodation' in overrides ? overrides['accommodation'] : nightsTotal
@@ -187,7 +188,7 @@ export async function GET(
                     const customItemsVal = (settlement.custom_items || []).reduce((sum: number, ci: any) => sum + (ci.amount || 0), 0)
                     const adjustmentsVal = (settlement.adjustments || []).reduce((sum: number, adj: any) => sum + (adj.amount || 0), 0)
 
-                    finalTotal = Math.max(0, nightsVal + consumptionVal + hardwareVal + tipVal + customItemsVal + adjustmentsVal)
+                    finalTotal = Math.max(0, nightsVal + consumptionVal + hardwareVal + tipVal + customItemsVal + adjustmentsVal - depositAmount)
                 }
 
                 return {
