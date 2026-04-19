@@ -22,11 +22,23 @@ interface HardwareItem {
     type: string
 }
 
+interface Adjustment {
+    label: string
+    amount: number
+}
+
+interface CustomItem {
+    label: string
+    amount: number
+}
+
 interface SettlementInfo {
     status: string
     qr_generated_at: string
     variable_symbol: string | null
     paid_at: string | null
+    adjustments?: Adjustment[]
+    custom_items?: CustomItem[]
     finalTotal: number
 }
 
@@ -561,6 +573,34 @@ export default function CostsPage() {
                                                     <span className="font-bold text-emerald-400">
                                                         −{guest.deposit.toLocaleString('cs-CZ')} Kč
                                                     </span>
+                                                </div>
+                                            )}
+
+                                            {/* Custom items added by admin in settlement */}
+                                            {guest.settlement?.custom_items && guest.settlement.custom_items.length > 0 && (
+                                                <div className="mt-4 pt-3 border-t border-emerald-800/30 space-y-1.5">
+                                                    {guest.settlement.custom_items.map((item, idx) => (
+                                                        <div key={`ci-${idx}`} className="flex items-center justify-between">
+                                                            <span className="text-sm text-[var(--nest-text-secondary)]">{item.label || 'Položka'}</span>
+                                                            <span className={`font-semibold ${item.amount < 0 ? 'text-emerald-400' : 'text-[var(--nest-text-primary)]'}`}>
+                                                                {item.amount < 0 ? '' : '+'}{item.amount.toLocaleString('cs-CZ')} Kč
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {/* Adjustments (e.g. záloha, extra dýško) added by admin in settlement */}
+                                            {guest.settlement?.adjustments && guest.settlement.adjustments.length > 0 && (
+                                                <div className="mt-4 pt-3 border-t border-emerald-800/30 space-y-1.5">
+                                                    {guest.settlement.adjustments.map((adj, idx) => (
+                                                        <div key={`adj-${idx}`} className="flex items-center justify-between">
+                                                            <span className="text-sm text-[var(--nest-text-secondary)]">{adj.label || 'Úprava'}</span>
+                                                            <span className={`font-semibold ${adj.amount < 0 ? 'text-emerald-400' : 'text-pink-400'}`}>
+                                                                {adj.amount < 0 ? '' : '+'}{adj.amount.toLocaleString('cs-CZ')} Kč
+                                                            </span>
+                                                        </div>
+                                                    ))}
                                                 </div>
                                             )}
 

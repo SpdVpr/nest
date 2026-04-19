@@ -213,6 +213,8 @@ export async function GET(
                         qr_generated_at: settlement.qr_generated_at,
                         variable_symbol: settlement.variable_symbol,
                         paid_at: settlement.paid_at,
+                        adjustments: settlement.adjustments || [],
+                        custom_items: settlement.custom_items || [],
                         finalTotal,
                     } : null,
                 }
