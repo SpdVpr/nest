@@ -26,15 +26,17 @@ async function autoSync() {
             name: doc.data().name || 'Neznámý event',
             start_date: doc.data().start_date?.toDate?.() || new Date(),
             end_date: doc.data().end_date?.toDate?.() || null,
+            records_synced: doc.data().records_synced === true,
         }))
         .filter(s => {
             const endDate = s.end_date || s.start_date
-            return endDate < now
+            return endDate < now && !s.records_synced
         })
 
     if (completedSessions.length === 0) return
 
-    // Existing auto-records
+    // Existing auto-records (only for sessions we're about to process — handles legacy data
+    // where some categories may already exist without the records_synced flag set)
     const existingSnap = await db.collection('nest_records').where('source', '==', 'auto').get()
     const existingKeys = new Set(existingSnap.docs.map(doc => {
         const d = doc.data()
@@ -42,6 +44,7 @@ async function autoSync() {
     }))
 
     const newRecords: any[] = []
+    const syncedSessionIds: string[] = []
 
     for (const session of completedSessions) {
         // Attendance
@@ -67,13 +70,27 @@ async function autoSync() {
             .where('session_id', '==', session.id)
             .get()
 
+        // Collect unique product IDs and fetch them in parallel
+        const productIds = new Set<string>()
+        consumptionSnap.docs.forEach(doc => {
+            const pid = doc.data().product_id
+            if (pid) productIds.add(pid)
+        })
+
+        const productNames: Record<string, string> = {}
+        await Promise.all(
+            Array.from(productIds).map(async pid => {
+                const prodDoc = await db.collection('products').doc(pid).get()
+                productNames[pid] = prodDoc.exists ? (prodDoc.data()?.name || '') : ''
+            })
+        )
+
         const productTotals: Record<string, { name: string; quantity: number }> = {}
         for (const doc of consumptionSnap.docs) {
             const data = doc.data()
             const pid = data.product_id
             if (!productTotals[pid]) {
-                const prodDoc = await db.collection('products').doc(pid).get()
-                productTotals[pid] = { name: prodDoc.exists ? (prodDoc.data()?.name || '') : '', quantity: 0 }
+                productTotals[pid] = { name: productNames[pid] || '', quantity: 0 }
             }
             productTotals[pid].quantity += data.quantity || 0
         }
@@ -96,13 +113,19 @@ async function autoSync() {
                 })
             }
         }
+
+        syncedSessionIds.push(session.id)
     }
 
-    if (newRecords.length > 0) {
-        const batch = db.batch()
-        for (const record of newRecords) {
-            batch.set(db.collection('nest_records').doc(), record)
-        }
+    const batch = db.batch()
+    for (const record of newRecords) {
+        batch.set(db.collection('nest_records').doc(), record)
+    }
+    // Mark sessions as synced so future calls skip them entirely
+    for (const sid of syncedSessionIds) {
+        batch.update(db.collection('sessions').doc(sid), { records_synced: true })
+    }
+    if (newRecords.length > 0 || syncedSessionIds.length > 0) {
         await batch.commit()
     }
 }
