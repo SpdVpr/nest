@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { useGuestAuth } from '@/lib/auth-context'
 import { guestStorage } from '@/lib/guest-storage'
+import { ACHIEVEMENTS, AchievementTier, computeUserStats, GROUP_LABELS, TIER_RANK } from '@/lib/achievements'
 
 interface ConsumptionItem {
   name: string
@@ -70,6 +71,7 @@ export default function ProfilePage() {
   const [savingName, setSavingName] = useState(false)
   const [unclaimingId, setUnclaimingId] = useState<string | null>(null)
   const [confirmUnclaimId, setConfirmUnclaimId] = useState<string | null>(null)
+  const [rarity, setRarity] = useState<{ totalIdentities: number; rarity: Record<string, number> } | null>(null)
 
   useEffect(() => {
     if (authLoading) return
@@ -78,7 +80,15 @@ export default function ProfilePage() {
       return
     }
     fetchHistory()
+    fetchRarity()
   }, [isAuthenticated, authLoading])
+
+  const fetchRarity = async () => {
+    try {
+      const res = await fetch('/api/achievements/rarity')
+      if (res.ok) setRarity(await res.json())
+    } catch { }
+  }
 
   const fetchHistory = async () => {
     if (!firebaseUser) {
@@ -222,14 +232,27 @@ export default function ProfilePage() {
     longestStayEvent: events.reduce((max, e) => e.guest.nights_count > max.guest.nights_count ? e : max, events[0])?.session.name || '',
   } : null
 
-  // Achievements
-  const badges = [
-    { id: 'veteran', name: 'Veterán', emoji: '🎖️', desc: '5+ eventů', earned: events.length >= 5 },
-    { id: 'nestar', name: 'Nestař', emoji: '👑', desc: '10+ eventů', earned: events.length >= 10 },
-    { id: 'pivni_kral', name: 'Pivní král', emoji: '🍺', desc: '50+ piv celkem', earned: totalBeers >= 50 },
-    { id: 'early_bird', name: 'Early bird', emoji: '🐦', desc: 'První registrace na eventu', earned: events.some(e => e.registrationOrder === 1) },
-    { id: 'big_spender', name: 'Big spender', emoji: '💸', desc: 'Útrata 5000+ Kč za event', earned: events.some(e => e.grandTotal >= 5000) },
-  ]
+  // Achievements: shared spec from lib/achievements.ts so server and client agree
+  const userStats = computeUserStats(events.map(e => ({
+    nights_count: e.guest.nights_count,
+    grandTotal: e.grandTotal,
+    tip: e.tip,
+    consumption: e.consumption.map(c => ({ name: c.name, category: c.category, qty: c.qty })),
+    registrationOrder: e.registrationOrder,
+    gameVoteCount: e.gameVoteCount,
+  })))
+
+  const evaluatedAchievements = ACHIEVEMENTS.map(a => ({ spec: a, progress: a.evaluate(userStats) }))
+    .sort((a, b) => {
+      // Earned first (in tier desc), then in-progress by completion %, then locked
+      if (a.progress.earned !== b.progress.earned) return a.progress.earned ? -1 : 1
+      if (a.progress.earned) return TIER_RANK[b.spec.tier] - TIER_RANK[a.spec.tier]
+      const pa = a.progress.target > 0 ? a.progress.current / a.progress.target : 0
+      const pb = b.progress.target > 0 ? b.progress.current / b.progress.target : 0
+      return pb - pa
+    })
+
+  const earnedCount = evaluatedAchievements.filter(a => a.progress.earned).length
 
   // CSV export
   const exportCSV = () => {
@@ -474,34 +497,140 @@ export default function ProfilePage() {
         )}
 
         {/* Achievements */}
-        {events.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--nest-text-primary)' }}>
-              Achievementy
-            </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-              {badges.map(badge => (
-                <div
-                  key={badge.id}
-                  className="rounded-xl p-4 text-center transition-all"
-                  style={{
-                    backgroundColor: badge.earned ? 'var(--nest-surface)' : 'var(--nest-bg)',
-                    border: `1px solid ${badge.earned ? 'rgba(245, 158, 11, 0.3)' : 'var(--nest-border)'}`,
-                    opacity: badge.earned ? 1 : 0.5,
-                  }}
-                >
-                  <div className="text-3xl mb-2">{badge.earned ? badge.emoji : '🔒'}</div>
-                  <div className="text-xs font-bold" style={{ color: badge.earned ? 'var(--nest-yellow)' : 'var(--nest-text-tertiary)' }}>
-                    {badge.name}
-                  </div>
-                  <div className="text-[10px] mt-0.5" style={{ color: 'var(--nest-text-tertiary)' }}>
-                    {badge.desc}
-                  </div>
-                </div>
-              ))}
+        {events.length > 0 && (() => {
+          const tierColor: Record<AchievementTier, { bg: string; ring: string; text: string }> = {
+            bronze: { bg: 'rgba(180, 83, 9, 0.15)', ring: 'rgba(217, 119, 6, 0.4)', text: '#fbbf24' },
+            silver: { bg: 'rgba(148, 163, 184, 0.18)', ring: 'rgba(148, 163, 184, 0.45)', text: '#e2e8f0' },
+            gold: { bg: 'rgba(245, 158, 11, 0.2)', ring: 'rgba(245, 158, 11, 0.55)', text: '#fcd34d' },
+            platinum: { bg: 'rgba(139, 92, 246, 0.2)', ring: 'rgba(167, 139, 250, 0.55)', text: '#c4b5fd' },
+          }
+          const tierLabel: Record<AchievementTier, string> = { bronze: 'Bronz', silver: 'Stříbro', gold: 'Zlato', platinum: 'Platina' }
+
+          const formatRarity = (achievementId: string, earnedByMe: boolean) => {
+            if (!rarity || rarity.totalIdentities === 0) return null
+            const earnedCount = rarity.rarity[achievementId] ?? 0
+            const total = rarity.totalIdentities
+            const pct = total > 0 ? (earnedCount / total) * 100 : 0
+            // Avoid showing 100% if the only earner is the current user but rarity hasn't refreshed yet
+            const displayCount = earnedByMe ? Math.max(earnedCount, 1) : earnedCount
+            const displayPct = total > 0 ? Math.round((displayCount / total) * 100) : 0
+            let rareLabel = ''
+            if (displayPct === 0) rareLabel = 'Nikdo nemá'
+            else if (displayPct < 10) rareLabel = 'Legendární'
+            else if (displayPct < 25) rareLabel = 'Vzácné'
+            else if (displayPct < 50) rareLabel = 'Neobvyklé'
+            else rareLabel = 'Časté'
+            return { earnedCount: displayCount, total, pct: displayPct, rareLabel }
+          }
+
+          return (
+            <div className="mb-8">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold" style={{ color: 'var(--nest-text-primary)' }}>
+                  Achievementy
+                </h2>
+                <span className="text-xs font-medium px-2.5 py-1 rounded-full" style={{ backgroundColor: 'rgba(245, 158, 11, 0.15)', color: 'var(--nest-yellow)' }}>
+                  {earnedCount} / {ACHIEVEMENTS.length}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {evaluatedAchievements.map(({ spec, progress: ap }) => {
+                  const colors = tierColor[spec.tier]
+                  const pct = ap.target > 0 ? Math.min(100, (ap.current / ap.target) * 100) : 0
+                  const rarityInfo = formatRarity(spec.id, ap.earned)
+
+                  return (
+                    <div
+                      key={spec.id}
+                      className="rounded-xl p-4 transition-all"
+                      style={{
+                        backgroundColor: ap.earned ? 'var(--nest-surface)' : 'var(--nest-bg)',
+                        border: `1px solid ${ap.earned ? colors.ring : 'var(--nest-border)'}`,
+                      }}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div
+                          className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
+                          style={{
+                            backgroundColor: ap.earned ? colors.bg : 'var(--nest-dark-3, #1f2230)',
+                            opacity: ap.earned ? 1 : 0.55,
+                          }}
+                        >
+                          {ap.earned ? spec.emoji : <Lock className="w-5 h-5" style={{ color: 'var(--nest-text-tertiary)' }} />}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span
+                              className="text-sm font-bold"
+                              style={{ color: ap.earned ? colors.text : 'var(--nest-text-secondary)' }}
+                            >
+                              {spec.name}
+                            </span>
+                            <span
+                              className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider"
+                              style={{ backgroundColor: colors.bg, color: colors.text }}
+                            >
+                              {tierLabel[spec.tier]}
+                            </span>
+                          </div>
+                          <p className="text-xs mt-0.5" style={{ color: 'var(--nest-text-tertiary)' }}>
+                            {spec.desc}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Progress bar */}
+                      <div className="mt-3">
+                        <div className="flex items-center justify-between text-[11px] mb-1">
+                          <span style={{ color: 'var(--nest-text-tertiary)' }}>
+                            {ap.target === 1
+                              ? (ap.earned ? 'Splněno' : 'Zatím ne')
+                              : `${ap.current.toLocaleString('cs-CZ')} / ${ap.target.toLocaleString('cs-CZ')}`}
+                          </span>
+                          {ap.target > 1 && (
+                            <span style={{ color: ap.earned ? colors.text : 'var(--nest-text-tertiary)' }}>
+                              {Math.round(pct)}%
+                            </span>
+                          )}
+                        </div>
+                        <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--nest-dark-3, #1f2230)' }}>
+                          <div
+                            className="h-full transition-all"
+                            style={{
+                              width: `${pct}%`,
+                              backgroundColor: ap.earned ? colors.text : 'var(--nest-text-tertiary)',
+                              opacity: ap.earned ? 1 : 0.5,
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Rarity */}
+                      {rarityInfo && (
+                        <div className="mt-2.5 flex items-center justify-between text-[11px]" style={{ color: 'var(--nest-text-tertiary)' }}>
+                          <span>
+                            {rarityInfo.earnedCount} / {rarityInfo.total} ({rarityInfo.pct}%)
+                          </span>
+                          <span
+                            className="font-medium"
+                            style={{
+                              color: rarityInfo.pct < 10 ? '#c4b5fd'
+                                : rarityInfo.pct < 25 ? '#fcd34d'
+                                : rarityInfo.pct < 50 ? '#93c5fd'
+                                : 'var(--nest-text-tertiary)'
+                            }}
+                          >
+                            {rarityInfo.rareLabel}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
 
         {/* Event history */}
         <div className="flex items-center justify-between mb-4">
