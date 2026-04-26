@@ -8,6 +8,88 @@ function verifyAuth(request: NextRequest): boolean {
     return token === process.env.ADMIN_PASSWORD
 }
 
+// PATCH /api/admin/sessions/[id]/guests/[guestId] - Admin: update guest fields
+// Currently supports updating nights_count, with propagation to hardware reservations
+// whose nights_count was tracking the guest's previous value.
+export async function PATCH(
+    request: NextRequest,
+    { params }: { params: Promise<{ id: string; guestId: string }> }
+) {
+    try {
+        if (!verifyAuth(request)) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
+        const { id: sessionId, guestId } = await params
+        const db = getFirebaseAdminDb()
+
+        const guestDoc = await db.collection('guests').doc(guestId).get()
+        if (!guestDoc.exists) {
+            return NextResponse.json({ error: 'Guest not found' }, { status: 404 })
+        }
+
+        const guestData = guestDoc.data()
+        if (guestData?.session_id !== sessionId) {
+            return NextResponse.json({ error: 'Guest does not belong to this event' }, { status: 403 })
+        }
+
+        const body = await request.json()
+        const { nights_count } = body
+
+        if (nights_count === undefined) {
+            return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
+        }
+
+        const newNights = parseInt(nights_count)
+        if (isNaN(newNights) || newNights < 0) {
+            return NextResponse.json({ error: 'Invalid nights_count' }, { status: 400 })
+        }
+
+        const oldNights = guestData?.nights_count ?? 1
+
+        const batch = db.batch()
+        batch.update(db.collection('guests').doc(guestId), { nights_count: newNights })
+
+        // Recalculate hardware reservations whose nights_count was tracking the guest default.
+        // Reservations the user explicitly set to a different value are left alone.
+        let hardwareUpdated = 0
+        const hwSnapshot = await db.collection('hardware_reservations')
+            .where('guest_id', '==', guestId)
+            .where('status', '==', 'active')
+            .get()
+
+        await Promise.all(
+            hwSnapshot.docs.map(async (resDoc) => {
+                const resData = resDoc.data()
+                if ((resData.nights_count ?? 1) !== oldNights) return
+
+                const hwDoc = await db.collection('hardware_items').doc(resData.hardware_item_id).get()
+                if (!hwDoc.exists) return
+                const hwData = hwDoc.data()
+                const pricePerNight = hwData?.price_per_night || 0
+                const quantity = resData.quantity || 1
+
+                batch.update(resDoc.ref, {
+                    nights_count: newNights,
+                    total_price: pricePerNight * quantity * newNights,
+                })
+                hardwareUpdated++
+            })
+        )
+
+        await batch.commit()
+
+        return NextResponse.json({
+            success: true,
+            nights_count: newNights,
+            hardware_updated: hardwareUpdated,
+        })
+    } catch (error) {
+        console.error('Error updating guest:', error)
+        return NextResponse.json({ error: 'Failed to update guest' }, { status: 500 })
+    }
+}
+
 // DELETE /api/admin/sessions/[id]/guests/[guestId] - Admin: remove guest from event
 export async function DELETE(
     request: NextRequest,

@@ -112,6 +112,16 @@ export default function SettlementPage() {
     const [customLabel, setCustomLabel] = useState('')
     const [customAmount, setCustomAmount] = useState('')
 
+    // Nights count editing
+    const [editingNightsGuest, setEditingNightsGuest] = useState<string | null>(null)
+    const [editingNightsValue, setEditingNightsValue] = useState('')
+    const [nightsSaving, setNightsSaving] = useState(false)
+
+    // Final amount (rounding) editing
+    const [editingFinalGuest, setEditingFinalGuest] = useState<string | null>(null)
+    const [editingFinalValue, setEditingFinalValue] = useState('')
+    const ROUNDING_LABEL = 'Zaokrouhleno'
+
     const [saving, setSaving] = useState(false)
     const [pricePerNight, setPricePerNight] = useState(0)
     const [surchargeEnabled, setSurchargeEnabled] = useState(false)
@@ -625,6 +635,67 @@ export default function SettlementPage() {
         }
     }
 
+    // Save nights count for a guest (propagates to hardware reservations server-side)
+    const saveNightsCount = async (guestId: string) => {
+        const newNights = parseInt(editingNightsValue)
+        if (isNaN(newNights) || newNights < 0) return
+
+        setNightsSaving(true)
+        try {
+            const token = localStorage.getItem('admin_token')
+            const res = await fetch(`/api/admin/sessions/${sessionId}/guests/${guestId}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({ nights_count: newNights }),
+            })
+            if (res.ok) {
+                setEditingNightsGuest(null)
+                setEditingNightsValue('')
+                // Refetch costs so accommodation + hardware totals reflect new nights
+                await fetchData()
+            }
+        } catch (error) {
+            console.error('Error saving nights count:', error)
+        } finally {
+            setNightsSaving(false)
+        }
+    }
+
+    // Save final amount: creates/updates a "Zaokrouhleno" adjustment so the total equals the desired amount
+    const saveFinalAmount = async (guest: GuestCost) => {
+        const desired = parseFloat(editingFinalValue)
+        if (isNaN(desired) || desired < 0) return
+
+        const settlement = getSettlement(guest.id)
+        const otherAdjustments = (settlement.adjustments || []).filter(a => a.label !== ROUNDING_LABEL)
+        const otherAdjTotal = otherAdjustments.reduce((sum, a) => sum + a.amount, 0)
+
+        // subtotal = overridden grand total + other (non-rounding) adjustments - deposit
+        // We want: max(0, subtotal + roundingAmount) = desired
+        const subtotalBeforeRounding = getOverriddenGrandTotal(guest) + otherAdjTotal - (guest.deposit || 0)
+        const diff = Math.round((desired - Math.max(0, subtotalBeforeRounding)) * 100) / 100
+
+        const newAdjustments = diff === 0
+            ? otherAdjustments
+            : [...otherAdjustments, { label: ROUNDING_LABEL, amount: diff }]
+
+        await settlementAction(guest.id, 'update', { adjustments: newAdjustments })
+        setEditingFinalGuest(null)
+        setEditingFinalValue('')
+    }
+
+    // Remove the rounding adjustment
+    const removeFinalAmount = async (guestId: string) => {
+        const settlement = getSettlement(guestId)
+        const newAdjustments = (settlement.adjustments || []).filter(a => a.label !== ROUNDING_LABEL)
+        await settlementAction(guestId, 'update', { adjustments: newAdjustments })
+        setEditingFinalGuest(null)
+        setEditingFinalValue('')
+    }
+
     // Copy payment info
     const copyPaymentInfo = (guest: GuestCost, index: number) => {
         const total = getFinalTotal(guest)
@@ -939,15 +1010,46 @@ export default function SettlementPage() {
                                                 const isEditing = editingItemKey === fullKey
                                                 const hasOverride = (settlement.overrides || {})[itemKey] !== undefined
                                                 const effectiveValue = getItemValue(guest.id, itemKey, guest.nightsTotal)
+                                                const isEditingNights = editingNightsGuest === guest.id
 
                                                 return (
                                                     <div
                                                         className={`flex items-center justify-between py-2.5 text-sm group rounded-lg px-2 -mx-2 cursor-pointer hover:bg-gray-50/50 ${hasOverride ? 'border-l-2 border-amber-400 pl-3' : ''}`}
-                                                        onClick={() => { if (!isEditing) startEditItem(guest.id, itemKey, effectiveValue) }}
+                                                        onClick={() => { if (!isEditing && !isEditingNights) startEditItem(guest.id, itemKey, effectiveValue) }}
                                                     >
                                                         <div className="flex items-center gap-2">
                                                             <span className="text-base">🏠</span>
-                                                            <span className="inline-flex items-center justify-center bg-blue-100 text-blue-700 font-bold text-xs rounded px-1.5 py-0.5 min-w-[28px]">{guest.nights_count}×</span>
+                                                            {isEditingNights ? (
+                                                                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                                                    <input
+                                                                        type="number"
+                                                                        value={editingNightsValue}
+                                                                        onChange={(e) => setEditingNightsValue(e.target.value)}
+                                                                        className="w-14 px-2 py-0.5 border border-blue-300 rounded text-sm text-gray-900 text-center"
+                                                                        min={0}
+                                                                        autoFocus
+                                                                        onKeyDown={(e) => {
+                                                                            if (e.key === 'Enter') saveNightsCount(guest.id)
+                                                                            if (e.key === 'Escape') { setEditingNightsGuest(null); setEditingNightsValue('') }
+                                                                        }}
+                                                                    />
+                                                                    <span className="text-gray-400 text-xs">nocí</span>
+                                                                    <button onClick={() => saveNightsCount(guest.id)} disabled={nightsSaving} className="text-green-600 hover:text-green-700 p-1 disabled:opacity-50"><Check className="w-4 h-4" /></button>
+                                                                    <button onClick={() => { setEditingNightsGuest(null); setEditingNightsValue('') }} className="text-gray-400 hover:text-gray-600 p-1"><X className="w-4 h-4" /></button>
+                                                                </div>
+                                                            ) : (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation()
+                                                                        setEditingNightsGuest(guest.id)
+                                                                        setEditingNightsValue(guest.nights_count.toString())
+                                                                    }}
+                                                                    className="inline-flex items-center justify-center bg-blue-100 hover:bg-blue-200 text-blue-700 font-bold text-xs rounded px-1.5 py-0.5 min-w-[28px] transition-colors"
+                                                                    title="Upravit počet nocí"
+                                                                >
+                                                                    {guest.nights_count}×
+                                                                </button>
+                                                            )}
                                                             <div className="flex flex-col">
                                                                 <span className="text-gray-900 font-medium">Ubytování</span>
                                                                 {(() => {
@@ -1430,15 +1532,115 @@ export default function SettlementPage() {
                                         )}
 
                                         {/* FINAL TOTAL */}
-                                        <div className="mt-4 bg-gray-900 text-white rounded-xl px-4 py-3 flex items-center justify-between">
-                                            <div>
-                                                <span className="font-bold text-lg">CELKEM K PLATBĚ</span>
-                                                {(guest.deposit || 0) > 0 && (
-                                                    <span className="text-xs text-gray-400 ml-2">(po odečtení zálohy)</span>
-                                                )}
-                                            </div>
-                                            <span className="text-2xl font-black">{finalTotal.toLocaleString('cs-CZ')} Kč</span>
-                                        </div>
+                                        {(() => {
+                                            const isEditingFinal = editingFinalGuest === guest.id
+                                            const hasRounding = (settlement.adjustments || []).some(a => a.label === ROUNDING_LABEL)
+                                            const roundingSuggestions = [...new Set([100, 500, 1000].map(step => Math.ceil(finalTotal / step) * step).filter(v => v > finalTotal))]
+
+                                            return (
+                                                <>
+                                                    <div className="mt-4 bg-gray-900 text-white rounded-xl px-4 py-3 flex items-center justify-between">
+                                                        <div>
+                                                            <span className="font-bold text-lg">CELKEM K PLATBĚ</span>
+                                                            {(guest.deposit || 0) > 0 && (
+                                                                <span className="text-xs text-gray-400 ml-2">(po odečtení zálohy)</span>
+                                                            )}
+                                                            {hasRounding && (
+                                                                <span className="text-xs text-amber-300 ml-2">(zaokrouhleno)</span>
+                                                            )}
+                                                        </div>
+                                                        <span className="text-2xl font-black">{finalTotal.toLocaleString('cs-CZ')} Kč</span>
+                                                    </div>
+
+                                                    {isEditingFinal ? (
+                                                        <div className="mt-2 px-3 py-2 rounded-lg border border-blue-200 bg-blue-50">
+                                                            <p className="text-xs text-blue-700 font-medium mb-2">
+                                                                Zadej finální částku — rozdíl se uloží jako úprava „{ROUNDING_LABEL}"
+                                                            </p>
+                                                            <div className="flex gap-2 items-center">
+                                                                <div className="relative flex-1">
+                                                                    <input
+                                                                        type="number"
+                                                                        value={editingFinalValue}
+                                                                        onChange={(e) => setEditingFinalValue(e.target.value)}
+                                                                        placeholder={`např. ${roundingSuggestions[0] || finalTotal}`}
+                                                                        className="w-full pl-3 pr-10 py-2 border border-blue-300 rounded-lg text-sm text-gray-900 text-right focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none"
+                                                                        autoFocus
+                                                                        min={0}
+                                                                        onKeyDown={(e) => {
+                                                                            if (e.key === 'Enter') saveFinalAmount(guest)
+                                                                            if (e.key === 'Escape') { setEditingFinalGuest(null); setEditingFinalValue('') }
+                                                                        }}
+                                                                    />
+                                                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">Kč</span>
+                                                                </div>
+                                                                <button
+                                                                    onClick={() => saveFinalAmount(guest)}
+                                                                    disabled={saving}
+                                                                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+                                                                >
+                                                                    Uložit
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => { setEditingFinalGuest(null); setEditingFinalValue('') }}
+                                                                    className="text-gray-400 hover:text-gray-600 p-2"
+                                                                >
+                                                                    <X className="w-4 h-4" />
+                                                                </button>
+                                                            </div>
+                                                            {roundingSuggestions.length > 0 && (
+                                                                <div className="flex gap-1.5 mt-2">
+                                                                    {roundingSuggestions.map(rounded => (
+                                                                        <button
+                                                                            key={rounded}
+                                                                            onClick={() => setEditingFinalValue(rounded.toString())}
+                                                                            className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors border ${editingFinalValue === rounded.toString()
+                                                                                ? 'bg-blue-600 text-white border-blue-600'
+                                                                                : 'bg-white text-blue-700 border-blue-200 hover:bg-blue-100'
+                                                                                }`}
+                                                                        >
+                                                                            {rounded.toLocaleString('cs-CZ')} Kč
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                            {editingFinalValue && !isNaN(parseFloat(editingFinalValue)) && (() => {
+                                                                const otherAdj = (settlement.adjustments || []).filter(a => a.label !== ROUNDING_LABEL).reduce((s, a) => s + a.amount, 0)
+                                                                const subBefore = Math.max(0, getOverriddenGrandTotal(guest) + otherAdj - (guest.deposit || 0))
+                                                                const diff = parseFloat(editingFinalValue) - subBefore
+                                                                if (diff === 0) return null
+                                                                return (
+                                                                    <p className={`text-xs mt-1.5 ${diff > 0 ? 'text-red-500' : 'text-green-600'}`}>
+                                                                        → Úprava bude: {diff > 0 ? '+' : ''}{diff.toLocaleString('cs-CZ')} Kč
+                                                                    </p>
+                                                                )
+                                                            })()}
+                                                            {hasRounding && (
+                                                                <button
+                                                                    onClick={() => removeFinalAmount(guest.id)}
+                                                                    className="mt-2 text-xs text-gray-400 hover:text-red-500 transition-colors"
+                                                                >
+                                                                    Odebrat zaokrouhlení
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="mt-2 flex justify-end">
+                                                            <button
+                                                                onClick={() => {
+                                                                    setEditingFinalGuest(guest.id)
+                                                                    setEditingFinalValue(finalTotal.toString())
+                                                                }}
+                                                                className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
+                                                            >
+                                                                <Edit2 className="w-3 h-3" />
+                                                                Zadat finální částku
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )
+                                        })()}
 
                                         {/* Notes */}
                                         <div className="mt-4">
