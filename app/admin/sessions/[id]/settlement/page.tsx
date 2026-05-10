@@ -17,6 +17,7 @@ interface ConsumptionItem {
 interface HardwareItem {
     name: string
     qty: number
+    nights_count: number
     totalPrice: number
     type: string
 }
@@ -49,6 +50,7 @@ interface CustomItem {
 interface Settlement {
     id?: string
     status: 'draft' | 'pending' | 'paid'
+    payment_method: 'qr' | 'cash'
     adjustments: Adjustment[]
     custom_items: CustomItem[]
     overrides: Record<string, number>
@@ -185,6 +187,7 @@ export default function SettlementPage() {
         const s = settlements[guestId]
         if (!s) return {
             status: 'draft',
+            payment_method: 'qr',
             adjustments: [],
             custom_items: [],
             overrides: {},
@@ -196,6 +199,7 @@ export default function SettlementPage() {
         // Ensure arrays/objects are never undefined (Firestore may omit empty fields)
         return {
             ...s,
+            payment_method: s.payment_method || 'qr',
             adjustments: s.adjustments || [],
             custom_items: s.custom_items || [],
             overrides: s.overrides || {},
@@ -437,6 +441,7 @@ export default function SettlementPage() {
                 setSettlements(prev => {
                     const current = prev[guestId] || {
                         status: 'draft',
+                        payment_method: 'qr',
                         adjustments: [],
                         custom_items: [],
                         overrides: {},
@@ -452,10 +457,17 @@ export default function SettlementPage() {
                         updated.status = 'pending'
                         updated.qr_generated_at = new Date().toISOString()
                         updated.variable_symbol = body.variable_symbol || current.variable_symbol
+                        updated.payment_method = 'qr'
+                    } else if (action === 'finalize_cash') {
+                        updated.status = 'pending'
+                        updated.qr_generated_at = new Date().toISOString()
+                        updated.payment_method = 'cash'
+                        updated.variable_symbol = ''
                     } else if (action === 'cancel_qr') {
                         updated.status = 'draft'
                         updated.qr_generated_at = null
                         updated.variable_symbol = ''
+                        updated.payment_method = 'qr'
                     } else if (action === 'mark_paid') {
                         updated.status = 'paid'
                         updated.paid_at = new Date().toISOString()
@@ -467,6 +479,7 @@ export default function SettlementPage() {
                         if (extra.overrides !== undefined) updated.overrides = extra.overrides
                         if (extra.custom_items !== undefined) updated.custom_items = extra.custom_items
                         if (extra.notes !== undefined) updated.notes = extra.notes
+                        if (extra.payment_method !== undefined) updated.payment_method = extra.payment_method
                     }
 
                     return { ...prev, [guestId]: updated }
@@ -964,8 +977,19 @@ export default function SettlementPage() {
                                         </div>
                                         <div>
                                             <h3 className="font-bold text-gray-900">{guest.name}</h3>
-                                            <div className="flex items-center gap-2 mt-0.5">
+                                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                                                 {getStatusBadge(settlement.status)}
+                                                {settlement.qr_generated_at && (
+                                                    settlement.payment_method === 'cash' ? (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-[11px] font-semibold">
+                                                            <Banknote className="w-3 h-3" /> Hotovost
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-[11px] font-semibold">
+                                                            <QrCode className="w-3 h-3" /> QR
+                                                        </span>
+                                                    )
+                                                )}
                                                 {settlement.paid_at && (
                                                     <span className="text-xs text-gray-400">
                                                         {new Date(settlement.paid_at).toLocaleDateString('cs-CZ')}
@@ -1182,6 +1206,9 @@ export default function SettlementPage() {
                                                             <span className="text-base">💻</span>
                                                             <span className="inline-flex items-center justify-center bg-purple-100 text-purple-700 font-bold text-xs rounded px-1.5 py-0.5 min-w-[28px]">{item.qty}×</span>
                                                             <span className="text-gray-900 font-medium">{item.name}</span>
+                                                            <span className="inline-flex items-center justify-center bg-amber-50 text-amber-700 border border-amber-200 font-medium text-[10px] rounded-full px-1.5 py-0.5">
+                                                                {item.nights_count}n
+                                                            </span>
                                                         </div>
                                                         {isEditing ? (
                                                             <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
@@ -1689,13 +1716,33 @@ export default function SettlementPage() {
                                                     setShowQR(guest.id)
                                                 }}
                                                 disabled={saving || !bankSettings?.bank_iban}
-                                                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+                                                className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50 ${settlement.payment_method === 'qr' && settlement.qr_generated_at
+                                                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                                                    : 'bg-blue-100 hover:bg-blue-200 text-blue-700'
+                                                    }`}
                                             >
                                                 <QrCode className="w-4 h-4" />
-                                                {settlement.qr_generated_at ? 'Obnovit QR' : 'Generovat QR'}
+                                                {settlement.payment_method === 'qr' && settlement.qr_generated_at ? 'Obnovit QR' : 'Generovat QR'}
                                             </button>
 
-                                            {/* Cancel QR */}
+                                            {/* Mark as cash payment */}
+                                            <button
+                                                onClick={() => {
+                                                    settlementAction(guest.id, 'finalize_cash')
+                                                    setShowQR(null)
+                                                }}
+                                                disabled={saving}
+                                                className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50 ${settlement.payment_method === 'cash' && settlement.qr_generated_at
+                                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                                    : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700'
+                                                    }`}
+                                                title="Označit jako platbu v hotovosti (bez QR)"
+                                            >
+                                                <Banknote className="w-4 h-4" />
+                                                {settlement.payment_method === 'cash' && settlement.qr_generated_at ? 'Hotovost ✓' : 'Hotovost'}
+                                            </button>
+
+                                            {/* Cancel finalized settlement */}
                                             {settlement.qr_generated_at && settlement.status !== 'paid' && (
                                                 <button
                                                     onClick={() => {
@@ -1706,7 +1753,7 @@ export default function SettlementPage() {
                                                     className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50"
                                                 >
                                                     <X className="w-4 h-4" />
-                                                    Zrušit QR
+                                                    {settlement.payment_method === 'cash' ? 'Zrušit hotovost' : 'Zrušit QR'}
                                                 </button>
                                             )}
 
@@ -1741,8 +1788,21 @@ export default function SettlementPage() {
                                             </button>
                                         </div>
 
+                                        {/* Cash payment indicator */}
+                                        {settlement.payment_method === 'cash' && settlement.qr_generated_at && settlement.status !== 'paid' && (
+                                            <div className="mt-4 flex items-center gap-3 p-4 bg-emerald-50 border-2 border-emerald-200 rounded-xl">
+                                                <Banknote className="w-7 h-7 text-emerald-600 flex-shrink-0" />
+                                                <div>
+                                                    <p className="font-bold text-emerald-700">Platba v hotovosti</p>
+                                                    <p className="text-xs text-emerald-600/80">
+                                                        QR kód se pro tohoto hosta nezobrazuje. Vybírej {finalTotal.toLocaleString('cs-CZ')} Kč v hotovosti.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
+
                                         {/* QR Code Display */}
-                                        {(showQR === guest.id || settlement.qr_generated_at) && spayd && (
+                                        {(showQR === guest.id || settlement.qr_generated_at) && spayd && settlement.payment_method !== 'cash' && (
                                             <div className="mt-4 flex flex-col items-center p-6 bg-white border-2 border-gray-200 rounded-xl">
                                                 {/* Use official QR Platba API for guaranteed compatibility */}
                                                 {getQRImageUrl(guest, guestIndex) ? (

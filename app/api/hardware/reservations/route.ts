@@ -78,6 +78,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No active session found' }, { status: 400 })
     }
 
+    // Block changes once the guest's settlement has been finalized (QR generated, cash marked, or paid).
+    const lockSnap = await db.collection('settlements')
+      .where('session_id', '==', activeSessionId)
+      .where('guest_id', '==', guest_id)
+      .limit(1)
+      .get()
+    if (!lockSnap.empty) {
+      const lockStatus = lockSnap.docs[0].data().status
+      if (lockStatus === 'pending' || lockStatus === 'paid') {
+        return NextResponse.json({
+          error: 'Vyúčtování již bylo vytvořeno, rezervace už nelze měnit. Kontaktuj admina.',
+        }, { status: 403 })
+      }
+    }
+
     // Fetch session data for hardware overrides
     const sessionDoc = await db.collection('sessions').doc(activeSessionId!).get()
     const sessionData = sessionDoc.exists ? sessionDoc.data() : {}

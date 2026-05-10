@@ -53,7 +53,7 @@ export async function POST(
     try {
         const { id: sessionId } = await params
         const body = await request.json()
-        const { guest_id, action, adjustments, overrides, custom_items, notes, status, variable_symbol } = body
+        const { guest_id, action, adjustments, overrides, custom_items, notes, status, variable_symbol, payment_method } = body
 
         const db = getFirebaseAdminDb()
 
@@ -73,6 +73,7 @@ export async function POST(
                 guest_id,
                 status: 'pending',
                 qr_generated_at: now,
+                payment_method: payment_method || 'qr',
                 updated_at: now,
             }
 
@@ -93,13 +94,44 @@ export async function POST(
             return NextResponse.json({ success: true, status: 'pending' })
         }
 
+        if (action === 'finalize_cash') {
+            // Finalize as cash payment → set status to pending, payment_method to 'cash'.
+            // Reuses qr_generated_at as the "settlement finalized at" timestamp so the
+            // public costs page shows it as final (same as a QR settlement).
+            const data: any = {
+                session_id: sessionId,
+                guest_id,
+                status: 'pending',
+                payment_method: 'cash',
+                qr_generated_at: now,
+                variable_symbol: null,
+                updated_at: now,
+            }
+
+            if (adjustments !== undefined) data.adjustments = adjustments
+            if (overrides !== undefined) data.overrides = overrides
+            if (notes !== undefined) data.notes = notes
+
+            if (!existingSnapshot.empty) {
+                await existingSnapshot.docs[0].ref.update(data)
+            } else {
+                await db.collection('settlements').add({
+                    ...data,
+                    created_at: now,
+                })
+            }
+
+            return NextResponse.json({ success: true, status: 'pending', payment_method: 'cash' })
+        }
+
         if (action === 'cancel_qr') {
-            // Cancel QR → reset to draft, clear QR data
+            // Cancel QR/cash settlement → reset to draft, clear finalization data
             if (!existingSnapshot.empty) {
                 await existingSnapshot.docs[0].ref.update({
                     status: 'draft',
                     qr_generated_at: null,
                     variable_symbol: null,
+                    payment_method: 'qr',
                     updated_at: now,
                 })
             }
@@ -147,6 +179,7 @@ export async function POST(
             if (custom_items !== undefined) data.custom_items = custom_items
             if (notes !== undefined) data.notes = notes
             if (status !== undefined) data.status = status
+            if (payment_method !== undefined) data.payment_method = payment_method
 
             if (!existingSnapshot.empty) {
                 await existingSnapshot.docs[0].ref.update(data)
@@ -159,6 +192,7 @@ export async function POST(
                     custom_items: custom_items || [],
                     overrides: overrides || {},
                     notes: notes || '',
+                    payment_method: payment_method || 'qr',
                     ...data,
                     created_at: now,
                 })

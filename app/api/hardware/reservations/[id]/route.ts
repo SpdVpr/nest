@@ -3,6 +3,18 @@ import { NextResponse } from 'next/server'
 import { getFirebaseAdminDb } from '@/lib/firebase/admin'
 import { Timestamp } from 'firebase-admin/firestore'
 
+async function isSettlementLocked(db: any, sessionId: string, guestId: string): Promise<boolean> {
+  if (!sessionId || !guestId) return false
+  const snap = await db.collection('settlements')
+    .where('session_id', '==', sessionId)
+    .where('guest_id', '==', guestId)
+    .limit(1)
+    .get()
+  if (snap.empty) return false
+  const status = snap.docs[0].data().status
+  return status === 'pending' || status === 'paid'
+}
+
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -18,6 +30,13 @@ export async function PATCH(
 
     if (!currentDoc.exists) {
       return NextResponse.json({ error: 'Reservation not found' }, { status: 404 })
+    }
+
+    const currentResData = currentDoc.data()
+    if (await isSettlementLocked(db, currentResData?.session_id, currentResData?.guest_id)) {
+      return NextResponse.json({
+        error: 'Vyúčtování již bylo vytvořeno, rezervace už nelze měnit. Kontaktuj admina.',
+      }, { status: 403 })
     }
 
     const updateData: any = {
@@ -81,6 +100,12 @@ export async function DELETE(
     // Read reservation data before deleting (to get guest_id and session_id)
     const docSnap = await db.collection('hardware_reservations').doc(id).get()
     const resData = docSnap.exists ? docSnap.data() : null
+
+    if (resData && await isSettlementLocked(db, resData.session_id, resData.guest_id)) {
+      return NextResponse.json({
+        error: 'Vyúčtování již bylo vytvořeno, rezervace už nelze měnit. Kontaktuj admina.',
+      }, { status: 403 })
+    }
 
     await db.collection('hardware_reservations').doc(id).delete()
 
