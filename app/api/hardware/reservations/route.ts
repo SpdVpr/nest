@@ -220,30 +220,45 @@ export async function GET(request: Request) {
       .where('session_id', '==', activeSessionId)
       .get()
 
-    // Fetch related data manually
-    const reservations = await Promise.all(
-      reservationsSnapshot.docs.map(async (doc) => {
-        const data = doc.data()
+    // Batch-fetch unique hardware items + guests instead of per-reservation reads (avoid N+1)
+    const hardwareItemIds = new Set<string>()
+    const guestIds = new Set<string>()
+    reservationsSnapshot.docs.forEach(doc => {
+      const data = doc.data()
+      if (data.hardware_item_id) hardwareItemIds.add(data.hardware_item_id)
+      if (data.guest_id) guestIds.add(data.guest_id)
+    })
 
-        // Fetch hardware item
-        const hardwareDoc = await db.collection('hardware_items').doc(data.hardware_item_id).get()
-        const hardwareItem = hardwareDoc.exists ? { id: hardwareDoc.id, ...hardwareDoc.data() } : null
+    const [hardwareDocs, guestDocs] = await Promise.all([
+      hardwareItemIds.size > 0
+        ? db.getAll(...Array.from(hardwareItemIds).map(id => db.collection('hardware_items').doc(id)))
+        : Promise.resolve([]),
+      guestIds.size > 0
+        ? db.getAll(...Array.from(guestIds).map(id => db.collection('guests').doc(id)))
+        : Promise.resolve([]),
+    ])
 
-        // Fetch guest
-        const guestDoc = await db.collection('guests').doc(data.guest_id).get()
-        const guest = guestDoc.exists ? { id: guestDoc.id, name: guestDoc.data().name } : null
+    const hardwareMap = new Map<string, any>()
+    hardwareDocs.forEach(doc => {
+      if (doc.exists) hardwareMap.set(doc.id, { id: doc.id, ...doc.data() })
+    })
+    const guestMap = new Map<string, { id: string, name: string }>()
+    guestDocs.forEach(doc => {
+      if (doc.exists) guestMap.set(doc.id, { id: doc.id, name: doc.data().name })
+    })
 
-        return {
-          id: doc.id,
-          ...data,
-          quantity: data.quantity || 1,
-          created_at: data.created_at?.toDate?.()?.toISOString() || data.created_at,
-          updated_at: data.updated_at?.toDate?.()?.toISOString() || data.updated_at,
-          hardware_items: hardwareItem,
-          guests: guest,
-        }
-      })
-    )
+    const reservations = reservationsSnapshot.docs.map(doc => {
+      const data = doc.data()
+      return {
+        id: doc.id,
+        ...data,
+        quantity: data.quantity || 1,
+        created_at: data.created_at?.toDate?.()?.toISOString() || data.created_at,
+        updated_at: data.updated_at?.toDate?.()?.toISOString() || data.updated_at,
+        hardware_items: hardwareMap.get(data.hardware_item_id) || null,
+        guests: guestMap.get(data.guest_id) || null,
+      }
+    })
 
     // Sort in memory by created_at descending
     reservations.sort((a, b) => {
