@@ -219,6 +219,9 @@ function AuthLoginContent() {
         result.user.displayName || result.user.email?.split('@')[0] || 'User',
         'google'
       )
+      // Refresh auth context profile — onAuthStateChanged may have already
+      // fired with a 404 before registration completed (first-time sign-in race)
+      await refreshProfile()
       const destination = await resolvePostLoginRedirect(token, false)
       router.push(destination)
     } catch (err: any) {
@@ -269,6 +272,9 @@ function AuthLoginContent() {
         result.user.displayName || result.user.email?.split('@')[0] || 'User',
         'apple'
       )
+      // Refresh auth context profile — onAuthStateChanged may have already
+      // fired with a 404 before registration completed (first-time sign-in race)
+      await refreshProfile()
       const destination = await resolvePostLoginRedirect(token, false)
       router.push(destination)
     } catch (err: any) {
