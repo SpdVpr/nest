@@ -105,6 +105,17 @@ export default function EventDetailPage() {
   const [hwPrepared, setHwPrepared] = useState<Record<string, string>>({})
   const [gamesPrepared, setGamesPrepared] = useState<Record<string, string>>({})
   const [deletingGuestId, setDeletingGuestId] = useState<string | null>(null)
+  // Edit guest modal state
+  const [editingGuestModal, setEditingGuestModal] = useState<ExtendedGuest | null>(null)
+  const [editGuestName, setEditGuestName] = useState('')
+  const [editGuestCheckIn, setEditGuestCheckIn] = useState('')
+  const [editGuestCheckOut, setEditGuestCheckOut] = useState('')
+  const [editGuestNights, setEditGuestNights] = useState('')
+  const [editGuestRoom, setEditGuestRoom] = useState('')
+  const [editGuestDietary, setEditGuestDietary] = useState<string[]>([])
+  const [editGuestDietaryNote, setEditGuestDietaryNote] = useState('')
+  const [savingGuest, setSavingGuest] = useState(false)
+  const [editGuestError, setEditGuestError] = useState('')
   // Broadcast state
   const [broadcastBody, setBroadcastBody] = useState('')
   const [broadcastType, setBroadcastType] = useState<'info' | 'food' | 'urgent' | 'fun'>('info')
@@ -112,6 +123,111 @@ export default function EventDetailPage() {
   const [broadcastHistory, setBroadcastHistory] = useState<any[]>([])
   const [broadcastSuccess, setBroadcastSuccess] = useState('')
   const [showBroadcastModal, setShowBroadcastModal] = useState(false)
+
+  const toDateInputValue = (value: string | Date | null | undefined): string => {
+    if (!value) return ''
+    const d = value instanceof Date ? value : new Date(value)
+    if (isNaN(d.getTime())) return ''
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
+  const openEditGuest = (guest: ExtendedGuest) => {
+    setEditingGuestModal(guest)
+    setEditGuestName(guest.name)
+    setEditGuestCheckIn(toDateInputValue(guest.check_in_date))
+    setEditGuestCheckOut(toDateInputValue(guest.check_out_date))
+    setEditGuestNights(String(guest.nights_count ?? 1))
+    setEditGuestRoom(guest.room || '')
+    setEditGuestDietary(Array.isArray((guest as any).dietary_restrictions) ? (guest as any).dietary_restrictions : [])
+    setEditGuestDietaryNote((guest as any).dietary_note || '')
+    setEditGuestError('')
+  }
+
+  const closeEditGuest = () => {
+    setEditingGuestModal(null)
+    setEditGuestError('')
+  }
+
+  // Recompute nights whenever the admin changes check-in/out
+  useEffect(() => {
+    if (!editingGuestModal) return
+    if (!editGuestCheckIn || !editGuestCheckOut) return
+    const inDate = new Date(editGuestCheckIn)
+    const outDate = new Date(editGuestCheckOut)
+    if (isNaN(inDate.getTime()) || isNaN(outDate.getTime())) return
+    const diffDays = Math.round((outDate.getTime() - inDate.getTime()) / (1000 * 60 * 60 * 24))
+    if (diffDays >= 0) setEditGuestNights(String(diffDays))
+  }, [editGuestCheckIn, editGuestCheckOut, editingGuestModal])
+
+  const handleSaveGuest = async () => {
+    if (!editingGuestModal) return
+    const trimmedName = editGuestName.trim()
+    if (!trimmedName) {
+      setEditGuestError('Jméno nesmí být prázdné')
+      return
+    }
+    const nightsNum = parseInt(editGuestNights)
+    if (isNaN(nightsNum) || nightsNum < 0) {
+      setEditGuestError('Počet nocí musí být nezáporné číslo')
+      return
+    }
+    if (editGuestCheckIn && editGuestCheckOut) {
+      const inDate = new Date(editGuestCheckIn)
+      const outDate = new Date(editGuestCheckOut)
+      if (outDate < inDate) {
+        setEditGuestError('Odjezd musí být po příjezdu')
+        return
+      }
+    }
+
+    setSavingGuest(true)
+    setEditGuestError('')
+    try {
+      const token = localStorage.getItem('admin_token')
+      const body: Record<string, any> = {
+        name: trimmedName,
+        nights_count: nightsNum,
+        room: editGuestRoom || null,
+        dietary_restrictions: editGuestDietary,
+        dietary_note: editGuestDietaryNote.trim() || null,
+      }
+      if (editGuestCheckIn) {
+        const d = new Date(editGuestCheckIn)
+        d.setHours(12, 0, 0, 0)
+        body.check_in_date = d.toISOString()
+      } else {
+        body.check_in_date = null
+      }
+      if (editGuestCheckOut) {
+        const d = new Date(editGuestCheckOut)
+        d.setHours(12, 0, 0, 0)
+        body.check_out_date = d.toISOString()
+      } else {
+        body.check_out_date = null
+      }
+
+      const res = await fetch(`/api/admin/sessions/${sessionId}/guests/${editingGuestModal.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setEditGuestError(data.error || 'Chyba při ukládání')
+        return
+      }
+      setEditingGuestModal(null)
+      await fetchEventData()
+    } catch (err) {
+      console.error('Error saving guest:', err)
+      setEditGuestError('Chyba při ukládání')
+    } finally {
+      setSavingGuest(false)
+    }
+  }
 
   const handleDeleteGuest = async (guestId: string, guestName: string) => {
     if (!confirm(`Opravdu chcete smazat účastníka "${guestName}" z akce? Budou smazány všechny jeho rezervace, spotřeba a další data.`)) {
@@ -1482,17 +1598,26 @@ export default function EventDetailPage() {
                         )}
                         {showEdit && (
                           <td className="px-4 py-3 text-center">
-                            <button
-                              onClick={() => handleDeleteGuest(guest.id, guest.name)}
-                              disabled={deletingGuestId === guest.id}
-                              title={`Smazat účastníka ${guest.name}`}
-                              className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
-                            >
-                              {deletingGuestId === guest.id
-                                ? <Loader2 className="w-4 h-4 animate-spin" />
-                                : <Trash2 className="w-4 h-4" />
-                              }
-                            </button>
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                onClick={() => openEditGuest(guest)}
+                                title={`Upravit účastníka ${guest.name}`}
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteGuest(guest.id, guest.name)}
+                                disabled={deletingGuestId === guest.id}
+                                title={`Smazat účastníka ${guest.name}`}
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+                              >
+                                {deletingGuestId === guest.id
+                                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                                  : <Trash2 className="w-4 h-4" />
+                                }
+                              </button>
+                            </div>
                           </td>
                         )}
                       </tr>
@@ -2019,6 +2144,142 @@ export default function EventDetailPage() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingGuestModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={closeEditGuest}>
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+          <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-700 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                  <Edit2 className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-white">Upravit účastníka</h2>
+                  <p className="text-xs text-white/60">{editingGuestModal.name}</p>
+                </div>
+              </div>
+              <button onClick={closeEditGuest} className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
+                <X className="w-4 h-4 text-white" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5 overflow-y-auto">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Jméno</label>
+                <input
+                  type="text"
+                  value={editGuestName}
+                  onChange={e => setEditGuestName(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Příjezd</label>
+                  <input
+                    type="date"
+                    value={editGuestCheckIn}
+                    onChange={e => setEditGuestCheckIn(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Odjezd</label>
+                  <input
+                    type="date"
+                    value={editGuestCheckOut}
+                    onChange={e => setEditGuestCheckOut(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Počet nocí</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={editGuestNights}
+                  onChange={e => setEditGuestNights(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-[11px] text-gray-400 mt-1">Při změně dat se počet nocí přepočítá automaticky. Můžeš jej i ručně přepsat.</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Pokoj</label>
+                <select
+                  value={editGuestRoom}
+                  onChange={e => setEditGuestRoom(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">— bez pokoje —</option>
+                  <option value="dolni">Dolní pokoj</option>
+                  <option value="horni-vlevo">Horní vlevo</option>
+                  <option value="horni-vpravo">Horní vpravo</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Stravovací omezení</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { value: 'vegan', label: '🌱 Vegan' },
+                    { value: 'vegetarian', label: '🥬 Vegetarián' },
+                    { value: 'gluten-free', label: '🌾 Bez lepku' },
+                    { value: 'lactose-free', label: '🥛 Bez laktózy' },
+                  ].map(opt => {
+                    const active = editGuestDietary.includes(opt.value)
+                    return (
+                      <button
+                        type="button"
+                        key={opt.value}
+                        onClick={() => setEditGuestDietary(active ? editGuestDietary.filter(v => v !== opt.value) : [...editGuestDietary, opt.value])}
+                        className={`px-3 py-2 rounded-lg border text-sm text-left transition-colors ${active ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+                      >
+                        {opt.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Poznámka ke stravě</label>
+                <input
+                  type="text"
+                  value={editGuestDietaryNote}
+                  onChange={e => setEditGuestDietaryNote(e.target.value)}
+                  placeholder="Alergie, preference…"
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {editGuestError && (
+                <div className="px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+                  {editGuestError}
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-2">
+              <button onClick={closeEditGuest} className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">
+                Zrušit
+              </button>
+              <button
+                onClick={handleSaveGuest}
+                disabled={savingGuest}
+                className="px-4 py-2 rounded-lg text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              >
+                {savingGuest ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                Uložit
+              </button>
             </div>
           </div>
         </div>

@@ -9,8 +9,9 @@ function verifyAuth(request: NextRequest): boolean {
 }
 
 // PATCH /api/admin/sessions/[id]/guests/[guestId] - Admin: update guest fields
-// Currently supports updating nights_count, with propagation to hardware reservations
-// whose nights_count was tracking the guest's previous value.
+// Supports: name, nights_count, check_in_date, check_out_date, room,
+// dietary_restrictions, dietary_note. When nights_count changes, hardware
+// reservations that were tracking the previous default are recalculated.
 export async function PATCH(
     request: NextRequest,
     { params }: { params: Promise<{ id: string; guestId: string }> }
@@ -22,6 +23,7 @@ export async function PATCH(
 
         const { id: sessionId, guestId } = await params
         const db = getFirebaseAdminDb()
+        const { Timestamp } = await import('firebase-admin/firestore')
 
         const guestDoc = await db.collection('guests').doc(guestId).get()
         if (!guestDoc.exists) {
@@ -34,54 +36,100 @@ export async function PATCH(
         }
 
         const body = await request.json()
-        const { nights_count } = body
+        const {
+            name,
+            nights_count,
+            check_in_date,
+            check_out_date,
+            room,
+            dietary_restrictions,
+            dietary_note,
+        } = body
 
-        if (nights_count === undefined) {
-            return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
+        const updateData: Record<string, any> = {}
+
+        if (typeof name === 'string') {
+            const trimmed = name.trim()
+            if (!trimmed) {
+                return NextResponse.json({ error: 'Name cannot be empty' }, { status: 400 })
+            }
+            updateData.name = trimmed
         }
 
-        const newNights = parseInt(nights_count)
-        if (isNaN(newNights) || newNights < 0) {
-            return NextResponse.json({ error: 'Invalid nights_count' }, { status: 400 })
+        let newNights: number | null = null
+        if (nights_count !== undefined) {
+            const parsed = parseInt(nights_count)
+            if (isNaN(parsed) || parsed < 0) {
+                return NextResponse.json({ error: 'Invalid nights_count' }, { status: 400 })
+            }
+            newNights = parsed
+            updateData.nights_count = parsed
+        }
+
+        if (check_in_date !== undefined) {
+            updateData.check_in_date = check_in_date
+                ? Timestamp.fromDate(new Date(check_in_date))
+                : null
+        }
+        if (check_out_date !== undefined) {
+            updateData.check_out_date = check_out_date
+                ? Timestamp.fromDate(new Date(check_out_date))
+                : null
+        }
+        if (room !== undefined) {
+            updateData.room = room || null
+        }
+        if (dietary_restrictions !== undefined) {
+            updateData.dietary_restrictions = Array.isArray(dietary_restrictions)
+                ? dietary_restrictions
+                : []
+        }
+        if (dietary_note !== undefined) {
+            updateData.dietary_note = dietary_note || null
+        }
+
+        if (Object.keys(updateData).length === 0) {
+            return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
         }
 
         const oldNights = guestData?.nights_count ?? 1
 
         const batch = db.batch()
-        batch.update(db.collection('guests').doc(guestId), { nights_count: newNights })
+        batch.update(db.collection('guests').doc(guestId), updateData)
 
         // Recalculate hardware reservations whose nights_count was tracking the guest default.
         // Reservations the user explicitly set to a different value are left alone.
         let hardwareUpdated = 0
-        const hwSnapshot = await db.collection('hardware_reservations')
-            .where('guest_id', '==', guestId)
-            .where('status', '==', 'active')
-            .get()
+        if (newNights !== null && newNights !== oldNights) {
+            const hwSnapshot = await db.collection('hardware_reservations')
+                .where('guest_id', '==', guestId)
+                .where('status', '==', 'active')
+                .get()
 
-        await Promise.all(
-            hwSnapshot.docs.map(async (resDoc) => {
-                const resData = resDoc.data()
-                if ((resData.nights_count ?? 1) !== oldNights) return
+            await Promise.all(
+                hwSnapshot.docs.map(async (resDoc) => {
+                    const resData = resDoc.data()
+                    if ((resData.nights_count ?? 1) !== oldNights) return
 
-                const hwDoc = await db.collection('hardware_items').doc(resData.hardware_item_id).get()
-                if (!hwDoc.exists) return
-                const hwData = hwDoc.data()
-                const pricePerNight = hwData?.price_per_night || 0
-                const quantity = resData.quantity || 1
+                    const hwDoc = await db.collection('hardware_items').doc(resData.hardware_item_id).get()
+                    if (!hwDoc.exists) return
+                    const hwData = hwDoc.data()
+                    const pricePerNight = hwData?.price_per_night || 0
+                    const quantity = resData.quantity || 1
 
-                batch.update(resDoc.ref, {
-                    nights_count: newNights,
-                    total_price: pricePerNight * quantity * newNights,
+                    batch.update(resDoc.ref, {
+                        nights_count: newNights,
+                        total_price: pricePerNight * quantity * newNights,
+                    })
+                    hardwareUpdated++
                 })
-                hardwareUpdated++
-            })
-        )
+            )
+        }
 
         await batch.commit()
 
         return NextResponse.json({
             success: true,
-            nights_count: newNights,
             hardware_updated: hardwareUpdated,
         })
     } catch (error) {
