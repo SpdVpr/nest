@@ -642,9 +642,11 @@ export default function EventDetailPage() {
     return guestReservations.map(r => {
       const hw = hardwareItems.find(h => h.id === r.hardware_item_id)
       return {
+        reservation: r,
         name: hw?.name || 'Neznámý HW',
         type: hw?.type || 'accessory',
         quantity: r.quantity || 1,
+        nights: r.nights_count || 1,
         price: r.total_price
       }
     }).sort((a, b) => (typeOrder[a.type] ?? 9) - (typeOrder[b.type] ?? 9))
@@ -1608,11 +1610,30 @@ export default function EventDetailPage() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap gap-1 max-w-xs">
-                            {guestHw.length > 0 ? guestHw.map((hw, i) => (
-                              <span key={i} className="text-[11px] px-1.5 py-0.5 rounded whitespace-nowrap" style={{ backgroundColor: 'rgba(59, 130, 246, 0.12)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.25)' }}>
-                                {hw.quantity > 1 ? `${hw.quantity}× ` : ''}{hw.name}
-                              </span>
-                            )) : (
+                            {guestHw.length > 0 ? guestHw.map((hw, i) => {
+                              const pillStyle = { backgroundColor: 'rgba(59, 130, 246, 0.12)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.25)' }
+                              const pillContent = (
+                                <>
+                                  {hw.quantity > 1 ? `${hw.quantity}× ` : ''}{hw.name}
+                                  <span className="opacity-60 ml-1">· {hw.nights}n</span>
+                                </>
+                              )
+                              return showEdit ? (
+                                <button
+                                  key={i}
+                                  onClick={() => openEditHw(hw.reservation)}
+                                  title="Upravit HW rezervaci"
+                                  className="text-[11px] px-1.5 py-0.5 rounded whitespace-nowrap hover:opacity-80 cursor-pointer transition-opacity"
+                                  style={pillStyle}
+                                >
+                                  {pillContent}
+                                </button>
+                              ) : (
+                                <span key={i} className="text-[11px] px-1.5 py-0.5 rounded whitespace-nowrap" style={pillStyle}>
+                                  {pillContent}
+                                </span>
+                              )
+                            }) : (
                               <span className="text-xs text-gray-400">—</span>
                             )}
                           </div>
@@ -2444,6 +2465,43 @@ export default function EventDetailPage() {
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
+
+              {(() => {
+                const guestHw = getGuestHardware(editingGuestModal.id)
+                return (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">HW rezervace</label>
+                    {guestHw.length === 0 ? (
+                      <p className="text-xs text-gray-400 italic">Host nemá žádné HW rezervace.</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {guestHw.map((hw, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => openEditHw(hw.reservation)}
+                            className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-gray-200 hover:border-blue-400 hover:bg-blue-50/50 text-left transition-colors"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-base flex-shrink-0">
+                                {hw.type === 'monitor' ? '📺' : hw.type === 'pc' ? '💻' : '🎮'}
+                              </span>
+                              <span className="text-sm text-gray-900 truncate">
+                                {hw.quantity > 1 ? `${hw.quantity}× ` : ''}{hw.name}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0 text-xs text-gray-500">
+                              <span>{hw.nights}n</span>
+                              <Edit2 className="w-3.5 h-3.5 text-gray-400" />
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-[11px] text-gray-400 mt-1.5">Klikni na položku pro úpravu nebo smazání. Při změně počtu nocí výše se HW automaticky synchronizuje.</p>
+                  </div>
+                )
+              })()}
 
               {editGuestError && (
                 <div className="px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
