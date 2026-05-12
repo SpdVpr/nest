@@ -77,24 +77,28 @@ export default function EventPage() {
   const fetchData = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/event/${slug}`)
 
-      if (response.status === 404) {
+      // Step 1: fetch event + guests in parallel (no dependency between them)
+      const [eventRes, guestsRes] = await Promise.all([
+        fetch(`/api/event/${slug}`),
+        fetch(`/api/event/${slug}/guests`),
+      ])
+
+      if (eventRes.status === 404) {
         setError('Event nebyl nalezen')
         return
       }
 
-      if (!response.ok) {
+      if (!eventRes.ok) {
         throw new Error('Failed to fetch event')
       }
 
-      const data = await response.json()
+      const data = await eventRes.json()
       setSession(data.session)
 
-      const guestsResponse = await fetch(`/api/event/${slug}/guests`)
       let allGuests: Guest[] = []
-      if (guestsResponse.ok) {
-        const guestsData = await guestsResponse.json()
+      if (guestsRes.ok) {
+        const guestsData = await guestsRes.json()
         allGuests = guestsData.guests || []
         setGuestCount(allGuests.length)
       }
@@ -114,33 +118,29 @@ export default function EventPage() {
       }
       setCurrentGuest(myGuest)
 
-      // Fetch checklist data if we have a guest and a session
+      // Step 2: fetch checklist data in parallel if we have a guest and a session
       if (myGuest && data.session) {
         const sessionId = data.session.id
         try {
-          // Seats
-          const seatsRes = await fetch(`/api/seats/reservations?session_id=${sessionId}`)
+          const [seatsRes, hwRes, gamesRes] = await Promise.all([
+            fetch(`/api/seats/reservations?session_id=${sessionId}`),
+            fetch(`/api/hardware/reservations?session_id=${sessionId}`),
+            fetch(`/api/event/${slug}/games`),
+          ])
+
           if (seatsRes.ok) {
             const seatsData = await seatsRes.json()
-            const mySeat = (seatsData.reservations || []).some((r: any) => r.guest_id === myGuest.id)
-            setSeatReserved(mySeat)
+            setSeatReserved((seatsData.reservations || []).some((r: any) => r.guest_id === myGuest.id))
           }
 
-          // Hardware
-          const hwRes = await fetch(`/api/hardware/reservations?session_id=${sessionId}`)
           if (hwRes.ok) {
             const hwData = await hwRes.json()
-            const myHw = (hwData.reservations || []).some((r: any) => r.guest_id === myGuest.id && r.status === 'active')
-            setHwReserved(myHw)
+            setHwReserved((hwData.reservations || []).some((r: any) => r.guest_id === myGuest.id && r.status === 'active'))
           }
 
-          // Games - check if guest has any votes
-          const gamesRes = await fetch(`/api/event/${slug}/games`)
           if (gamesRes.ok) {
             const gamesData = await gamesRes.json()
-            const votes = gamesData.votes || []
-            const hasVoted = votes.some((v: any) => v.guest_id === myGuest.id)
-            setGamesVoted(hasVoted)
+            setGamesVoted((gamesData.votes || []).some((v: any) => v.guest_id === myGuest.id))
           }
         } catch {
           // Don't fail the page if checklist fetch fails

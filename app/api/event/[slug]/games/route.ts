@@ -24,10 +24,11 @@ export async function GET(
 
         const sessionId = sessionSnapshot.docs[0].id
 
-        // Fetch games
-        const gamesSnap = await db.collection('games')
-            .where('session_id', '==', sessionId)
-            .get()
+        // Fetch games + votes in parallel (independent queries)
+        const [gamesSnap, votesSnap] = await Promise.all([
+            db.collection('games').where('session_id', '==', sessionId).get(),
+            db.collection('game_votes').where('session_id', '==', sessionId).get(),
+        ])
 
         const games = gamesSnap.docs.map(doc => {
             const data = doc.data()
@@ -37,11 +38,6 @@ export async function GET(
                 created_at: data.created_at?.toDate?.()?.toISOString() || data.created_at,
             }
         })
-
-        // Fetch votes
-        const votesSnap = await db.collection('game_votes')
-            .where('session_id', '==', sessionId)
-            .get()
 
         const votes = votesSnap.docs.map(doc => ({
             id: doc.id,

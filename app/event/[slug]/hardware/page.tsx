@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Monitor, Cpu, Check, Gamepad2, Keyboard, Mouse, Headphones, Cable, Edit2, Trash2, X, Save, Plus, Minus } from 'lucide-react'
+import { ArrowLeft, Monitor, Cpu, Check, Gamepad2, Keyboard, Mouse, Headphones, Cable, Edit2, Trash2, X, Save, Plus, Minus, Lock, Moon } from 'lucide-react'
 import NestPage from '@/components/NestPage'
 import { Session, Guest, GameLibraryItem } from '@/types/database.types'
 import { HardwareItem } from '@/types/hardware.types'
@@ -59,6 +59,7 @@ export default function EventHardwarePage() {
   const [guests, setGuests] = useState<Guest[]>([])
   const [hardwareItems, setHardwareItems] = useState<HardwareItem[]>([])
   const [reservations, setReservations] = useState<any[]>([])
+  const [settlementsMap, setSettlementsMap] = useState<Record<string, { status: string; payment_method: string }>>({})
   const [allGameInstalls, setAllGameInstalls] = useState<Record<string, string[]>>({})
   const [loading, setLoading] = useState(true)
   const [selectedGuest, setSelectedGuest] = useState<Guest | null>(null)
@@ -119,6 +120,13 @@ export default function EventHardwarePage() {
         }
       }
 
+      // Fetch settlement statuses to lock UI when a guest's settlement is finalized
+      const settlementsRes = await fetch(`/api/event/${slug}/settlements`)
+      if (settlementsRes.ok) {
+        const settlementsData = await settlementsRes.json()
+        setSettlementsMap(settlementsData.settlements || {})
+      }
+
       const guestsRes = await fetch(`/api/event/${slug}/guests`)
       if (guestsRes.ok) {
         const guestsData = await guestsRes.json()
@@ -169,6 +177,15 @@ export default function EventHardwarePage() {
   const hardwarePricingEnabled = session?.hardware_pricing_enabled !== false
   const hwOverrides = (session as any)?.hardware_overrides || {} as Record<string, { quantity: number }>
 
+  // A guest is "locked" once admin has finalized their settlement (QR generated or cash marked)
+  const isGuestLocked = (guestId: string | undefined | null): boolean => {
+    if (!guestId) return false
+    const s = settlementsMap[guestId]
+    if (!s) return false
+    return s.status === 'pending' || s.status === 'paid'
+  }
+  const myLocked = isGuestLocked(selectedGuest?.id)
+
   // Get effective quantity for an item (applying session overrides)
   const getEffectiveQuantity = (item: HardwareItem): number => {
     if (hwOverrides[item.id] !== undefined) {
@@ -193,6 +210,7 @@ export default function EventHardwarePage() {
       setShowGuestSelection(true)
       return
     }
+    if (myLocked) return
     setSelectedQuantities(prev => {
       const current = prev[itemId] || 0
       const next = Math.max(0, Math.min(current + delta, maxAvailable))
@@ -203,6 +221,10 @@ export default function EventHardwarePage() {
       }
       return { ...prev, [itemId]: next }
     })
+  }
+
+  const changeNightsCount = (delta: number) => {
+    setNightsCount(prev => Math.max(1, prev + delta))
   }
 
   const getTotalSelectedCount = () => Object.values(selectedQuantities).reduce((a, b) => a + b, 0)
@@ -480,48 +502,72 @@ export default function EventHardwarePage() {
 
         return (
           <div className="nest-card-elevated p-6 mb-6">
-            <h2 className="text-base font-bold mb-4">
-              Moje rezervace ({myReservations.length})
-            </h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-bold">
+                Moje rezervace ({myReservations.length})
+              </h2>
+              {myLocked && (
+                <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/25 font-medium">
+                  <Lock className="w-3 h-3" />
+                  Vyúčtování hotové
+                </span>
+              )}
+            </div>
+            {myLocked && (
+              <div className="mb-3 text-xs text-[var(--nest-text-secondary)]">
+                Admin už vytvořil vyúčtování — rezervace už nelze měnit. Pokud potřebuješ změnu, řekni adminovi.
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {myReservations.map((reservation) => (
-                <div
-                  key={reservation.id}
-                  className="p-3 bg-[var(--nest-dark-3)] rounded-xl border border-[var(--nest-dark-4)]"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0 pt-0.5 text-[var(--nest-yellow)]">
-                      {getItemIcon({ name: reservation.hardware_items?.name || '', type: reservation.hardware_items?.type || 'accessory' }, "w-6 h-6")}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-[var(--nest-text-primary)] text-base">
-                        {reservation.hardware_items?.is_top && <span style={{ color: '#f59e0b' }}>★ </span>}
-                        {reservation.quantity > 1 ? `${reservation.quantity}× ` : ''}{reservation.hardware_items?.name || 'Neznámé zařízení'}
-                      </h3>
-                      {formatSpecs(reservation.hardware_items?.specs) && (
-                        <p className="text-xs text-[var(--nest-text-secondary)] mt-0.5">
-                          {formatSpecs(reservation.hardware_items?.specs)}
-                        </p>
+              {myReservations.map((reservation) => {
+                const nights = reservation.nights_count || 1
+                return (
+                  <div
+                    key={reservation.id}
+                    className="p-3 bg-[var(--nest-dark-3)] rounded-xl border border-[var(--nest-dark-4)]"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 pt-0.5 text-[var(--nest-yellow)]">
+                        {getItemIcon({ name: reservation.hardware_items?.name || '', type: reservation.hardware_items?.type || 'accessory' }, "w-6 h-6")}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-[var(--nest-text-primary)] text-base">
+                          {reservation.hardware_items?.is_top && <span style={{ color: '#f59e0b' }}>★ </span>}
+                          {reservation.quantity > 1 ? `${reservation.quantity}× ` : ''}{reservation.hardware_items?.name || 'Neznámé zařízení'}
+                        </h3>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--nest-yellow)]/10 text-[var(--nest-yellow)] border border-[var(--nest-yellow)]/20 font-semibold">
+                            <Moon className="w-2.5 h-2.5" />
+                            {nights} {nights === 1 ? 'noc' : nights < 5 ? 'noci' : 'nocí'}
+                          </span>
+                        </div>
+                        {formatSpecs(reservation.hardware_items?.specs) && (
+                          <p className="text-xs text-[var(--nest-text-secondary)] mt-1">
+                            {formatSpecs(reservation.hardware_items?.specs)}
+                          </p>
+                        )}
+                      </div>
+                      {!myLocked && (
+                        <button
+                          onClick={() => handleDeleteReservation(reservation.id)}
+                          className="flex-shrink-0 inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white px-2.5 py-1 rounded-lg text-xs font-medium transition-colors"
+                        >
+                          <Trash2 className="w-3 h-3" /> Zrušit
+                        </button>
                       )}
                     </div>
-                    <button
-                      onClick={() => handleDeleteReservation(reservation.id)}
-                      className="flex-shrink-0 inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white px-2.5 py-1 rounded-lg text-xs font-medium transition-colors"
-                    >
-                      <Trash2 className="w-3 h-3" /> Zrušit
-                    </button>
-                  </div>
 
-                  {reservation.total_price > 0 && hardwarePricingEnabled && (
-                    <div className="border-t border-[var(--nest-border)] pt-2 mt-3">
-                      <div className="flex items-center gap-1 text-sm">
-                        <span className="text-[var(--nest-text-secondary)]">Cena:</span>
-                        <span className="font-bold text-[var(--nest-yellow)]">{reservation.total_price} Kč</span>
+                    {reservation.total_price > 0 && hardwarePricingEnabled && (
+                      <div className="border-t border-[var(--nest-border)] pt-2 mt-3">
+                        <div className="flex items-center gap-1 text-sm">
+                          <span className="text-[var(--nest-text-secondary)]">Cena:</span>
+                          <span className="font-bold text-[var(--nest-yellow)]">{reservation.total_price} Kč</span>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </div>
         )
@@ -687,8 +733,8 @@ export default function EventHardwarePage() {
                       <div className="flex items-center justify-center gap-3 pt-3 border-t border-[var(--nest-border)]">
                         <button
                           onClick={() => changeQuantity(item.id, -1, available)}
-                          disabled={qty === 0}
-                          className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors font-bold text-lg ${qty === 0
+                          disabled={qty === 0 || myLocked}
+                          className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors font-bold text-lg ${qty === 0 || myLocked
                             ? 'bg-[var(--nest-bg)] text-[var(--nest-text-tertiary)] cursor-not-allowed'
                             : 'bg-red-900/30 text-red-400 hover:bg-red-900/50'
                             }`}
@@ -703,8 +749,8 @@ export default function EventHardwarePage() {
 
                         <button
                           onClick={() => changeQuantity(item.id, 1, available)}
-                          disabled={qty >= available && !!selectedGuest}
-                          className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors font-bold text-lg ${qty >= available && !!selectedGuest
+                          disabled={(qty >= available && !!selectedGuest) || myLocked}
+                          className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors font-bold text-lg ${(qty >= available && !!selectedGuest) || myLocked
                             ? 'bg-[var(--nest-bg)] text-[var(--nest-text-tertiary)] cursor-not-allowed'
                             : 'bg-emerald-900/20 text-emerald-400 hover:bg-emerald-900/30'
                             }`}
@@ -752,11 +798,28 @@ export default function EventHardwarePage() {
               })}
           </div>
 
-          <div className="flex items-center justify-between border-t border-white/30 pt-3">
-            <div className="flex items-center gap-4">
+          <div className="flex items-center justify-between border-t border-white/30 pt-3 flex-wrap gap-3">
+            <div className="flex items-center gap-4 flex-wrap">
               <div>
-                <p className="text-xs text-emerald-300/70">Počet nocí:</p>
-                <p className="text-lg font-bold">{nightsCount}</p>
+                <p className="text-xs text-emerald-300/70 mb-1">Počet nocí:</p>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => changeNightsCount(-1)}
+                    disabled={nightsCount <= 1}
+                    className="w-7 h-7 rounded-full bg-white/15 hover:bg-white/25 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+                    title="Méně nocí"
+                  >
+                    <Minus className="w-3.5 h-3.5" />
+                  </button>
+                  <span className="text-lg font-bold w-7 text-center">{nightsCount}</span>
+                  <button
+                    onClick={() => changeNightsCount(1)}
+                    className="w-7 h-7 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition-colors"
+                    title="Více nocí"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
 
               {hardwarePricingEnabled && (
@@ -834,6 +897,7 @@ export default function EventHardwarePage() {
               {sortedGuests.map((guest, idx) => {
                 const isMe = selectedGuest?.id === guest.guestId
                 const hasReservations = guest.items.length > 0
+                const guestLocked = isGuestLocked(guest.guestId)
                 return (
                   <div key={idx} className={`py-3 ${isMe ? 'bg-[var(--nest-yellow)]/10 -mx-2 px-2 rounded-lg' : ''}`}>
                     <div className="flex items-start gap-4">
@@ -853,6 +917,9 @@ export default function EventHardwarePage() {
                         ) : (
                           <Edit2 className="w-3 h-3 text-[var(--nest-text-tertiary)] group-hover:text-[var(--nest-yellow)] transition-colors" />
                         )}
+                        {guestLocked && (
+                          <Lock className="w-3 h-3 text-amber-400" />
+                        )}
                       </button>
                       <div className="flex-1 min-w-0">
                         {hasReservations ? (
@@ -862,6 +929,10 @@ export default function EventHardwarePage() {
                                 <div key={item.id} className="inline-flex items-center gap-1">
                                   <span className="text-sm text-[var(--nest-text-primary)]">
                                     {item.qty > 1 ? `${item.qty}× ` : ''}{item.name}
+                                  </span>
+                                  <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--nest-yellow)]/10 text-[var(--nest-yellow)]/80 border border-[var(--nest-yellow)]/15 font-medium">
+                                    <Moon className="w-2.5 h-2.5" />
+                                    {item.nights}n
                                   </span>
                                   {i < guest.items.length - 1 && <span className="text-[var(--nest-text-tertiary)] ml-0.5">,</span>}
                                 </div>

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Receipt, ChevronDown, ChevronUp, AlertTriangle, RefreshCw, Heart, CreditCard, CheckCircle2, Download, QrCode, Copy } from 'lucide-react'
+import { ArrowLeft, Receipt, ChevronDown, ChevronUp, AlertTriangle, RefreshCw, Heart, CreditCard, CheckCircle2, Download, QrCode, Copy, Banknote, Moon } from 'lucide-react'
 import NestPage from '@/components/NestPage'
 import { useCurrentGuest } from '@/lib/auth-context'
 
@@ -18,6 +18,7 @@ interface ConsumptionItem {
 interface HardwareItem {
     name: string
     qty: number
+    nights_count: number
     totalPrice: number
     type: string
 }
@@ -36,6 +37,7 @@ interface SettlementInfo {
     status: string
     qr_generated_at: string
     variable_symbol: string | null
+    payment_method: 'qr' | 'cash'
     paid_at: string | null
     adjustments?: Adjustment[]
     custom_items?: CustomItem[]
@@ -327,7 +329,11 @@ export default function CostsPage() {
                                                         <span className="text-xs bg-emerald-900/40 text-emerald-400 px-2 py-0.5 rounded-full font-medium">✅ zaplaceno</span>
                                                     )}
                                                     {guest.settlement && guest.settlement.status !== 'paid' && (
-                                                        <span className="text-xs bg-blue-900/40 text-blue-400 px-2 py-0.5 rounded-full font-medium">💳 k zaplacení</span>
+                                                        guest.settlement.payment_method === 'cash' ? (
+                                                            <span className="text-xs bg-emerald-900/40 text-emerald-400 px-2 py-0.5 rounded-full font-medium">💵 hotovost</span>
+                                                        ) : (
+                                                            <span className="text-xs bg-blue-900/40 text-blue-400 px-2 py-0.5 rounded-full font-medium">💳 k zaplacení</span>
+                                                        )
                                                     )}
                                                 </div>
                                                 <div className="flex items-center gap-3 text-sm text-[var(--nest-text-secondary)] flex-wrap">
@@ -434,6 +440,10 @@ export default function CostsPage() {
                                                                 <div className="flex items-center gap-2 min-w-0">
                                                                     <span className="text-[var(--nest-text-tertiary)] text-xs w-8">{item.qty}×</span>
                                                                     <span className="text-[var(--nest-text-primary)]">{item.name}</span>
+                                                                    <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--nest-yellow)]/10 text-[var(--nest-yellow)]/80 border border-[var(--nest-yellow)]/15 font-medium">
+                                                                        <Moon className="w-2.5 h-2.5" />
+                                                                        {item.nights_count} {item.nights_count === 1 ? 'noc' : item.nights_count < 5 ? 'noci' : 'nocí'}
+                                                                    </span>
                                                                 </div>
                                                                 <span className="font-semibold text-[var(--nest-text-primary)] flex-shrink-0 ml-2">
                                                                     {item.totalPrice > 0 ? `${item.totalPrice.toLocaleString('cs-CZ')} Kč` : 'Zdarma'}
@@ -621,11 +631,27 @@ export default function CostsPage() {
                                                             <CheckCircle2 className="w-8 h-8 text-emerald-500 flex-shrink-0" />
                                                             <div>
                                                                 <p className="font-bold text-emerald-400 text-lg">Zaplaceno ✅</p>
-                                                                {guest.settlement.paid_at && (
-                                                                    <p className="text-sm text-emerald-400/80">
-                                                                        {new Date(guest.settlement.paid_at).toLocaleString('cs-CZ')}
-                                                                    </p>
-                                                                )}
+                                                                <p className="text-sm text-emerald-400/80">
+                                                                    {guest.settlement.payment_method === 'cash' ? 'Hotovostí' : 'Platba přes QR'}
+                                                                    {guest.settlement.paid_at && ` • ${new Date(guest.settlement.paid_at).toLocaleString('cs-CZ')}`}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    ) : guest.settlement.payment_method === 'cash' ? (
+                                                        /* Cash payment - no QR */
+                                                        <div className="bg-emerald-900/20 border-2 border-emerald-700/50 rounded-xl p-5">
+                                                            <div className="flex items-center gap-3 mb-3">
+                                                                <Banknote className="w-7 h-7 text-emerald-500" />
+                                                                <div>
+                                                                    <h4 className="font-bold text-emerald-400 text-lg">Platba v hotovosti</h4>
+                                                                    <p className="text-xs text-emerald-400/70">QR kód se nepoužívá — částka se vybere v hotovosti.</p>
+                                                                </div>
+                                                            </div>
+                                                            <div className="bg-[var(--nest-bg)] rounded-lg p-4 flex items-center justify-between">
+                                                                <span className="text-sm text-[var(--nest-text-secondary)]">Částka k zaplacení:</span>
+                                                                <span className="text-2xl font-black text-[var(--nest-text-primary)]">
+                                                                    {guest.settlement.finalTotal.toLocaleString('cs-CZ')} Kč
+                                                                </span>
                                                             </div>
                                                         </div>
                                                     ) : (

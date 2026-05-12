@@ -48,21 +48,30 @@ export default function GuestsPage() {
     try {
       setLoading(true)
 
-      const sessionRes = await fetch(`/api/event/${slug}`)
-      let sessionData: any = null
+      // Fetch event + guests in parallel; guests endpoint also returns session_id which we use for seats
+      const [sessionRes, guestsRes] = await Promise.all([
+        fetch(`/api/event/${slug}`),
+        fetch(`/api/event/${slug}/guests`),
+      ])
+
+      let sessionId: string | null = null
+
       if (sessionRes.ok) {
-        sessionData = await sessionRes.json()
+        const sessionData = await sessionRes.json()
         setSession(sessionData.session)
+        sessionId = sessionData.session?.id || null
       }
 
-      const guestsRes = await fetch(`/api/event/${slug}/guests`)
       if (guestsRes.ok) {
         const guestsData = await guestsRes.json()
         setGuests(guestsData.guests || [])
+        if (!sessionId && guestsData.session_id) {
+          sessionId = guestsData.session_id
+        }
       }
 
-      if (sessionData?.session?.id) {
-        const seatsRes = await fetch(`/api/seats/reservations?session_id=${sessionData.session.id}`)
+      if (sessionId) {
+        const seatsRes = await fetch(`/api/seats/reservations?session_id=${sessionId}`)
         if (seatsRes.ok) {
           const seatsData = await seatsRes.json()
           setSeatReservations(seatsData.reservations || [])
