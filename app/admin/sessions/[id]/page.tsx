@@ -122,6 +122,13 @@ export default function EventDetailPage() {
   const [editHwNights, setEditHwNights] = useState('')
   const [savingHw, setSavingHw] = useState(false)
   const [editHwError, setEditHwError] = useState('')
+  // Add HW state (within per-guest edit modal)
+  const [addHwGuestId, setAddHwGuestId] = useState<string | null>(null)
+  const [addHwItemId, setAddHwItemId] = useState('')
+  const [addHwQty, setAddHwQty] = useState('1')
+  const [addHwNights, setAddHwNights] = useState('1')
+  const [addingHw, setAddingHw] = useState(false)
+  const [addHwError, setAddHwError] = useState('')
   // Broadcast state
   const [broadcastBody, setBroadcastBody] = useState('')
   const [broadcastType, setBroadcastType] = useState<'info' | 'food' | 'urgent' | 'fun'>('info')
@@ -303,6 +310,63 @@ export default function EventDetailPage() {
       setEditHwError('Chyba při mazání')
     } finally {
       setSavingHw(false)
+    }
+  }
+
+  const openAddHw = (guest: ExtendedGuest) => {
+    setAddHwGuestId(guest.id)
+    setAddHwItemId('')
+    setAddHwQty('1')
+    setAddHwNights(String(guest.nights_count || 1))
+    setAddHwError('')
+  }
+
+  const closeAddHw = () => {
+    setAddHwGuestId(null)
+    setAddHwError('')
+  }
+
+  const handleAddHw = async () => {
+    if (!addHwGuestId) return
+    if (!addHwItemId) {
+      setAddHwError('Vyber HW položku')
+      return
+    }
+    const qty = parseInt(addHwQty)
+    const nights = parseInt(addHwNights)
+    if (isNaN(qty) || qty < 1) {
+      setAddHwError('Množství musí být alespoň 1')
+      return
+    }
+    if (isNaN(nights) || nights < 1) {
+      setAddHwError('Počet nocí musí být alespoň 1')
+      return
+    }
+    setAddingHw(true)
+    setAddHwError('')
+    try {
+      const res = await fetch('/api/hardware/reservations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          guest_id: addHwGuestId,
+          session_id: sessionId,
+          nights_count: nights,
+          reservations: [{ hardware_item_id: addHwItemId, quantity: qty }],
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setAddHwError(data.error || 'Chyba při přidávání')
+        return
+      }
+      closeAddHw()
+      await fetchEventData()
+    } catch (err) {
+      console.error('Error adding HW reservation:', err)
+      setAddHwError('Chyba při přidávání')
+    } finally {
+      setAddingHw(false)
     }
   }
 
@@ -1612,10 +1676,13 @@ export default function EventDetailPage() {
                           <div className="flex flex-wrap gap-1 max-w-xs">
                             {guestHw.length > 0 ? guestHw.map((hw, i) => {
                               const pillStyle = { backgroundColor: 'rgba(59, 130, 246, 0.12)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.25)' }
+                              const nightsMismatch = hw.nights !== guest.nights_count
                               const pillContent = (
                                 <>
                                   {hw.quantity > 1 ? `${hw.quantity}× ` : ''}{hw.name}
-                                  <span className="opacity-60 ml-1">· {hw.nights}n</span>
+                                  {nightsMismatch && (
+                                    <span className="opacity-60 ml-1">· {hw.nights}n</span>
+                                  )}
                                 </>
                               )
                               return showEdit ? (
@@ -1787,11 +1854,15 @@ export default function EventDetailPage() {
                       <span className="font-semibold w-36 flex-shrink-0 truncate text-gray-900">{guest.name}</span>
                       <div className="flex-1 flex flex-wrap gap-1.5">
                         {guest.items.map((item, i) => {
+                          const guestRow = guests.find(g => g.id === guest.guestId)
+                          const nightsMismatch = guestRow ? item.nights !== guestRow.nights_count : false
                           const pill = (
                             <>
                               {item.type === 'monitor' ? '📺' : item.type === 'pc' ? '💻' : '🎮'}
                               {item.qty > 1 ? `${item.qty}× ` : ''}{item.name}
-                              <span className="text-[10px] opacity-70">· {item.nights}n</span>
+                              {nightsMismatch && (
+                                <span className="text-[10px] opacity-70">· {item.nights}n</span>
+                              )}
                             </>
                           )
                           const style = item.type === 'monitor'
@@ -2468,9 +2539,23 @@ export default function EventDetailPage() {
 
               {(() => {
                 const guestHw = getGuestHardware(editingGuestModal.id)
+                const isAddingForThisGuest = addHwGuestId === editingGuestModal.id
+                const availableHw = hardwareItems.filter(h => h.is_available !== false)
                 return (
                   <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">HW rezervace</label>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider">HW rezervace</label>
+                      {!isAddingForThisGuest && (
+                        <button
+                          type="button"
+                          onClick={() => openAddHw(editingGuestModal)}
+                          className="text-xs font-semibold text-blue-600 hover:text-blue-700 inline-flex items-center gap-1"
+                        >
+                          + Přidat HW
+                        </button>
+                      )}
+                    </div>
+
                     {guestHw.length === 0 ? (
                       <p className="text-xs text-gray-400 italic">Host nemá žádné HW rezervace.</p>
                     ) : (
@@ -2498,6 +2583,68 @@ export default function EventDetailPage() {
                         ))}
                       </div>
                     )}
+
+                    {isAddingForThisGuest && (
+                      <div className="mt-2 p-3 rounded-lg border border-blue-200 bg-blue-50/30 space-y-2">
+                        <select
+                          value={addHwItemId}
+                          onChange={e => setAddHwItemId(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">— Vyber HW —</option>
+                          {availableHw.map(h => (
+                            <option key={h.id} value={h.id}>
+                              {h.type === 'pc' ? '💻 ' : h.type === 'monitor' ? '📺 ' : '🎮 '}{h.name}
+                              {h.price_per_night > 0 ? ` (${h.price_per_night} Kč/n)` : ''}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Množství</label>
+                            <input
+                              type="number"
+                              min={1}
+                              value={addHwQty}
+                              onChange={e => setAddHwQty(e.target.value)}
+                              className="w-full px-3 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Noci</label>
+                            <input
+                              type="number"
+                              min={1}
+                              value={addHwNights}
+                              onChange={e => setAddHwNights(e.target.value)}
+                              className="w-full px-3 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                        </div>
+                        {addHwError && (
+                          <p className="text-xs text-red-700">{addHwError}</p>
+                        )}
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={closeAddHw}
+                            className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-100"
+                          >
+                            Zrušit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleAddHw}
+                            disabled={addingHw}
+                            className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 inline-flex items-center gap-1.5"
+                          >
+                            {addingHw ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                            Přidat
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     <p className="text-[11px] text-gray-400 mt-1.5">Klikni na položku pro úpravu nebo smazání. Při změně počtu nocí výše se HW automaticky synchronizuje.</p>
                   </div>
                 )
