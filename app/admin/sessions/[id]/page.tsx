@@ -1668,9 +1668,9 @@ export default function EventDetailPage() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
-                          {guest.check_in_date ? formatDateOnly(new Date(guest.check_in_date)) : '—'}
+                          {guest.check_in_date ? new Date(guest.check_in_date).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' }) : '—'}
                           {' → '}
-                          {guest.check_out_date ? formatDateOnly(new Date(guest.check_out_date)) : '—'}
+                          {guest.check_out_date ? new Date(guest.check_out_date).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' }) : '—'}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap gap-1 max-w-xs">
