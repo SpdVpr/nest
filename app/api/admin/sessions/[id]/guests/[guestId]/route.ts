@@ -97,8 +97,8 @@ export async function PATCH(
         const batch = db.batch()
         batch.update(db.collection('guests').doc(guestId), updateData)
 
-        // Recalculate hardware reservations whose nights_count was tracking the guest default.
-        // Reservations the user explicitly set to a different value are left alone.
+        // Sync all active hardware reservations for this guest to the new nights count.
+        // Admin's authoritative change to the guest's stay always wins over per-item overrides.
         let hardwareUpdated = 0
         if (newNights !== null && newNights !== oldNights) {
             const hwSnapshot = await db.collection('hardware_reservations')
@@ -109,7 +109,7 @@ export async function PATCH(
             await Promise.all(
                 hwSnapshot.docs.map(async (resDoc) => {
                     const resData = resDoc.data()
-                    if ((resData.nights_count ?? 1) !== oldNights) return
+                    if ((resData.nights_count ?? 1) === newNights) return
 
                     const hwDoc = await db.collection('hardware_items').doc(resData.hardware_item_id).get()
                     if (!hwDoc.exists) return

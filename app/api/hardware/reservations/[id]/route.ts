@@ -11,7 +11,7 @@ export async function PATCH(
     const db = getFirebaseAdminDb()
     const { id } = await params
     const body = await request.json()
-    const { status, nights_count } = body
+    const { status, nights_count, quantity } = body
 
     const docRef = db.collection('hardware_reservations').doc(id)
     const currentDoc = await docRef.get()
@@ -20,6 +20,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Reservation not found' }, { status: 404 })
     }
 
+    const currentData = currentDoc.data()
     const updateData: any = {
       updated_at: Timestamp.now(),
     }
@@ -32,23 +33,37 @@ export async function PATCH(
       updateData.status = status
     }
 
-    // Update nights_count if provided
+    let newNights: number | null = null
     if (nights_count !== undefined) {
-      if (typeof nights_count !== 'number' || nights_count < 1) {
+      const parsed = typeof nights_count === 'number' ? nights_count : parseInt(nights_count)
+      if (isNaN(parsed) || parsed < 1) {
         return NextResponse.json({ error: 'Invalid nights_count' }, { status: 400 })
       }
+      newNights = parsed
+      updateData.nights_count = parsed
+    }
 
-      // Get hardware item to recalculate price
-      const currentData = currentDoc.data()
+    let newQuantity: number | null = null
+    if (quantity !== undefined) {
+      const parsed = typeof quantity === 'number' ? quantity : parseInt(quantity)
+      if (isNaN(parsed) || parsed < 1) {
+        return NextResponse.json({ error: 'Invalid quantity' }, { status: 400 })
+      }
+      newQuantity = parsed
+      updateData.quantity = parsed
+    }
+
+    // Recalculate total_price if nights or quantity changed
+    if (newNights !== null || newQuantity !== null) {
       const hardwareDoc = await db.collection('hardware_items').doc(currentData.hardware_item_id).get()
-
       if (!hardwareDoc.exists) {
         return NextResponse.json({ error: 'Hardware item not found' }, { status: 404 })
       }
-
       const hardwareData = hardwareDoc.data()
-      updateData.nights_count = nights_count
-      updateData.total_price = hardwareData.price_per_night * nights_count
+      const pricePerNight = hardwareData.price_per_night || 0
+      const finalNights = newNights ?? currentData.nights_count ?? 1
+      const finalQuantity = newQuantity ?? currentData.quantity ?? 1
+      updateData.total_price = pricePerNight * finalNights * finalQuantity
     }
 
     await docRef.update(updateData)

@@ -116,6 +116,12 @@ export default function EventDetailPage() {
   const [editGuestDietaryNote, setEditGuestDietaryNote] = useState('')
   const [savingGuest, setSavingGuest] = useState(false)
   const [editGuestError, setEditGuestError] = useState('')
+  // Edit HW reservation state
+  const [editingHwRes, setEditingHwRes] = useState<HardwareReservation | null>(null)
+  const [editHwQty, setEditHwQty] = useState('')
+  const [editHwNights, setEditHwNights] = useState('')
+  const [savingHw, setSavingHw] = useState(false)
+  const [editHwError, setEditHwError] = useState('')
   // Broadcast state
   const [broadcastBody, setBroadcastBody] = useState('')
   const [broadcastType, setBroadcastType] = useState<'info' | 'food' | 'urgent' | 'fun'>('info')
@@ -226,6 +232,77 @@ export default function EventDetailPage() {
       setEditGuestError('Chyba při ukládání')
     } finally {
       setSavingGuest(false)
+    }
+  }
+
+  const openEditHw = (res: HardwareReservation) => {
+    setEditingHwRes(res)
+    setEditHwQty(String(res.quantity || 1))
+    setEditHwNights(String(res.nights_count || 1))
+    setEditHwError('')
+  }
+
+  const closeEditHw = () => {
+    setEditingHwRes(null)
+    setEditHwError('')
+  }
+
+  const handleSaveHw = async () => {
+    if (!editingHwRes) return
+    const qty = parseInt(editHwQty)
+    const nights = parseInt(editHwNights)
+    if (isNaN(qty) || qty < 1) {
+      setEditHwError('Množství musí být alespoň 1')
+      return
+    }
+    if (isNaN(nights) || nights < 1) {
+      setEditHwError('Počet nocí musí být alespoň 1')
+      return
+    }
+    setSavingHw(true)
+    setEditHwError('')
+    try {
+      const res = await fetch(`/api/hardware/reservations/${editingHwRes.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quantity: qty, nights_count: nights }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setEditHwError(data.error || 'Chyba při ukládání')
+        return
+      }
+      setEditingHwRes(null)
+      await fetchEventData()
+    } catch (err) {
+      console.error('Error saving HW reservation:', err)
+      setEditHwError('Chyba při ukládání')
+    } finally {
+      setSavingHw(false)
+    }
+  }
+
+  const handleDeleteHw = async () => {
+    if (!editingHwRes) return
+    if (!confirm('Opravdu chcete smazat tuto HW rezervaci?')) return
+    setSavingHw(true)
+    setEditHwError('')
+    try {
+      const res = await fetch(`/api/hardware/reservations/${editingHwRes.id}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setEditHwError(data.error || 'Chyba při mazání')
+        return
+      }
+      setEditingHwRes(null)
+      await fetchEventData()
+    } catch (err) {
+      console.error('Error deleting HW reservation:', err)
+      setEditHwError('Chyba při mazání')
+    } finally {
+      setSavingHw(false)
     }
   }
 
@@ -1638,7 +1715,7 @@ export default function EventDetailPage() {
         {/* Hardware Reservations - grouped by guest */}
         {reservations.length > 0 && (() => {
           // Group reservations by guest
-          const guestHwMap: Record<string, { guestId: string; name: string; items: { name: string; type: string; qty: number; nights: number; price: number }[] }> = {}
+          const guestHwMap: Record<string, { guestId: string; name: string; items: { reservation: HardwareReservation; name: string; type: string; qty: number; nights: number; price: number }[] }> = {}
           reservations.forEach(r => {
             const gid = r.guest_id
             if (!guestHwMap[gid]) {
@@ -1646,6 +1723,7 @@ export default function EventDetailPage() {
             }
             const hw = hardwareItems.find(h => h.id === r.hardware_item_id)
             guestHwMap[gid].items.push({
+              reservation: r,
               name: hw?.name || 'Neznámý HW',
               type: hw?.type || 'accessory',
               qty: r.quantity || 1,
@@ -1687,20 +1765,39 @@ export default function EventDetailPage() {
                       </button>
                       <span className="font-semibold w-36 flex-shrink-0 truncate text-gray-900">{guest.name}</span>
                       <div className="flex-1 flex flex-wrap gap-1.5">
-                        {guest.items.map((item, i) => (
-                          <span
-                            key={i}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
-                            style={item.type === 'monitor'
-                              ? { backgroundColor: 'rgba(249, 115, 22, 0.12)', color: '#fb923c', border: '1px solid rgba(249, 115, 22, 0.25)' }
-                              : item.type === 'pc'
-                                ? { backgroundColor: 'rgba(59, 130, 246, 0.12)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.25)' }
-                                : { backgroundColor: 'rgba(168, 85, 247, 0.12)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.25)' }}
-                          >
-                            {item.type === 'monitor' ? '📺' : item.type === 'pc' ? '💻' : '🎮'}
-                            {item.qty > 1 ? `${item.qty}× ` : ''}{item.name}
-                          </span>
-                        ))}
+                        {guest.items.map((item, i) => {
+                          const pill = (
+                            <>
+                              {item.type === 'monitor' ? '📺' : item.type === 'pc' ? '💻' : '🎮'}
+                              {item.qty > 1 ? `${item.qty}× ` : ''}{item.name}
+                              <span className="text-[10px] opacity-70">· {item.nights}n</span>
+                            </>
+                          )
+                          const style = item.type === 'monitor'
+                            ? { backgroundColor: 'rgba(249, 115, 22, 0.12)', color: '#fb923c', border: '1px solid rgba(249, 115, 22, 0.25)' }
+                            : item.type === 'pc'
+                              ? { backgroundColor: 'rgba(59, 130, 246, 0.12)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.25)' }
+                              : { backgroundColor: 'rgba(168, 85, 247, 0.12)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.25)' }
+                          return showEdit ? (
+                            <button
+                              key={i}
+                              onClick={() => openEditHw(item.reservation)}
+                              title="Upravit HW rezervaci"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium hover:opacity-80 cursor-pointer transition-opacity"
+                              style={style}
+                            >
+                              {pill}
+                            </button>
+                          ) : (
+                            <span
+                              key={i}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
+                              style={style}
+                            >
+                              {pill}
+                            </span>
+                          )
+                        })}
                       </div>
                       {showFinances && <span className="flex-shrink-0 font-bold text-gray-900 text-sm">{Number(guestTotal).toLocaleString('cs-CZ')} Kč</span>}
                     </div>
@@ -2148,6 +2245,93 @@ export default function EventDetailPage() {
           </div>
         </div>
       )}
+
+      {editingHwRes && (() => {
+        const hw = hardwareItems.find(h => h.id === editingHwRes.hardware_item_id)
+        const guestName = getGuestName(editingHwRes.guest_id)
+        const pricePerNight = (hw as any)?.price_per_night || 0
+        const previewQty = parseInt(editHwQty) || 0
+        const previewNights = parseInt(editHwNights) || 0
+        const previewTotal = pricePerNight * previewQty * previewNights
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={closeEditHw}>
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+            <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+              <div className="px-5 py-3 bg-gradient-to-r from-blue-600 to-blue-700 flex items-center justify-between">
+                <div className="min-w-0">
+                  <h2 className="text-sm font-bold text-white truncate">{hw?.name || 'HW rezervace'}</h2>
+                  <p className="text-[11px] text-white/60 truncate">{guestName}</p>
+                </div>
+                <button onClick={closeEditHw} className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors flex-shrink-0">
+                  <X className="w-3.5 h-3.5 text-white" />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Množství</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={editHwQty}
+                      onChange={e => setEditHwQty(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Noci</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={editHwNights}
+                      onChange={e => setEditHwNights(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                {pricePerNight > 0 && (
+                  <div className="px-3 py-2 rounded-lg bg-gray-50 text-xs text-gray-600 flex items-center justify-between">
+                    <span>{pricePerNight} Kč × {previewQty} × {previewNights} nocí</span>
+                    <span className="font-bold text-gray-900">{previewTotal.toLocaleString('cs-CZ')} Kč</span>
+                  </div>
+                )}
+
+                {editHwError && (
+                  <div className="px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+                    {editHwError}
+                  </div>
+                )}
+              </div>
+
+              <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between gap-2">
+                <button
+                  onClick={handleDeleteHw}
+                  disabled={savingHw}
+                  className="px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Smazat
+                </button>
+                <div className="flex items-center gap-2">
+                  <button onClick={closeEditHw} className="px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">
+                    Zrušit
+                  </button>
+                  <button
+                    onClick={handleSaveHw}
+                    disabled={savingHw}
+                    className="px-4 py-2 rounded-lg text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                  >
+                    {savingHw ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                    Uložit
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {editingGuestModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={closeEditGuest}>
