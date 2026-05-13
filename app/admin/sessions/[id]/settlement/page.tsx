@@ -253,6 +253,11 @@ export default function SettlementPage() {
         return Math.max(0, afterDeposit)
     }
 
+    const isCashSettlement = (guestId: string): boolean => {
+        const settlement = getSettlement(guestId)
+        return settlement.payment_method === 'cash' && !!settlement.qr_generated_at
+    }
+
     // Start editing a line item
     const startEditItem = (guestId: string, key: string, currentValue: number) => {
         setEditingItemKey(`${guestId}:${key}`)
@@ -528,7 +533,7 @@ export default function SettlementPage() {
         for (let i = 0; i < guests.length; i++) {
             const guest = guests[i]
             const settlement = getSettlement(guest.id)
-            if (settlement.status !== 'paid') {
+            if (settlement.status !== 'paid' && !isCashSettlement(guest.id)) {
                 await settlementAction(guest.id, 'generate_qr')
             }
         }
@@ -540,7 +545,7 @@ export default function SettlementPage() {
             const guest = guests[i]
             if (selectedGuests.has(guest.id)) {
                 const settlement = getSettlement(guest.id)
-                if (settlement.status !== 'paid') {
+                if (settlement.status !== 'paid' && !isCashSettlement(guest.id)) {
                     await settlementAction(guest.id, 'generate_qr')
                 }
             }
@@ -563,10 +568,11 @@ export default function SettlementPage() {
 
     // Select/deselect all
     const toggleSelectAll = () => {
-        if (selectedGuests.size === guests.filter(g => getSettlement(g.id).status !== 'paid').length) {
+        const selectableGuests = guests.filter(g => getSettlement(g.id).status !== 'paid' && !isCashSettlement(g.id))
+        if (selectedGuests.size === selectableGuests.length) {
             setSelectedGuests(new Set())
         } else {
-            setSelectedGuests(new Set(guests.filter(g => getSettlement(g.id).status !== 'paid').map(g => g.id)))
+            setSelectedGuests(new Set(selectableGuests.map(g => g.id)))
         }
     }
 
@@ -725,6 +731,29 @@ export default function SettlementPage() {
     const pendingCount = guests.filter(g => getSettlement(g.id).status === 'pending').length
     const paidCount = guests.filter(g => getSettlement(g.id).status === 'paid').length
     const totalRemaining = totalToCollect - totalPaid
+    const paymentSummary = guests.reduce(
+        (acc, guest) => {
+            const method = isCashSettlement(guest.id) ? 'cash' : 'bank'
+            acc[method].count += 1
+            acc[method].total += getFinalTotal(guest)
+            return acc
+        },
+        {
+            bank: { count: 0, total: 0 },
+            cash: { count: 0, total: 0 },
+        }
+    )
+    const hardwareTypeTotals = guests.reduce(
+        (acc, guest) => {
+            guest.hardware.forEach((item, idx) => {
+                const value = getItemValue(guest.id, `hardware-${idx}`, item.totalPrice)
+                if (item.type === 'pc') acc.pc += value
+                if (item.type === 'monitor') acc.monitor += value
+            })
+            return acc
+        },
+        { pc: 0, monitor: 0 }
+    )
 
     const getStatusBadge = (status: string) => {
         switch (status) {
@@ -873,7 +902,7 @@ export default function SettlementPage() {
                 <div className="bg-white rounded-xl shadow">
                     <button
                         onClick={() => setShowStats(!showStats)}
-                        className="w-full px-5 py-3 flex items-center justify-between text-left hover:bg-gray-50 transition-colors rounded-xl"
+                        className="w-full px-5 py-3 flex items-center justify-between text-left rounded-xl"
                     >
                         <div className="flex items-center gap-2">
                             <BarChart3 className="w-5 h-5 text-blue-600" />
@@ -904,6 +933,24 @@ export default function SettlementPage() {
                                 <p className="text-xs text-red-600 uppercase font-medium">Zbývá vybrat</p>
                                 <p className="text-2xl font-bold text-red-600">{totalRemaining.toLocaleString('cs-CZ')} Kč</p>
                             </div>
+                            <div className="bg-blue-50 rounded-xl p-4">
+                                <p className="text-xs text-blue-700 uppercase font-medium">Platba na účet</p>
+                                <p className="text-2xl font-bold text-blue-700">{paymentSummary.bank.total.toLocaleString('cs-CZ')} Kč</p>
+                                <p className="text-xs text-blue-500">{paymentSummary.bank.count} hostů</p>
+                            </div>
+                            <div className="bg-emerald-50 rounded-xl p-4">
+                                <p className="text-xs text-emerald-700 uppercase font-medium">Platba hotově</p>
+                                <p className="text-2xl font-bold text-emerald-700">{paymentSummary.cash.total.toLocaleString('cs-CZ')} Kč</p>
+                                <p className="text-xs text-emerald-500">{paymentSummary.cash.count} hostů</p>
+                            </div>
+                            <div className="bg-purple-50 rounded-xl p-4">
+                                <p className="text-xs text-purple-700 uppercase font-medium">PC celkem</p>
+                                <p className="text-2xl font-bold text-purple-700">{hardwareTypeTotals.pc.toLocaleString('cs-CZ')} Kč</p>
+                            </div>
+                            <div className="bg-indigo-50 rounded-xl p-4">
+                                <p className="text-xs text-indigo-700 uppercase font-medium">Monitory celkem</p>
+                                <p className="text-2xl font-bold text-indigo-700">{hardwareTypeTotals.monitor.toLocaleString('cs-CZ')} Kč</p>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -915,7 +962,7 @@ export default function SettlementPage() {
                             onClick={toggleSelectAll}
                             className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
                         >
-                            {selectedGuests.size === guests.filter(g => getSettlement(g.id).status !== 'paid').length && selectedGuests.size > 0 ? (
+                            {selectedGuests.size === guests.filter(g => getSettlement(g.id).status !== 'paid' && !isCashSettlement(g.id)).length && selectedGuests.size > 0 ? (
                                 <CheckSquare className="w-4 h-4 text-blue-600" />
                             ) : (
                                 <Square className="w-4 h-4" />
@@ -999,6 +1046,12 @@ export default function SettlementPage() {
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-3">
+                                        {isCashSettlement(guest.id) && (
+                                            <span className="px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 bg-emerald-100 text-emerald-700">
+                                                <Banknote className="w-3.5 h-3.5" />
+                                                Hotově
+                                            </span>
+                                        )}
                                         <span className={`text-xl font-bold ${settlement.status === 'paid' ? 'text-green-600' : 'text-gray-900'
                                             }`}>
                                             {finalTotal.toLocaleString('cs-CZ')} Kč

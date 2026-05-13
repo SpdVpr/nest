@@ -82,6 +82,7 @@ export default function EventChecklist({
                 icon: BedDouble,
                 href: `/event/${slug}/accommodation`,
                 done: !!roomSelected,
+                hidden: session.accommodation_enabled === false,
             },
             {
                 id: 'games',

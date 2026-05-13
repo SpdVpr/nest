@@ -26,6 +26,14 @@ interface MealTemplate {
     allergens: string[]
 }
 
+interface MenuGuest {
+    id: string
+    name: string
+    nights_count?: number
+    check_in_date?: string | null
+    check_out_date?: string | null
+}
+
 const MEAL_TYPE_LABELS: Record<MealType, string> = {
     breakfast: '🌅 Snídaně',
     lunch: '☀️ Oběd',
@@ -35,7 +43,7 @@ const MEAL_TYPE_LABELS: Record<MealType, string> = {
 const MEAL_TYPE_DEFAULTS: Record<MealType, string> = {
     breakfast: '10:00',
     lunch: '15:00',
-    dinner: '21:00',
+    dinner: '20:00',
 }
 
 const MEAL_ORDER: Record<MealType, number> = {
@@ -57,6 +65,7 @@ export default function MenuEditorPage() {
     const [isAuthenticated, setIsAuthenticated] = useState(false)
     const [hasChanges, setHasChanges] = useState(false)
     const [mealTemplates, setMealTemplates] = useState<MealTemplate[]>([])
+    const [guests, setGuests] = useState<MenuGuest[]>([])
 
     useEffect(() => {
         const token = localStorage.getItem('admin_token')
@@ -95,6 +104,7 @@ export default function MenuEditorPage() {
                     _localId: item._localId || genLocalId(),
                 }))
                 setMenuItems(itemsWithIds)
+                setGuests(data.guests || [])
             }
 
             // Fetch meal templates
@@ -142,6 +152,30 @@ export default function MenuEditorPage() {
         return menuItems
             .filter(item => item.day_index === dayIndex)
             .sort((a, b) => (a.order || 0) - (b.order || 0))
+    }
+
+    const getGuestsCountForDay = (date: Date): number => {
+        const dayStart = new Date(date)
+        dayStart.setHours(0, 0, 0, 0)
+        const dayEnd = new Date(date)
+        dayEnd.setHours(23, 59, 59, 999)
+
+        return guests.filter(guest => {
+            if (!guest.check_in_date && !guest.check_out_date) return true
+
+            const checkIn = guest.check_in_date ? new Date(guest.check_in_date) : null
+            const checkOut = guest.check_out_date ? new Date(guest.check_out_date) : null
+            if (checkIn) checkIn.setHours(0, 0, 0, 0)
+            if (checkOut) checkOut.setHours(23, 59, 59, 999)
+
+            return (!checkIn || checkIn <= dayEnd) && (!checkOut || checkOut >= dayStart)
+        }).length
+    }
+
+    const formatPeopleCount = (count: number): string => {
+        if (count === 1) return '1 osoba'
+        if (count >= 2 && count <= 4) return `${count} osoby`
+        return `${count} lidí`
     }
 
     const addMeal = (dayIndex: number, mealType: MealType) => {
@@ -362,13 +396,19 @@ export default function MenuEditorPage() {
                         ) : (
                             days.map((day) => {
                                 const dayMeals = getMealsForDay(day.dayIndex)
+                                const peopleCount = getGuestsCountForDay(day.date)
                                 return (
                                     <div key={day.dayIndex} className="bg-white rounded-xl shadow overflow-hidden">
                                         {/* Day Header */}
                                         <div className="px-6 py-4 flex items-center justify-between" style={{ background: 'linear-gradient(to right, rgba(249, 115, 22, 0.12), rgba(251, 191, 36, 0.08))', borderBottom: '1px solid rgba(249, 115, 22, 0.2)' }}>
-                                            <h2 className="text-lg font-bold" style={{ color: 'var(--nest-text-primary)' }}>
-                                                📅 {day.label}
-                                            </h2>
+                                            <div>
+                                                <h2 className="text-lg font-bold" style={{ color: 'var(--nest-text-primary)' }}>
+                                                    📅 {day.label}
+                                                </h2>
+                                                <p className="text-sm mt-0.5" style={{ color: 'var(--nest-text-secondary)' }}>
+                                                    {formatPeopleCount(peopleCount)} v tento den
+                                                </p>
+                                            </div>
                                             <button
                                                 onClick={() => addQuickDayMeals(day.dayIndex)}
                                                 className="text-sm font-medium px-3 py-1 rounded-lg transition-colors"

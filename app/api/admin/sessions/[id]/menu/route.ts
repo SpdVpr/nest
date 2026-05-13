@@ -22,9 +22,15 @@ export async function GET(
         const { id } = await context.params
         const db = getFirebaseAdminDb()
 
-        const snapshot = await db.collection('menu_items')
-            .where('session_id', '==', id)
-            .get()
+        const [snapshot, guestsSnapshot] = await Promise.all([
+            db.collection('menu_items')
+                .where('session_id', '==', id)
+                .get(),
+            db.collection('guests')
+                .where('session_id', '==', id)
+                .where('is_active', '==', true)
+                .get(),
+        ])
 
         const items = snapshot.docs.map(doc => {
             const data = doc.data()
@@ -41,7 +47,18 @@ export async function GET(
             return (a.order || 0) - (b.order || 0)
         })
 
-        return NextResponse.json({ items })
+        const guests = guestsSnapshot.docs.map(doc => {
+            const data = doc.data()
+            return {
+                id: doc.id,
+                name: data.name,
+                nights_count: data.nights_count || 0,
+                check_in_date: data.check_in_date?.toDate?.()?.toISOString() || data.check_in_date || null,
+                check_out_date: data.check_out_date?.toDate?.()?.toISOString() || data.check_out_date || null,
+            }
+        })
+
+        return NextResponse.json({ items, guests })
     } catch (error) {
         console.error('Error fetching menu items:', error)
         return NextResponse.json(

@@ -279,12 +279,12 @@ export default function EventPage() {
       label: 'Místa',
       desc: 'Zasedací pořádek',
     }] : []),
-    {
+    ...(session.accommodation_enabled !== false ? [{
       href: `/event/${slug}/accommodation`,
       icon: BedDouble,
       label: 'Ubytování',
       desc: 'Výběr pokoje',
-    },
+    }] : []),
     ...(session.menu_enabled ? [{
       href: `/event/${slug}/menu`,
       icon: UtensilsCrossed,

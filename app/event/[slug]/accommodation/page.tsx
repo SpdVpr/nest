@@ -101,6 +101,18 @@ export default function AccommodationPage() {
   const totalBeds = ROOMS.reduce((sum, r) => sum + r.beds, 0)
   const totalOccupied = guests.filter(g => g.room).length
 
+  if (session?.accommodation_enabled === false) {
+    return (
+      <NestPage sessionSlug={slug} backHref={`/event/${slug}`} title="Ubytování" maxWidth="max-w-2xl">
+        <div className="nest-card-elevated p-6 mt-4 text-center">
+          <BedDouble className="w-10 h-10 mx-auto mb-3 text-[var(--nest-white-40)]" />
+          <h1 className="text-xl font-bold mb-2">Výběr pokojů je vypnutý</h1>
+          <p className="text-sm text-[var(--nest-white-60)]">Organizátor pro tuto akci výběr ubytování nepovolil.</p>
+        </div>
+      </NestPage>
+    )
+  }
+
   return (
     <NestPage sessionSlug={slug} backHref={`/event/${slug}`} title="Ubytování" maxWidth="max-w-2xl">
       <div className="nest-card-elevated p-6 mt-4">

@@ -249,7 +249,7 @@ function AdminSessionsPageInner() {
       items.push({
         day_index: day.dayIndex,
         meal_type: 'dinner',
-        time: '21:00',
+        time: '20:00',
         description: '',
         order: 2,
       })

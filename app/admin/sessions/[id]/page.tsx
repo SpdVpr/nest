@@ -85,7 +85,7 @@ export default function EventDetailPage() {
   const [editHwPricingEnabled, setEditHwPricingEnabled] = useState(true)
   const [editHwEnabled, setEditHwEnabled] = useState(true)
   const [editSeatsEnabled, setEditSeatsEnabled] = useState(true)
-  const [editAccommodationEnabled, setEditAccommodationEnabled] = useState(false)
+  const [editAccommodationEnabled, setEditAccommodationEnabled] = useState(true)
   const [editHwOverrides, setEditHwOverrides] = useState<Record<string, HardwareOverride>>({})
   const [allHardwareItemsForEdit, setAllHardwareItemsForEdit] = useState<AdminHardwareItemDetail[]>([])
   const [showHwConfigEdit, setShowHwConfigEdit] = useState(false)
@@ -479,13 +479,24 @@ export default function EventDetailPage() {
     setEditHwPricingEnabled(sessionToEdit.hardware_pricing_enabled !== false)
     setEditHwEnabled((sessionToEdit as any).hardware_enabled !== false)
     setEditSeatsEnabled((sessionToEdit as any).seats_enabled !== false)
-    setEditAccommodationEnabled((sessionToEdit as any).accommodation_enabled || false)
+    setEditAccommodationEnabled((sessionToEdit as any).accommodation_enabled !== false)
     setEditHwOverrides(sessionToEdit.hardware_overrides || {})
     setShowHwConfigEdit(false)
     setEditTopProducts((sessionToEdit as any).top_products || [])
     // Fetch HW items for override UI
     fetchHardwareItemsForEdit()
     fetchAllProducts()
+  }
+
+  const toggleEditEvent = () => {
+    if (editingEvent) {
+      setEditingEvent(false)
+      return
+    }
+
+    if (session) {
+      startEditEvent(session)
+    }
   }
 
   const fetchHardwareItemsForEdit = async () => {
@@ -919,19 +930,7 @@ export default function EventDetailPage() {
             </div>
             {showEdit && (
               <button
-                onClick={() => {
-                  setEditingEvent(!editingEvent)
-                  if (!editingEvent) {
-                    setEditEventName(session.name)
-                    setEditEventStartDate(session.start_date?.split('T')[0] || '')
-                    setEditEventEndDate(session.end_date?.split('T')[0] || '')
-                    setEditEventStartTime(session.start_time || '')
-                    setEditEventEndTime(session.end_time || '')
-                    setEditEventDescription(session.description || '')
-                    setEditPricePerNight((session.price_per_night || 0).toString())
-                    setEditSurchargeEnabled(session.surcharge_enabled === true)
-                  }
-                }}
+                onClick={toggleEditEvent}
                 className="text-sm text-blue-600 hover:text-blue-700 font-medium flex-shrink-0 hidden sm:inline-flex items-center gap-1"
               >
                 <Edit className="w-4 h-4" />
@@ -988,19 +987,7 @@ export default function EventDetailPage() {
             </Link>
             {showEdit && (
               <button
-                onClick={() => {
-                  setEditingEvent(!editingEvent)
-                  if (!editingEvent) {
-                    setEditEventName(session.name)
-                    setEditEventStartDate(session.start_date?.split('T')[0] || '')
-                    setEditEventEndDate(session.end_date?.split('T')[0] || '')
-                    setEditEventStartTime(session.start_time || '')
-                    setEditEventEndTime(session.end_time || '')
-                    setEditEventDescription(session.description || '')
-                    setEditPricePerNight((session.price_per_night || 0).toString())
-                    setEditSurchargeEnabled(session.surcharge_enabled === true)
-                  }
-                }}
+                onClick={toggleEditEvent}
                 className="sm:hidden inline-flex items-center gap-1.5 px-3 py-2 text-blue-600 hover:text-blue-700 font-medium text-sm"
               >
                 <Edit className="w-4 h-4" />
