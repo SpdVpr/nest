@@ -452,47 +452,78 @@ export default function EventPage() {
         />
       )}
 
-      {/* REGISTRATION — Dominant CTA (hide if user already has claimed guest) */}
+      {/* ACCOUNT CTAs — prominent for non-authenticated users (account first, then event registration) */}
+      {!isAuthenticated && (
+        <div className="mb-4">
+          <div className="mb-3 px-3 py-2.5 rounded-xl flex items-start gap-2.5" style={{ backgroundColor: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+            <Sparkles className="w-4 h-4 text-[var(--nest-yellow)] mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-xs font-semibold text-[var(--nest-yellow)]">Doporučujeme: nejdřív si vytvoř účet</p>
+              <p className="text-[11px] text-[var(--nest-white-60)] mt-0.5">Uchováš si historii, oblíbence i rychlejší registraci na další akce.</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <Link
+              href={`/auth/login?mode=register&redirect=/event/${slug}/register`}
+              className="group block"
+            >
+              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[var(--nest-yellow-dark)] to-[var(--nest-yellow)] p-4 nest-glow transition-all duration-300 group-hover:scale-[1.02] h-full">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[var(--nest-dark)]/20 flex items-center justify-center flex-shrink-0">
+                    <UserPlus className="w-5 h-5 text-[var(--nest-dark)]" />
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="text-sm font-bold text-[var(--nest-dark)]">Vytvořit účet</h2>
+                    <p className="text-[11px] text-[var(--nest-dark)]/70 leading-tight">Registrace zdarma</p>
+                  </div>
+                </div>
+              </div>
+            </Link>
+
+            <Link
+              href={`/auth/login?redirect=/event/${slug}/register`}
+              className="group block"
+            >
+              <div className="relative overflow-hidden rounded-2xl p-4 transition-all duration-300 group-hover:scale-[1.02] h-full" style={{ backgroundColor: 'var(--nest-surface)', border: '1px solid var(--nest-border)' }}>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)' }}>
+                    <LogIn className="w-5 h-5 text-[var(--nest-yellow)]" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-bold text-[var(--nest-white)]">Přihlásit se</h3>
+                    <p className="text-[11px] text-[var(--nest-white-40)] leading-tight">Mám účet</p>
+                  </div>
+                </div>
+              </div>
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* REGISTRATION — CTA (hide if user already has claimed guest) */}
       {!claimedGuest && (
         <Link
           href={`/event/${slug}/register`}
           className="block mb-4 group"
         >
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[var(--nest-yellow-dark)] to-[var(--nest-yellow)] p-5 nest-glow transition-all duration-300 group-hover:scale-[1.02]">
+          <div
+            className={`relative overflow-hidden rounded-2xl p-5 transition-all duration-300 group-hover:scale-[1.02] ${isAuthenticated ? 'bg-gradient-to-r from-[var(--nest-yellow-dark)] to-[var(--nest-yellow)] nest-glow' : ''}`}
+            style={!isAuthenticated ? { backgroundColor: 'var(--nest-surface)', border: '1px solid var(--nest-border)' } : undefined}
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-[var(--nest-dark)]/20 flex items-center justify-center">
-                  <UserPlus className="w-6 h-6 text-[var(--nest-dark)]" />
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isAuthenticated ? 'bg-[var(--nest-dark)]/20' : ''}`} style={!isAuthenticated ? { backgroundColor: 'rgba(245, 158, 11, 0.1)' } : undefined}>
+                  <UserPlus className={`w-6 h-6 ${isAuthenticated ? 'text-[var(--nest-dark)]' : 'text-[var(--nest-yellow)]'}`} />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-[var(--nest-dark)]">Registrace na akci</h2>
-                  <p className="text-sm text-[var(--nest-dark)]/70">Zaregistruj se a vyber si svůj termín</p>
+                  <h2 className={`text-lg font-bold ${isAuthenticated ? 'text-[var(--nest-dark)]' : 'text-[var(--nest-white)]'}`}>Registrace na akci</h2>
+                  <p className={`text-sm ${isAuthenticated ? 'text-[var(--nest-dark)]/70' : 'text-[var(--nest-white-40)]'}`}>
+                    {isAuthenticated ? 'Zaregistruj se a vyber si svůj termín' : 'Pokračovat bez účtu — jen nick'}
+                  </p>
                 </div>
               </div>
-              <ChevronRight className="w-6 h-6 text-[var(--nest-dark)]/60 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </Link>
-      )}
-
-      {/* LOGIN CTA — for users who aren't authenticated yet */}
-      {!isAuthenticated && (
-        <Link
-          href={`/auth/login?redirect=/event/${slug}`}
-          className="block mb-6 group"
-        >
-          <div className="relative overflow-hidden rounded-2xl p-4 transition-all duration-300 group-hover:scale-[1.01]" style={{ backgroundColor: 'var(--nest-surface)', border: '1px solid var(--nest-border)' }}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)' }}>
-                  <LogIn className="w-5 h-5 text-[var(--nest-yellow)]" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-[var(--nest-white)]">Přihlásit se</h3>
-                  <p className="text-xs text-[var(--nest-white-40)]">Propoj svůj účet a uchovej historii</p>
-                </div>
-              </div>
-              <ChevronRight className="w-5 h-5 text-[var(--nest-white-40)] group-hover:translate-x-1 transition-transform" />
+              <ChevronRight className={`w-6 h-6 group-hover:translate-x-1 transition-transform ${isAuthenticated ? 'text-[var(--nest-dark)]/60' : 'text-[var(--nest-white-40)]'}`} />
             </div>
           </div>
         </Link>

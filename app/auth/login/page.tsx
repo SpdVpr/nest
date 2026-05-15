@@ -31,7 +31,8 @@ export default function AuthLoginPage() {
 }
 
 function AuthLoginContent() {
-  const [mode, setMode] = useState<Mode>('login')
+  const initialMode = (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('mode') === 'register') ? 'register' : 'login'
+  const [mode, setMode] = useState<Mode>(initialMode as Mode)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')

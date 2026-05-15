@@ -288,22 +288,27 @@ export default function RegisterPage() {
             <label htmlFor="name" className="block text-xs font-medium text-[var(--nest-white-60)] mb-1.5">
               Tvoje jméno <span className="text-[var(--nest-error)]">*</span>
             </label>
-            {isAuthenticated && userProfile ? (
-              <div className="flex items-center gap-2 px-4 py-2.5 bg-[var(--nest-dark-3)] border border-[var(--nest-success)]/30 rounded-xl text-sm">
-                <span className="text-[var(--nest-white)] font-medium flex-1">{name}</span>
-                <span className="text-[10px] text-[var(--nest-success)] bg-[var(--nest-success)]/10 px-2 py-0.5 rounded-full">z profilu</span>
-              </div>
-            ) : (
+            <div className="relative">
               <input
                 type="text"
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Zadej své jméno"
-                className="w-full px-4 py-2.5 bg-[var(--nest-dark-3)] border border-[var(--nest-dark-4)] rounded-xl focus:ring-2 focus:ring-[var(--nest-yellow)]/50 focus:border-[var(--nest-yellow)]/50 text-[var(--nest-white)] placeholder-[var(--nest-white-40)] text-sm outline-none transition-all"
+                className={`w-full px-4 py-2.5 bg-[var(--nest-dark-3)] border rounded-xl focus:ring-2 focus:ring-[var(--nest-yellow)]/50 focus:border-[var(--nest-yellow)]/50 text-[var(--nest-white)] placeholder-[var(--nest-white-40)] text-sm outline-none transition-all ${isAuthenticated && userProfile && name === userProfile.display_name ? 'border-[var(--nest-success)]/30 pr-20' : 'border-[var(--nest-dark-4)]'}`}
                 disabled={submitting}
-                autoFocus
+                autoFocus={!isAuthenticated}
               />
+              {isAuthenticated && userProfile && name === userProfile.display_name && (
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-[var(--nest-success)] bg-[var(--nest-success)]/10 px-2 py-0.5 rounded-full pointer-events-none">
+                  z profilu
+                </span>
+              )}
+            </div>
+            {isAuthenticated && userProfile && (
+              <p className="text-[11px] text-[var(--nest-white-40)] mt-1.5">
+                Načteno z profilu — můžeš upravit pro tuto akci.
+              </p>
             )}
           </div>
 

@@ -218,6 +218,15 @@ export default function GuestsPage() {
                               {isCurrentGuest && (
                                 <UserCheck className="w-3 h-3 text-[var(--nest-success)]" />
                               )}
+                              {canEditGuest(guest) && guest.check_in_date && guest.check_out_date && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); openEditDays(guest) }}
+                                  className="p-1 rounded hover:bg-[var(--nest-yellow)]/10 transition-colors"
+                                  title="Změnit dny"
+                                >
+                                  <Pencil className="w-3 h-3 text-[var(--nest-yellow)]" />
+                                </button>
+                              )}
                             </div>
                           </td>
                           <td className="py-2.5 px-3 text-center text-xs text-[var(--nest-white-60)]">
