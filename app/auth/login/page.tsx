@@ -51,6 +51,12 @@ function AuthLoginContent() {
   const shouldUseRedirectFlow = isMobile
   const redirectProcessed = useRef(false)
 
+  const createGoogleProvider = () => {
+    const provider = new GoogleAuthProvider()
+    provider.setCustomParameters({ prompt: 'select_account' })
+    return provider
+  }
+
   // Save redirect target before OAuth redirect (so it survives the round-trip)
   const saveRedirectTarget = () => {
     if (typeof window !== 'undefined' && redirect) {
@@ -206,7 +212,7 @@ function AuthLoginContent() {
 
     try {
       const auth = await ensureFirebaseAuthPersistence()
-      const provider = new GoogleAuthProvider()
+      const provider = createGoogleProvider()
 
       if (shouldUseRedirectFlow) {
         // Redirect flow is still preferable on mobile where popups are fragile.
@@ -242,7 +248,7 @@ function AuthLoginContent() {
             return
           }
           const auth = await ensureFirebaseAuthPersistence()
-          const provider = new GoogleAuthProvider()
+          const provider = createGoogleProvider()
           saveRedirectTarget()
           await signInWithRedirect(auth, provider)
           return
