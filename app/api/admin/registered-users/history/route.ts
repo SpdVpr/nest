@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getFirebaseAdminDb } from '@/lib/firebase/admin'
 import { verifyAdminRequest } from '@/lib/verify-admin'
 import { getGuestsByUserId, getSessionById, getProductById } from '@/lib/firebase/queries'
+import { getRoundingTipFromAdjustments } from '@/lib/settlement-utils'
 
 // GET /api/admin/registered-users/history?uid=xxx - Get full event history for a user (admin only)
 export async function GET(request: NextRequest) {
@@ -67,9 +68,12 @@ export async function GET(request: NextRequest) {
                 }))
 
                 const seats = seatSnap.docs.filter(d => !d.data().auto_reserved).map(d => d.data().seat_id as string)
-                const tip = tipsSnap.docs[0] ? (tipsSnap.docs[0].data().amount || 0) : 0
                 const nightsTotal = (guest.nights_count || 1) * (session.price_per_night || 0)
                 const settlementDoc = settlementSnap.docs[0]
+                const settlementData = settlementDoc?.data()
+                const directTip = tipsSnap.docs[0] ? (tipsSnap.docs[0].data().amount || 0) : 0
+                const roundingTip = getRoundingTipFromAdjustments(settlementData?.adjustments)
+                const tip = directTip + roundingTip
 
                 return {
                     session: { id: session.id, name: session.name, slug: session.slug, start_date: session.start_date, end_date: session.end_date, status: session.status },
@@ -83,7 +87,7 @@ export async function GET(request: NextRequest) {
                     gameVoteCount: votesSnap.size,
                     nightsTotal,
                     grandTotal: nightsTotal + snacksTotal + hwTotal + tip,
-                    settlement: settlementDoc ? { status: settlementDoc.data().status || 'draft', paid_at: settlementDoc.data().paid_at || null } : null,
+                    settlement: settlementDoc ? { status: settlementData?.status || 'draft', paid_at: settlementData?.paid_at || null } : null,
                 }
             })
         )

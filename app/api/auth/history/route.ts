@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getFirebaseAdminApp, getFirebaseAdminDb } from '@/lib/firebase/admin'
 import { getAuth } from 'firebase-admin/auth'
 import { getGuestsByUserId, getSessionById, getProductById } from '@/lib/firebase/queries'
+import { getRoundingTipFromAdjustments } from '@/lib/settlement-utils'
 
 // GET /api/auth/history - Get full event history for authenticated user
 export async function GET(request: NextRequest) {
@@ -121,19 +122,23 @@ export async function GET(request: NextRequest) {
                     .filter(doc => !doc.data().auto_reserved)
                     .map(doc => doc.data().seat_id as string)
 
-                // Process tip
+                // Process settlement
+                const settlementDoc = settlementSnap.docs[0]
+                const settlementData = settlementDoc?.data()
+                const settlement = settlementDoc ? {
+                    status: settlementData?.status || 'draft',
+                    paid_at: settlementData?.paid_at || null,
+                } : null
+
+                // Process tip. Positive "Zaokrouhleno" settlement adjustments are
+                // treated as tips because settlement uses rounding for practical tip entry.
                 const tipDoc = tipsSnap.docs[0]
-                const tip = tipDoc ? (tipDoc.data().amount || 0) : 0
+                const directTip = tipDoc ? (tipDoc.data().amount || 0) : 0
+                const roundingTip = getRoundingTipFromAdjustments(settlementData?.adjustments)
+                const tip = directTip + roundingTip
 
                 // Process game votes count
                 const gameVoteCount = gameVotesSnap.size
-
-                // Process settlement
-                const settlementDoc = settlementSnap.docs[0]
-                const settlement = settlementDoc ? {
-                    status: settlementDoc.data().status || 'draft',
-                    paid_at: settlementDoc.data().paid_at || null,
-                } : null
 
                 // Calculate accommodation
                 const nightsCount = guest.nights_count || 1

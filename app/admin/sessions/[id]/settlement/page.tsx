@@ -731,6 +731,8 @@ export default function SettlementPage() {
     const pendingCount = guests.filter(g => getSettlement(g.id).status === 'pending').length
     const paidCount = guests.filter(g => getSettlement(g.id).status === 'paid').length
     const totalRemaining = totalToCollect - totalPaid
+    const totalDepositsPaid = guests.reduce((sum, guest) => sum + (guest.deposit || 0), 0)
+    const depositsPaidCount = guests.filter(guest => (guest.deposit || 0) > 0).length
     const paymentSummary = guests.reduce(
         (acc, guest) => {
             const method = isCashSettlement(guest.id) ? 'cash' : 'bank'
@@ -942,6 +944,11 @@ export default function SettlementPage() {
                                 <p className="text-xs text-emerald-700 uppercase font-medium">Platba hotově</p>
                                 <p className="text-2xl font-bold text-emerald-700">{paymentSummary.cash.total.toLocaleString('cs-CZ')} Kč</p>
                                 <p className="text-xs text-emerald-500">{paymentSummary.cash.count} hostů</p>
+                            </div>
+                            <div className="bg-teal-50 rounded-xl p-4">
+                                <p className="text-xs text-teal-700 uppercase font-medium">Zaplacené zálohy</p>
+                                <p className="text-2xl font-bold text-teal-700">{totalDepositsPaid.toLocaleString('cs-CZ')} Kč</p>
+                                <p className="text-xs text-teal-500">{depositsPaidCount} hostů</p>
                             </div>
                             <div className="bg-purple-50 rounded-xl p-4">
                                 <p className="text-xs text-purple-700 uppercase font-medium">PC celkem</p>
@@ -1644,7 +1651,8 @@ export default function SettlementPage() {
                                                                         value={editingFinalValue}
                                                                         onChange={(e) => setEditingFinalValue(e.target.value)}
                                                                         placeholder={`např. ${roundingSuggestions[0] || finalTotal}`}
-                                                                        className="w-full pl-3 pr-10 py-2 border border-blue-300 rounded-lg text-sm text-gray-900 text-right focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none"
+                                                                        className="w-full pl-3 pr-10 py-2 border border-blue-300 rounded-lg !bg-white text-sm !text-gray-900 text-right placeholder:!text-gray-400 focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none"
+                                                                        style={{ color: '#111827', backgroundColor: '#ffffff', WebkitTextFillColor: '#111827', colorScheme: 'light' }}
                                                                         autoFocus
                                                                         min={0}
                                                                         onKeyDown={(e) => {

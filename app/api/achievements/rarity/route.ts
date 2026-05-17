@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getFirebaseAdminDb } from '@/lib/firebase/admin'
 import { ACHIEVEMENTS, computeUserStats } from '@/lib/achievements'
+import { getRoundingTipFromAdjustments } from '@/lib/settlement-utils'
 
 interface CachedRarity {
     expiresAt: number
@@ -119,12 +120,13 @@ export async function GET() {
             }
         }
 
-        // Bulk-fetch related data (consumption, hardware reservations, tips, game votes)
+        // Bulk-fetch related data (consumption, hardware reservations, tips, settlements, game votes)
         // in parallel by collection. Each lookup uses its own pre-built guest map.
-        const [consumptionSnap, hwSnap, tipsSnap, votesSnap] = await Promise.all([
+        const [consumptionSnap, hwSnap, tipsSnap, settlementsSnap, votesSnap] = await Promise.all([
             db.collection('consumption').get(),
             db.collection('hardware_reservations').where('status', '==', 'active').get(),
             db.collection('tips').get(),
+            db.collection('settlements').get(),
             db.collection('game_votes').get(),
         ])
 
@@ -147,6 +149,13 @@ export async function GET() {
             const guest = idLookup.get(d.guest_id)
             if (!guest) return
             guest.tip += d.amount || 0
+        })
+
+        settlementsSnap.docs.forEach(doc => {
+            const d = doc.data()
+            const guest = idLookup.get(d.guest_id)
+            if (!guest) return
+            guest.tip += getRoundingTipFromAdjustments(d.adjustments)
         })
 
         votesSnap.docs.forEach(doc => {
