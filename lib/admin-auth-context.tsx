@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react'
 import { onAuthStateChanged, User, signOut } from 'firebase/auth'
-import { getFirebaseAuth } from '@/lib/firebase/client'
+import { ensureFirebaseAuthPersistence, getFirebaseAuth } from '@/lib/firebase/client'
 import { AdminUser, AdminRole } from '@/lib/admin-roles'
 
 interface AdminAuthContextType {
@@ -39,8 +39,12 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
 
 
     useEffect(() => {
-        const auth = getFirebaseAuth()
-        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        let unsubscribe: (() => void) | undefined
+        let cancelled = false
+
+        ensureFirebaseAuthPersistence().then((auth) => {
+            if (cancelled) return
+            unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
             setUser(firebaseUser)
             let foundAdmin = false
 
@@ -85,10 +89,14 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
                 }
             }
 
-            setLoading(false)
+                setLoading(false)
+            })
         })
 
-        return () => unsubscribe()
+        return () => {
+            cancelled = true
+            unsubscribe?.()
+        }
     }, [])
 
     const logout = useCallback(async () => {

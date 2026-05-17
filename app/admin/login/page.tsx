@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Lock, Shield, UserPlus, Mail, User, ArrowLeft, KeyRound } from 'lucide-react'
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth'
-import { getFirebaseAuth } from '@/lib/firebase/client'
+import { ensureFirebaseAuthPersistence } from '@/lib/firebase/client'
 
 type Mode = 'login' | 'register' | 'admin_password' | 'forgot_password'
 
@@ -26,7 +26,7 @@ export default function AdminLoginPage() {
     setError('')
 
     try {
-      const auth = getFirebaseAuth()
+      const auth = await ensureFirebaseAuthPersistence()
       const credential = await signInWithEmailAndPassword(auth, email, password)
       const token = await credential.user.getIdToken()
 
@@ -77,7 +77,7 @@ export default function AdminLoginPage() {
     }
 
     try {
-      const auth = getFirebaseAuth()
+      const auth = await ensureFirebaseAuthPersistence()
       const credential = await createUserWithEmailAndPassword(auth, email, password)
       const token = await credential.user.getIdToken()
 
@@ -125,7 +125,7 @@ export default function AdminLoginPage() {
     setSuccess('')
 
     try {
-      const auth = getFirebaseAuth()
+      const auth = await ensureFirebaseAuthPersistence()
       await sendPasswordResetEmail(auth, resetEmail)
       setSuccess('Email pro obnovení hesla byl odeslán! Zkontroluj svou schránku (i spam).')
       setResetEmail('')

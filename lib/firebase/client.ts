@@ -17,6 +17,7 @@ let app: FirebaseApp
 let db: Firestore
 let storage: FirebaseStorage
 let auth: Auth
+let authPersistencePromise: Promise<void> | null = null
 
 export function getFirebaseApp() {
   if (!app) {
@@ -44,7 +45,17 @@ export function getFirebaseAuth() {
     auth = getAuth(getFirebaseApp())
     // Explicitly set persistence — iOS Safari may not default to local persistence
     // due to ITP (Intelligent Tracking Prevention) restrictions
-    setPersistence(auth, browserLocalPersistence).catch(() => {})
+    authPersistencePromise = setPersistence(auth, browserLocalPersistence).catch((error) => {
+      console.warn('Firebase auth persistence setup failed:', error)
+    })
   }
   return auth
+}
+
+export async function ensureFirebaseAuthPersistence() {
+  const authInstance = getFirebaseAuth()
+  if (authPersistencePromise) {
+    await authPersistencePromise
+  }
+  return authInstance
 }

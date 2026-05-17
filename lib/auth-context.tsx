@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react'
 import { onAuthStateChanged, User, signOut } from 'firebase/auth'
 import { usePathname } from 'next/navigation'
-import { getFirebaseAuth } from '@/lib/firebase/client'
+import { ensureFirebaseAuthPersistence, getFirebaseAuth } from '@/lib/firebase/client'
 import { UserProfile, Guest } from '@/types/database.types'
 import { guestStorage, StoredGuest, GUEST_STORAGE_EVENT } from '@/lib/guest-storage'
 
@@ -16,7 +16,7 @@ interface GuestAuthContextType {
     loading: boolean
     isAuthenticated: boolean
     logout: () => Promise<void>
-    refreshProfile: () => Promise<void>
+    refreshProfile: (user?: User) => Promise<void>
     getClaimedGuestForSession: (sessionId: string) => ClaimedGuest | null
     getClaimedGuestBySlug: (slug: string) => ClaimedGuest | null
 }
@@ -63,19 +63,27 @@ export function GuestAuthProvider({ children }: { children: ReactNode }) {
     }, [])
 
     useEffect(() => {
-        const auth = getFirebaseAuth()
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
-            setFirebaseUser(user)
-            if (user) {
-                await fetchProfile(user)
-            } else {
-                setUserProfile(null)
-                setClaimedGuests([])
-            }
-            setLoading(false)
+        let unsubscribe: (() => void) | undefined
+        let cancelled = false
+
+        ensureFirebaseAuthPersistence().then((auth) => {
+            if (cancelled) return
+            unsubscribe = onAuthStateChanged(auth, async (user) => {
+                setFirebaseUser(user)
+                if (user) {
+                    await fetchProfile(user)
+                } else {
+                    setUserProfile(null)
+                    setClaimedGuests([])
+                }
+                setLoading(false)
+            })
         })
 
-        return () => unsubscribe()
+        return () => {
+            cancelled = true
+            unsubscribe?.()
+        }
     }, [fetchProfile])
 
     // Auto-hydrate guestStorage whenever the pathname matches an event slug the
@@ -106,8 +114,8 @@ export function GuestAuthProvider({ children }: { children: ReactNode }) {
         setClaimedGuests([])
     }, [])
 
-    const refreshProfile = useCallback(async () => {
-        const user = firebaseUser || getFirebaseAuth().currentUser
+    const refreshProfile = useCallback(async (targetUser?: User) => {
+        const user = targetUser || firebaseUser || getFirebaseAuth().currentUser
         if (user) {
             setFirebaseUser(user)
             await fetchProfile(user)

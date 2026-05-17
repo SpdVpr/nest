@@ -13,7 +13,7 @@ import {
   OAuthProvider,
   sendPasswordResetEmail,
 } from 'firebase/auth'
-import { getFirebaseAuth } from '@/lib/firebase/client'
+import { ensureFirebaseAuthPersistence } from '@/lib/firebase/client'
 import { useGuestAuth } from '@/lib/auth-context'
 
 type Mode = 'login' | 'register' | 'forgot_password'
@@ -47,6 +47,8 @@ function AuthLoginContent() {
 
   // Detect mobile/tablet browsers where popups don't work well (iOS Safari, etc.)
   const isMobile = typeof window !== 'undefined' && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+  const isEdge = typeof window !== 'undefined' && /Edg\//.test(navigator.userAgent)
+  const shouldUseRedirectFlow = isMobile || isEdge
   const redirectProcessed = useRef(false)
 
   // Save redirect target before OAuth redirect (so it survives the round-trip)
@@ -75,7 +77,7 @@ function AuthLoginContent() {
 
     const handleRedirectResult = async () => {
       try {
-        const auth = getFirebaseAuth()
+        const auth = await ensureFirebaseAuthPersistence()
         const result = await getRedirectResult(auth)
         if (!result) return // No redirect result — normal page load
 
@@ -91,9 +93,9 @@ function AuthLoginContent() {
         )
         // Refresh auth context profile — onAuthStateChanged may have already
         // fired with a 404 before registration completed (race condition on iOS Safari)
-        await refreshProfile()
+        await refreshProfile(result.user)
         const savedRedirect = getSavedRedirect()
-        router.push(savedRedirect)
+        router.replace(savedRedirect)
       } catch (err: any) {
         if (err.code !== 'auth/popup-closed-by-user') {
           console.error('Redirect result error:', err)
@@ -115,6 +117,10 @@ function AuthLoginContent() {
       },
       body: JSON.stringify({ display_name: displayName, auth_provider: provider }),
     })
+    if (!res.ok) {
+      const data = await res.json().catch(() => null)
+      throw new Error(data?.error || 'Registration failed')
+    }
     return res.ok
   }
 
@@ -130,7 +136,7 @@ function AuthLoginContent() {
     setError('')
 
     try {
-      const auth = getFirebaseAuth()
+      const auth = await ensureFirebaseAuthPersistence()
       const credential = await signInWithEmailAndPassword(auth, email, password)
       const token = await credential.user.getIdToken()
 
@@ -172,7 +178,7 @@ function AuthLoginContent() {
     }
 
     try {
-      const auth = getFirebaseAuth()
+      const auth = await ensureFirebaseAuthPersistence()
       const credential = await createUserWithEmailAndPassword(auth, email, password)
       const token = await credential.user.getIdToken()
 
@@ -199,11 +205,11 @@ function AuthLoginContent() {
     setError('')
 
     try {
-      const auth = getFirebaseAuth()
+      const auth = await ensureFirebaseAuthPersistence()
       const provider = new GoogleAuthProvider()
 
-      if (isMobile) {
-        // Mobile: use redirect flow (works on iOS Safari)
+      if (shouldUseRedirectFlow) {
+        // Redirect flow avoids OAuth popup/storage races on mobile and Edge.
         saveRedirectTarget()
         await signInWithRedirect(auth, provider)
         // Page will redirect — no code after this runs
@@ -222,7 +228,7 @@ function AuthLoginContent() {
       )
       // Refresh auth context profile — onAuthStateChanged may have already
       // fired with a 404 before registration completed (first-time sign-in race)
-      await refreshProfile()
+      await refreshProfile(result.user)
       const destination = await resolvePostLoginRedirect(token, false)
       router.push(destination)
     } catch (err: any) {
@@ -231,7 +237,7 @@ function AuthLoginContent() {
       } else if (err.code === 'auth/popup-blocked') {
         // Popup blocked — fall back to redirect
         try {
-          const auth = getFirebaseAuth()
+          const auth = await ensureFirebaseAuthPersistence()
           const provider = new GoogleAuthProvider()
           saveRedirectTarget()
           await signInWithRedirect(auth, provider)
@@ -252,13 +258,13 @@ function AuthLoginContent() {
     setError('')
 
     try {
-      const auth = getFirebaseAuth()
+      const auth = await ensureFirebaseAuthPersistence()
       const provider = new OAuthProvider('apple.com')
       provider.addScope('email')
       provider.addScope('name')
 
-      if (isMobile) {
-        // Mobile: use redirect flow (works on iOS Safari)
+      if (shouldUseRedirectFlow) {
+        // Redirect flow avoids OAuth popup/storage races on mobile and Edge.
         saveRedirectTarget()
         await signInWithRedirect(auth, provider)
         return
@@ -275,7 +281,7 @@ function AuthLoginContent() {
       )
       // Refresh auth context profile — onAuthStateChanged may have already
       // fired with a 404 before registration completed (first-time sign-in race)
-      await refreshProfile()
+      await refreshProfile(result.user)
       const destination = await resolvePostLoginRedirect(token, false)
       router.push(destination)
     } catch (err: any) {
@@ -283,7 +289,7 @@ function AuthLoginContent() {
         // User closed popup
       } else if (err.code === 'auth/popup-blocked') {
         try {
-          const auth = getFirebaseAuth()
+          const auth = await ensureFirebaseAuthPersistence()
           const provider = new OAuthProvider('apple.com')
           provider.addScope('email')
           provider.addScope('name')
@@ -308,7 +314,7 @@ function AuthLoginContent() {
     setSuccess('')
 
     try {
-      const auth = getFirebaseAuth()
+      const auth = await ensureFirebaseAuthPersistence()
       await sendPasswordResetEmail(auth, resetEmail)
       setSuccess('Email pro obnovení hesla byl odeslán!')
     } catch (err: any) {
