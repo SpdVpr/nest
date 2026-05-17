@@ -48,7 +48,7 @@ function AuthLoginContent() {
   // Detect mobile/tablet browsers where popups don't work well (iOS Safari, etc.)
   const isMobile = typeof window !== 'undefined' && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
   const isEdge = typeof window !== 'undefined' && /Edg\//.test(navigator.userAgent)
-  const shouldUseRedirectFlow = isMobile || isEdge
+  const shouldUseRedirectFlow = isMobile
   const redirectProcessed = useRef(false)
 
   // Save redirect target before OAuth redirect (so it survives the round-trip)
@@ -209,7 +209,7 @@ function AuthLoginContent() {
       const provider = new GoogleAuthProvider()
 
       if (shouldUseRedirectFlow) {
-        // Redirect flow avoids OAuth popup/storage races on mobile and Edge.
+        // Redirect flow is still preferable on mobile where popups are fragile.
         saveRedirectTarget()
         await signInWithRedirect(auth, provider)
         // Page will redirect — no code after this runs
@@ -237,6 +237,10 @@ function AuthLoginContent() {
       } else if (err.code === 'auth/popup-blocked') {
         // Popup blocked — fall back to redirect
         try {
+          if (isEdge) {
+            setError('Přihlášení přes Google se nepodařilo otevřít. Povol v Edge vyskakovací okna pro tento web a zkus to znovu.')
+            return
+          }
           const auth = await ensureFirebaseAuthPersistence()
           const provider = new GoogleAuthProvider()
           saveRedirectTarget()
@@ -264,7 +268,7 @@ function AuthLoginContent() {
       provider.addScope('name')
 
       if (shouldUseRedirectFlow) {
-        // Redirect flow avoids OAuth popup/storage races on mobile and Edge.
+        // Redirect flow is still preferable on mobile where popups are fragile.
         saveRedirectTarget()
         await signInWithRedirect(auth, provider)
         return
@@ -289,6 +293,10 @@ function AuthLoginContent() {
         // User closed popup
       } else if (err.code === 'auth/popup-blocked') {
         try {
+          if (isEdge) {
+            setError('Přihlášení přes Apple se nepodařilo otevřít. Povol v Edge vyskakovací okna pro tento web a zkus to znovu.')
+            return
+          }
           const auth = await ensureFirebaseAuthPersistence()
           const provider = new OAuthProvider('apple.com')
           provider.addScope('email')
