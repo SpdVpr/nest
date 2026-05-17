@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getFirebaseAdminApp, getFirebaseAdminDb } from '@/lib/firebase/admin'
 import { getAuth } from 'firebase-admin/auth'
 import { getGuestsByUserId, getSessionById, getProductById } from '@/lib/firebase/queries'
-import { getRoundingTipFromAdjustments } from '@/lib/settlement-utils'
+import { getRoundingTipFromAdjustments, getTipFromCustomItems } from '@/lib/settlement-utils'
 
 // GET /api/auth/history - Get full event history for authenticated user
 export async function GET(request: NextRequest) {
@@ -135,7 +135,8 @@ export async function GET(request: NextRequest) {
                 const tipDoc = tipsSnap.docs[0]
                 const directTip = tipDoc ? (tipDoc.data().amount || 0) : 0
                 const roundingTip = getRoundingTipFromAdjustments(settlementData?.adjustments)
-                const tip = directTip + roundingTip
+                const customItemTip = getTipFromCustomItems(settlementData?.custom_items)
+                const tip = directTip + roundingTip + customItemTip
 
                 // Process game votes count
                 const gameVoteCount = gameVotesSnap.size

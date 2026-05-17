@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getFirebaseAdminDb } from '@/lib/firebase/admin'
 import { ACHIEVEMENTS, computeUserStats } from '@/lib/achievements'
-import { getRoundingTipFromAdjustments } from '@/lib/settlement-utils'
+import { getRoundingTipFromAdjustments, getTipFromCustomItems } from '@/lib/settlement-utils'
 
 interface CachedRarity {
     expiresAt: number
@@ -156,6 +156,7 @@ export async function GET() {
             const guest = idLookup.get(d.guest_id)
             if (!guest) return
             guest.tip += getRoundingTipFromAdjustments(d.adjustments)
+            guest.tip += getTipFromCustomItems(d.custom_items)
         })
 
         votesSnap.docs.forEach(doc => {

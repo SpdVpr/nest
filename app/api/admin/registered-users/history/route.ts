@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getFirebaseAdminDb } from '@/lib/firebase/admin'
 import { verifyAdminRequest } from '@/lib/verify-admin'
 import { getGuestsByUserId, getSessionById, getProductById } from '@/lib/firebase/queries'
-import { getRoundingTipFromAdjustments } from '@/lib/settlement-utils'
+import { getRoundingTipFromAdjustments, getTipFromCustomItems } from '@/lib/settlement-utils'
 
 // GET /api/admin/registered-users/history?uid=xxx - Get full event history for a user (admin only)
 export async function GET(request: NextRequest) {
@@ -73,7 +73,8 @@ export async function GET(request: NextRequest) {
                 const settlementData = settlementDoc?.data()
                 const directTip = tipsSnap.docs[0] ? (tipsSnap.docs[0].data().amount || 0) : 0
                 const roundingTip = getRoundingTipFromAdjustments(settlementData?.adjustments)
-                const tip = directTip + roundingTip
+                const customItemTip = getTipFromCustomItems(settlementData?.custom_items)
+                const tip = directTip + roundingTip + customItemTip
 
                 return {
                     session: { id: session.id, name: session.name, slug: session.slug, start_date: session.start_date, end_date: session.end_date, status: session.status },
