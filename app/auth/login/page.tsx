@@ -38,6 +38,10 @@ function AuthLoginContent() {
   const [name, setName] = useState('')
   const [resetEmail, setResetEmail] = useState('')
   const [loading, setLoading] = useState(false)
+  const [processingRedirect, setProcessingRedirect] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return sessionStorage.getItem('auth_redirect_pending') === '1'
+  })
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const router = useRouter()
@@ -61,6 +65,7 @@ function AuthLoginContent() {
   const saveRedirectTarget = () => {
     if (typeof window !== 'undefined' && redirect) {
       sessionStorage.setItem('auth_redirect', redirect)
+      sessionStorage.setItem('auth_redirect_pending', '1')
     }
   }
 
@@ -70,6 +75,7 @@ function AuthLoginContent() {
       const saved = sessionStorage.getItem('auth_redirect')
       if (saved) {
         sessionStorage.removeItem('auth_redirect')
+        sessionStorage.removeItem('auth_redirect_pending')
         return saved
       }
     }
@@ -85,8 +91,15 @@ function AuthLoginContent() {
       try {
         const auth = await ensureFirebaseAuthPersistence()
         const result = await getRedirectResult(auth)
-        if (!result) return // No redirect result — normal page load
+        if (!result) {
+          if (typeof window !== 'undefined') {
+            sessionStorage.removeItem('auth_redirect_pending')
+          }
+          setProcessingRedirect(false)
+          return
+        }
 
+        setProcessingRedirect(true)
         setLoading(true)
         const token = await result.user.getIdToken()
         const providerName = result.providerId?.includes('apple') ? 'apple' : 'google'
@@ -103,6 +116,10 @@ function AuthLoginContent() {
         const savedRedirect = getSavedRedirect()
         router.replace(savedRedirect)
       } catch (err: any) {
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('auth_redirect_pending')
+        }
+        setProcessingRedirect(false)
         if (err.code !== 'auth/popup-closed-by-user') {
           console.error('Redirect result error:', err)
           setError(err.message || 'Přihlášení selhalo.')
@@ -340,6 +357,24 @@ function AuthLoginContent() {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (processingRedirect) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: 'var(--nest-bg, #0f1117)' }}>
+        <div className="max-w-sm w-full text-center">
+          <div className="mx-auto mb-6 w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)' }}>
+            <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--nest-yellow, #f59e0b)' }} />
+          </div>
+          <h1 className="text-2xl font-bold mb-2" style={{ color: 'var(--nest-text-primary, #fff)' }}>
+            Dokončujeme přihlášení
+          </h1>
+          <p className="text-sm" style={{ color: 'var(--nest-text-secondary, #888)' }}>
+            Chvilku vydrž, za moment tě přesměrujeme.
+          </p>
+        </div>
+      </div>
+    )
   }
 
   return (
