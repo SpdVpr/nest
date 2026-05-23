@@ -1,7 +1,24 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  async rewrites() {
+    const firebaseAuthDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
+
+    if (!firebaseAuthDomain) {
+      return [];
+    }
+
+    return [
+      {
+        source: "/__/auth/:path*",
+        destination: `https://${firebaseAuthDomain}/__/auth/:path*`,
+      },
+      {
+        source: "/__/firebase/init.json",
+        destination: `https://${firebaseAuthDomain}/__/firebase/init.json`,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
