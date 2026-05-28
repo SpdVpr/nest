@@ -53,8 +53,25 @@ export async function GET(
         // If guest_id is provided, fetch their saved selections
         const guestId = request.nextUrl.searchParams.get('guest_id')
         let savedSelections: Record<string, boolean> | null = null
+        let guest: any = null
 
         if (guestId) {
+            const guestDoc = await db.collection('guests').doc(guestId).get()
+            if (guestDoc.exists) {
+                const guestData = guestDoc.data()
+                if (guestData?.session_id === sessionDoc.id && guestData?.is_active !== false) {
+                    guest = {
+                        id: guestDoc.id,
+                        name: guestData.name,
+                        check_in_date: guestData.check_in_date?.toDate?.()?.toISOString() || null,
+                        check_out_date: guestData.check_out_date?.toDate?.()?.toISOString() || null,
+                        meal_preferences: guestData.meal_preferences || [],
+                        dietary_restrictions: guestData.dietary_restrictions || [],
+                        dietary_note: guestData.dietary_note || '',
+                    }
+                }
+            }
+
             const selSnapshot = await db.collection('guest_meal_selections')
                 .where('guest_id', '==', guestId)
                 .where('session_id', '==', sessionDoc.id)
@@ -67,7 +84,7 @@ export async function GET(
             }
         }
 
-        return NextResponse.json({ items, enabled: true, savedSelections })
+        return NextResponse.json({ items, enabled: true, savedSelections, guest })
     } catch (error) {
         console.error('Error fetching menu:', error)
         return NextResponse.json(

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { ArrowLeft, UtensilsCrossed, Loader2, Check, AlertCircle, X } from 'lucide-react'
-import { Session, MenuItem, MealType } from '@/types/database.types'
+import { GuestMealPreference, Session, MenuItem, MealType } from '@/types/database.types'
 import { formatDateOnly } from '@/lib/utils'
 import { useCurrentGuest } from '@/lib/auth-context'
 import NestLoading from '@/components/NestLoading'
@@ -29,6 +29,23 @@ const DIETARY_OPTIONS = [
     { value: 'lactose-free', label: '🥛 Bez laktózy', color: 'bg-blue-900/40 text-blue-300 border-blue-700/50' },
 ]
 
+interface MenuGuest {
+    id: string
+    name?: string
+    check_in_date?: string | null
+    check_out_date?: string | null
+    meal_preferences?: GuestMealPreference[]
+    dietary_restrictions?: string[]
+    dietary_note?: string | null
+}
+
+const toDateKey = (date: Date): string => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+}
+
 export default function EventMenuPage() {
     const params = useParams()
     const slug = params?.slug as string
@@ -39,6 +56,7 @@ export default function EventMenuPage() {
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [saved, setSaved] = useState(false)
+    const [guest, setGuest] = useState<MenuGuest | null>(null)
 
     // Guest state (derived from auth context + localStorage)
     const storedGuest = useCurrentGuest(slug)
@@ -58,21 +76,9 @@ export default function EventMenuPage() {
         }
     }, [slug, guestId])
 
-    // Initialize all meals as "will eat" (true) by default when items load,
-    // but only for meals that don't have a saved selection
     useEffect(() => {
-        if (menuItems.length > 0) {
-            setSelections(prev => {
-                const merged: Record<string, boolean> = { ...prev }
-                menuItems.forEach(item => {
-                    if (merged[item.id] === undefined) {
-                        merged[item.id] = true // default to selected
-                    }
-                })
-                return merged
-            })
-        }
-    }, [menuItems])
+        setSelections(prev => buildInitialSelections(prev))
+    }, [menuItems, guest, session])
 
     const fetchData = async () => {
         try {
@@ -92,10 +98,15 @@ export default function EventMenuPage() {
                 const menuData = await menuRes.json()
                 setMenuItems(menuData.items || [])
                 setMenuEnabled(menuData.enabled || false)
+                setGuest(menuData.guest || null)
 
                 // Restore saved selections if available
                 if (menuData.savedSelections && typeof menuData.savedSelections === 'object') {
                     setSelections(menuData.savedSelections)
+                }
+                if (menuData.guest) {
+                    setDietaryRestrictions(Array.isArray(menuData.guest.dietary_restrictions) ? menuData.guest.dietary_restrictions : [])
+                    setDietaryNote(menuData.guest.dietary_note || '')
                 }
             }
         } catch (error) {
@@ -103,6 +114,53 @@ export default function EventMenuPage() {
         } finally {
             setLoading(false)
         }
+    }
+
+    const getDayDateKey = (dayIndex: number): string | null => {
+        if (!session?.start_date) return null
+        const date = new Date(session.start_date)
+        date.setHours(0, 0, 0, 0)
+        date.setDate(date.getDate() + dayIndex)
+        return toDateKey(date)
+    }
+
+    const isGuestPresentOnDay = (dayIndex: number): boolean => {
+        if (!guestId || !guest?.check_in_date || !guest?.check_out_date) return true
+        const dayKey = getDayDateKey(dayIndex)
+        if (!dayKey) return true
+
+        const checkIn = new Date(guest.check_in_date)
+        const checkOut = new Date(guest.check_out_date)
+        const checkInKey = toDateKey(checkIn)
+        const checkOutKey = toDateKey(checkOut)
+
+        return dayKey >= checkInKey && dayKey <= checkOutKey
+    }
+
+    const canGuestEatMeal = (meal: MenuItem): boolean => {
+        if (!isGuestPresentOnDay(meal.day_index)) return false
+        const dayKey = getDayDateKey(meal.day_index)
+        if (!dayKey) return true
+
+        const preference = guest?.meal_preferences?.find(item => item.date === dayKey)
+        if (!preference) return true
+        if (meal.meal_type === 'lunch') return preference.lunch === true
+        if (meal.meal_type === 'dinner') return preference.dinner === true
+        return true
+    }
+
+    const buildInitialSelections = (savedSelections: Record<string, boolean>): Record<string, boolean> => {
+        const next: Record<string, boolean> = {}
+
+        menuItems.forEach(item => {
+            if (!canGuestEatMeal(item)) {
+                next[item.id] = false
+                return
+            }
+            next[item.id] = savedSelections[item.id] ?? true
+        })
+
+        return next
     }
 
     const getEventDays = (): { dayIndex: number; date: Date; label: string; dateStr: string }[] => {
@@ -137,11 +195,14 @@ export default function EventMenuPage() {
     const getMealsForDay = (dayIndex: number): MenuItem[] => {
         return menuItems
             .filter(item => item.day_index === dayIndex)
+            .filter(item => !guestId || canGuestEatMeal(item))
             .sort((a, b) => (a.order || 0) - (b.order || 0))
     }
 
     const toggleMealSelection = (mealId: string) => {
         if (!guestId) return
+        const meal = menuItems.find(item => item.id === mealId)
+        if (!meal || !canGuestEatMeal(meal)) return
         setSelections(prev => ({
             ...prev,
             [mealId]: !prev[mealId]
@@ -154,17 +215,19 @@ export default function EventMenuPage() {
         )
     }
 
-    const getSelectedCount = () => Object.values(selections).filter(v => v).length
-    const getSkippedCount = () => Object.values(selections).filter(v => !v).length
+    const getRelevantMeals = () => menuItems.filter(item => !guestId || canGuestEatMeal(item))
+    const getSelectedCount = () => getRelevantMeals().filter(item => selections[item.id]).length
+    const getSkippedCount = () => getRelevantMeals().filter(item => selections[item.id] === false).length
 
     const handleSave = async () => {
         if (!guestId) return
 
         setSaving(true)
         try {
+            const sanitizedSelections = buildInitialSelections(selections)
             // Convert selections to first/last meal format + individual selections
             const selectedMealIds = menuItems
-                .filter(m => selections[m.id])
+                .filter(m => sanitizedSelections[m.id])
                 .map(m => m.id)
 
             const response = await fetch(`/api/event/${slug}/menu`, {
@@ -172,7 +235,7 @@ export default function EventMenuPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     guest_id: guestId,
-                    meal_selections: selections,
+                    meal_selections: sanitizedSelections,
                     selected_meal_ids: selectedMealIds,
                     dietary_restrictions: dietaryRestrictions,
                     dietary_note: dietaryNote,
