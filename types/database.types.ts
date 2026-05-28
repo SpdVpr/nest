@@ -76,6 +76,8 @@ export interface Guest {
   nights_count: number
   check_in_date?: string | null
   check_out_date?: string | null
+  arrival_time?: string | null     // Format: "HH:MM"
+  meal_preferences?: GuestMealPreference[]
   dietary_restrictions?: string[]  // ['vegan', 'vegetarian', 'gluten-free', 'lactose-free']
   dietary_note?: string | null     // free text for custom allergies
   room?: string | null         // room ID selected for accommodation (e.g. 'dolni', 'horni-vlevo')
@@ -91,7 +93,15 @@ export interface GuestInput {
   nights_count?: number
   check_in_date?: string | null
   check_out_date?: string | null
+  arrival_time?: string | null
+  meal_preferences?: GuestMealPreference[]
   is_active?: boolean
+}
+
+export interface GuestMealPreference {
+  date: string              // "YYYY-MM-DD"
+  lunch: boolean
+  dinner: boolean
 }
 
 // =============================================

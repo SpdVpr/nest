@@ -4,6 +4,30 @@ import { getSessionBySlug } from '@/lib/firebase/queries'
 import { Guest } from '@/types/database.types'
 import { verifyGuestRequest } from '@/lib/verify-guest'
 
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/
+
+function normalizeMealPreferences(value: unknown): { date: string; lunch: boolean; dinner: boolean }[] {
+  if (!Array.isArray(value)) return []
+
+  return value
+    .filter((item) => item && typeof item === 'object')
+    .map((item) => {
+      const preference = item as Record<string, unknown>
+      return {
+        date: typeof preference.date === 'string' ? preference.date : '',
+        lunch: preference.lunch === true,
+        dinner: preference.dinner === true,
+      }
+    })
+    .filter((item) => /^\d{4}-\d{2}-\d{2}$/.test(item.date))
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((item, index, all) => ({
+      date: item.date,
+      lunch: index > 0 && item.lunch,
+      dinner: index < all.length - 1 && item.dinner,
+    }))
+}
+
 // GET /api/event/[slug]/guests - Get guests for specific event
 export async function GET(
   request: NextRequest,
@@ -132,7 +156,7 @@ export async function POST(
   try {
     const { slug } = await params
     const body = await request.json()
-    const { name, nights_count = 1, check_in_date, check_out_date } = body
+    const { name, nights_count = 1, check_in_date, check_out_date, arrival_time, meal_preferences } = body
 
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
       return NextResponse.json(
@@ -155,6 +179,18 @@ export async function POST(
         { status: 400 }
       )
     }
+
+    const normalizedArrivalTime = typeof arrival_time === 'string' && arrival_time.trim()
+      ? arrival_time.trim()
+      : null
+    if (normalizedArrivalTime && !TIME_PATTERN.test(normalizedArrivalTime)) {
+      return NextResponse.json(
+        { error: 'arrival_time must be in HH:MM format' },
+        { status: 400 }
+      )
+    }
+
+    const normalizedMealPreferences = normalizeMealPreferences(meal_preferences)
 
     // Get the session
     const session = await getSessionBySlug(slug)
@@ -201,6 +237,8 @@ export async function POST(
       nights_count: nightsNum,
       check_in_date: check_in_date ? Timestamp.fromDate(new Date(check_in_date)) : null,
       check_out_date: check_out_date ? Timestamp.fromDate(new Date(check_out_date)) : null,
+      arrival_time: normalizedArrivalTime,
+      meal_preferences: normalizedMealPreferences,
       is_active: true,
       created_at: Timestamp.now(),
     }
@@ -220,6 +258,8 @@ export async function POST(
       created_at: guestData.created_at.toDate().toISOString(),
       check_in_date: guestData.check_in_date?.toDate().toISOString() || null,
       check_out_date: guestData.check_out_date?.toDate().toISOString() || null,
+      arrival_time: guestData.arrival_time,
+      meal_preferences: guestData.meal_preferences,
     } as Guest
 
     // Trigger notifications for other registered users on this event

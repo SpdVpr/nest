@@ -147,6 +147,27 @@ export default function EventDetailPage() {
     return `${year}-${month}-${day}`
   }
 
+  const getGuestMealCounts = (guest: ExtendedGuest) => {
+    const preferences = Array.isArray(guest.meal_preferences) ? guest.meal_preferences : []
+    return preferences.reduce((counts, item) => ({
+      lunch: counts.lunch + (item.lunch ? 1 : 0),
+      dinner: counts.dinner + (item.dinner ? 1 : 0),
+    }), { lunch: 0, dinner: 0 })
+  }
+
+  const getGuestMealTitle = (guest: ExtendedGuest) => {
+    const preferences = Array.isArray(guest.meal_preferences) ? guest.meal_preferences : []
+    if (preferences.length === 0) return 'Jídlo nevyplněno'
+
+    return preferences.map(item => {
+      const meals = [
+        item.lunch ? 'oběd' : null,
+        item.dinner ? 'večeře' : null,
+      ].filter(Boolean).join(', ')
+      return `${item.date}: ${meals || 'bez jídla'}`
+    }).join('\n')
+  }
+
   const openEditGuest = (guest: ExtendedGuest) => {
     setEditingGuestModal(guest)
     setEditGuestName(guest.name)
@@ -1606,6 +1627,7 @@ export default function EventDetailPage() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Místo</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Noci</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Příjezd / Odjezd</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Strava</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">HW</th>
                   {showFinances && <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">HW (Kč)</th>}
                   {showFinances && <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Jídlo (Kč)</th>}
@@ -1623,6 +1645,7 @@ export default function EventDetailPage() {
                     const foodPrice = getTotalConsumptionByGuest(guest.id)
                     const totalPrice = getTotalPriceByGuest(guest.id)
                     const guestHw = getGuestHardware(guest.id)
+                    const mealCounts = getGuestMealCounts(guest)
                     return (
                       <tr key={guest.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">
@@ -1655,9 +1678,30 @@ export default function EventDetailPage() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
-                          {guest.check_in_date ? new Date(guest.check_in_date).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' }) : '—'}
-                          {' → '}
-                          {guest.check_out_date ? new Date(guest.check_out_date).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' }) : '—'}
+                          <div>
+                            {guest.check_in_date ? new Date(guest.check_in_date).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' }) : '—'}
+                            {' → '}
+                            {guest.check_out_date ? new Date(guest.check_out_date).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' }) : '—'}
+                          </div>
+                          {guest.arrival_time && (
+                            <div className="text-[11px] text-gray-400 mt-0.5">
+                              příjezd {guest.arrival_time}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap" title={getGuestMealTitle(guest)}>
+                          {Array.isArray(guest.meal_preferences) && guest.meal_preferences.length > 0 ? (
+                            <div className="flex flex-col gap-1">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-100 font-semibold">
+                                Oběd {mealCounts.lunch}×
+                              </span>
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 font-semibold">
+                                Večeře {mealCounts.dinner}×
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-gray-300">—</span>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap gap-1 max-w-xs">
@@ -1777,7 +1821,7 @@ export default function EventDetailPage() {
                   })
                 ) : (
                   <tr>
-                    <td colSpan={9} className="px-6 py-8 text-center text-gray-500">
+                    <td colSpan={10} className="px-6 py-8 text-center text-gray-500">
                       Zatím žádní hosté
                     </td>
                   </tr>

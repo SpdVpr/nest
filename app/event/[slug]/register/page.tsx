@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
-import { Users, Loader2, Info } from 'lucide-react'
+import { Users, Loader2, Info, Clock, Utensils } from 'lucide-react'
 import { Session } from '@/types/database.types'
 import { formatEventRange } from '@/lib/utils'
 import DateRangeCalendar from '@/components/DateRangeCalendar'
@@ -14,6 +14,53 @@ import { useGuestAuth } from '@/lib/auth-context'
 
 const MIN_GUESTS_FOR_BASE_PRICE = 10
 const SURCHARGE_PER_MISSING_GUEST = 150
+
+type MealPreferenceFormItem = {
+  date: string
+  label: string
+  lunch: boolean
+  dinner: boolean
+  canLunch: boolean
+  canDinner: boolean
+}
+
+const toDateKey = (date: Date): string => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const buildDefaultMealPreferences = (checkIn?: Date, checkOut?: Date): MealPreferenceFormItem[] => {
+  if (!checkIn || !checkOut) return []
+
+  const start = new Date(checkIn.getFullYear(), checkIn.getMonth(), checkIn.getDate())
+  const end = new Date(checkOut.getFullYear(), checkOut.getMonth(), checkOut.getDate())
+  if (end < start) return []
+
+  const days: Date[] = []
+  const current = new Date(start)
+  while (current <= end) {
+    days.push(new Date(current))
+    current.setDate(current.getDate() + 1)
+  }
+
+  return days.map((date, index) => {
+    const isFirstDay = index === 0
+    const isLastDay = index === days.length - 1
+    const canLunch = !isFirstDay
+    const canDinner = !isLastDay
+
+    return {
+      date: toDateKey(date),
+      label: date.toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' }),
+      lunch: canLunch,
+      dinner: canDinner,
+      canLunch,
+      canDinner,
+    }
+  })
+}
 
 export default function RegisterPage() {
   const params = useParams()
@@ -28,6 +75,8 @@ export default function RegisterPage() {
   const [name, setName] = useState('')
   const [checkedInDate, setCheckedInDate] = useState<Date | undefined>()
   const [checkedOutDate, setCheckedOutDate] = useState<Date | undefined>()
+  const [arrivalTime, setArrivalTime] = useState('')
+  const [mealPreferences, setMealPreferences] = useState<MealPreferenceFormItem[]>([])
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -43,6 +92,10 @@ export default function RegisterPage() {
     }
   }, [isAuthenticated, userProfile])
 
+  useEffect(() => {
+    setMealPreferences(buildDefaultMealPreferences(checkedInDate, checkedOutDate))
+  }, [checkedInDate, checkedOutDate])
+
   const fetchEvent = async () => {
     try {
       setLoading(true)
@@ -54,6 +107,7 @@ export default function RegisterPage() {
 
       const data = await response.json()
       setSession(data.session)
+      setArrivalTime(prev => prev || data.session?.start_time || '')
       setGuestCount(data.guest_count || 0)
     } catch (error) {
       console.error('Error fetching event:', error)
@@ -90,6 +144,19 @@ export default function RegisterPage() {
     return { basePrice, effectivePrice: basePrice + surcharge, surcharge, effectiveGuestCount }
   }
 
+  const toggleMealPreference = (date: string, meal: 'lunch' | 'dinner') => {
+    setMealPreferences(prev => prev.map(item => {
+      if (item.date !== date) return item
+      if (meal === 'lunch' && item.canLunch) {
+        return { ...item, lunch: !item.lunch }
+      }
+      if (meal === 'dinner' && item.canDinner) {
+        return { ...item, dinner: !item.dinner }
+      }
+      return item
+    }))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -100,6 +167,11 @@ export default function RegisterPage() {
 
     if (!checkedInDate || !checkedOutDate) {
       setError('Vyber si příjezdový a odjezdový den')
+      return
+    }
+
+    if (!arrivalTime) {
+      setError('Vyber čas příjezdu')
       return
     }
 
@@ -126,7 +198,9 @@ export default function RegisterPage() {
           name: name.trim(),
           nights_count: nightsNum,
           check_in_date: checkedInDate,
-          check_out_date: checkedOutDate
+          check_out_date: checkedOutDate,
+          arrival_time: arrivalTime,
+          meal_preferences: mealPreferences.map(({ date, lunch, dinner }) => ({ date, lunch, dinner }))
         }),
       })
 
@@ -343,6 +417,76 @@ export default function RegisterPage() {
             )}
           </div>
 
+          {checkedInDate && checkedOutDate && (
+            <>
+              <div className="mb-5">
+                <label htmlFor="arrivalTime" className="block text-xs font-medium text-[var(--nest-white-60)] mb-1.5">
+                  Čas příjezdu <span className="text-[var(--nest-error)]">*</span>
+                </label>
+                <div className="relative">
+                  <Clock className="w-4 h-4 text-[var(--nest-yellow)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="time"
+                    id="arrivalTime"
+                    value={arrivalTime}
+                    onChange={(e) => setArrivalTime(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 bg-[var(--nest-dark-3)] border border-[var(--nest-dark-4)] rounded-xl focus:ring-2 focus:ring-[var(--nest-yellow)]/50 focus:border-[var(--nest-yellow)]/50 text-[var(--nest-white)] text-sm outline-none transition-all"
+                    disabled={submitting}
+                  />
+                </div>
+              </div>
+
+              <div className="mb-5">
+                <div className="flex items-center gap-2 mb-2">
+                  <Utensils className="w-4 h-4 text-[var(--nest-yellow)]" />
+                  <label className="block text-xs font-medium text-[var(--nest-white-60)]">
+                    Jídlo
+                  </label>
+                </div>
+                <div className="space-y-2">
+                  {mealPreferences.map(item => (
+                    <div key={item.date} className="p-2.5 rounded-xl border border-[var(--nest-dark-4)] bg-[var(--nest-dark-3)]">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-xs font-semibold text-[var(--nest-white)]">{item.label}</p>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => toggleMealPreference(item.date, 'lunch')}
+                            disabled={!item.canLunch || submitting}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors ${item.lunch
+                              ? 'bg-[var(--nest-yellow)] text-[var(--nest-dark)] border-[var(--nest-yellow)]'
+                              : item.canLunch
+                                ? 'bg-transparent text-[var(--nest-white-60)] border-[var(--nest-dark-4)] hover:border-[var(--nest-yellow)]/50'
+                                : 'bg-transparent text-[var(--nest-white-25)] border-[var(--nest-dark-4)] cursor-not-allowed'
+                              }`}
+                          >
+                            Oběd
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => toggleMealPreference(item.date, 'dinner')}
+                            disabled={!item.canDinner || submitting}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors ${item.dinner
+                              ? 'bg-[var(--nest-yellow)] text-[var(--nest-dark)] border-[var(--nest-yellow)]'
+                              : item.canDinner
+                                ? 'bg-transparent text-[var(--nest-white-60)] border-[var(--nest-dark-4)] hover:border-[var(--nest-yellow)]/50'
+                                : 'bg-transparent text-[var(--nest-white-25)] border-[var(--nest-dark-4)] cursor-not-allowed'
+                              }`}
+                          >
+                            Večeře
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[11px] text-[var(--nest-white-40)] mt-2">
+                  První den začíná večeří, poslední den končí obědem. Dny mezi tím mají oběd i večeři.
+                </p>
+              </div>
+            </>
+          )}
+
           {error && (
             <div className="mb-4 p-3 bg-[var(--nest-error)]/10 border border-[var(--nest-error)]/20 rounded-xl text-[var(--nest-error)] text-xs">
               {error}
@@ -352,7 +496,7 @@ export default function RegisterPage() {
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={submitting || !name.trim() || !checkedInDate || !checkedOutDate}
+            disabled={submitting || !name.trim() || !checkedInDate || !checkedOutDate || !arrivalTime}
             className="w-full bg-[var(--nest-yellow)] hover:bg-[var(--nest-yellow-dark)] disabled:bg-[var(--nest-dark-4)] disabled:text-[var(--nest-white-40)] disabled:cursor-not-allowed text-[var(--nest-dark)] py-3 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2"
           >
             {submitting ? (
