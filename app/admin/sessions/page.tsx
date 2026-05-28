@@ -228,6 +228,8 @@ function AdminSessionsPageInner() {
     if (days.length === 0) return
 
     const items: InlineMenuItem[] = []
+    const lastDayIndex = Math.max(0, days.length - 1)
+
     days.forEach(day => {
       // Snídaně - vždy bufet
       items.push({
@@ -238,21 +240,25 @@ function AdminSessionsPageInner() {
         order: 0,
       })
       // Oběd
-      items.push({
-        day_index: day.dayIndex,
-        meal_type: 'lunch',
-        time: '15:00',
-        description: '',
-        order: 1,
-      })
+      if (day.dayIndex !== 0) {
+        items.push({
+          day_index: day.dayIndex,
+          meal_type: 'lunch',
+          time: '15:00',
+          description: '',
+          order: 1,
+        })
+      }
       // Večeře
-      items.push({
-        day_index: day.dayIndex,
-        meal_type: 'dinner',
-        time: '20:00',
-        description: '',
-        order: 2,
-      })
+      if (day.dayIndex !== lastDayIndex) {
+        items.push({
+          day_index: day.dayIndex,
+          meal_type: 'dinner',
+          time: '20:00',
+          description: '',
+          order: 2,
+        })
+      }
     })
 
     setMenuItems(items)

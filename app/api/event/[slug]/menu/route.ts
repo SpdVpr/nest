@@ -3,6 +3,50 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getFirebaseAdminDb } from '@/lib/firebase/admin'
 import { Timestamp } from 'firebase-admin/firestore'
 
+function toDate(value: any): Date | null {
+    if (!value) return null
+    const date = value.toDate?.() || new Date(value)
+    return isNaN(date.getTime()) ? null : date
+}
+
+function getLastDayIndex(sessionData: any): number {
+    const start = toDate(sessionData.start_date)
+    const end = toDate(sessionData.end_date) || start
+    if (!start || !end) return 0
+
+    const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate())
+    const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate())
+    return Math.max(0, Math.round((endDay.getTime() - startDay.getTime()) / (1000 * 60 * 60 * 24)))
+}
+
+function normalizeBoundaryMeals(items: any[], sessionData: any): any[] {
+    const lastDayIndex = getLastDayIndex(sessionData)
+    const firstDayTypes = new Set(items.filter(item => item.day_index === 0).map(item => item.meal_type))
+    const lastDayTypes = new Set(items.filter(item => item.day_index === lastDayIndex).map(item => item.meal_type))
+
+    return items.map(item => {
+        if (item.day_index === 0 && item.meal_type === 'lunch' && !firstDayTypes.has('dinner')) {
+            return {
+                ...item,
+                meal_type: 'dinner',
+                time: item.time === '15:00' ? '20:00' : item.time,
+                order: 2,
+            }
+        }
+
+        if (item.day_index === lastDayIndex && item.meal_type === 'dinner' && !lastDayTypes.has('lunch')) {
+            return {
+                ...item,
+                meal_type: 'lunch',
+                time: item.time === '20:00' ? '15:00' : item.time,
+                order: 1,
+            }
+        }
+
+        return item
+    })
+}
+
 // GET /api/event/[slug]/menu - Get menu for event
 export async function GET(
     request: NextRequest,
@@ -35,14 +79,14 @@ export async function GET(
             .where('session_id', '==', sessionDoc.id)
             .get()
 
-        const items = menuSnapshot.docs.map(doc => {
+        const items = normalizeBoundaryMeals(menuSnapshot.docs.map(doc => {
             const data = doc.data()
             return {
                 id: doc.id,
                 ...data,
                 created_at: data.created_at?.toDate?.()?.toISOString() || data.created_at,
             }
-        })
+        }), sessionData)
 
         // Sort by day_index, then order
         items.sort((a: any, b: any) => {

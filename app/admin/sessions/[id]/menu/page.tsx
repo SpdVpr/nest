@@ -191,6 +191,17 @@ export default function MenuEditorPage() {
         setHasChanges(true)
     }
 
+    const getAllowedMealTypes = (dayIndex: number): MealType[] => {
+        const days = getEventDays()
+        const lastDayIndex = Math.max(0, days.length - 1)
+
+        return (['breakfast', 'lunch', 'dinner'] as MealType[]).filter(type => {
+            if (type === 'lunch' && dayIndex === 0) return false
+            if (type === 'dinner' && dayIndex === lastDayIndex) return false
+            return true
+        })
+    }
+
     const updateMeal = (localId: string, field: keyof LocalMenuItem, value: any) => {
         setMenuItems(prev =>
             prev.map(item =>
@@ -266,7 +277,7 @@ export default function MenuEditorPage() {
         const existing = getMealsForDay(dayIndex)
         const existingTypes = new Set(existing.map(m => m.meal_type))
 
-        const toAdd: MealType[] = ['breakfast', 'lunch', 'dinner']
+        const toAdd: MealType[] = getAllowedMealTypes(dayIndex)
         const newItems: LocalMenuItem[] = []
 
         for (const type of toAdd) {
@@ -416,7 +427,7 @@ export default function MenuEditorPage() {
                                                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(249, 115, 22, 0.25)')}
                                                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(249, 115, 22, 0.15)')}
                                             >
-                                                + Přidat snídani/oběd/večeři
+                                                + Přidat jídla pro tento den
                                             </button>
                                         </div>
 
@@ -509,7 +520,7 @@ export default function MenuEditorPage() {
 
                                             {/* Add meal button */}
                                             <div className="flex gap-2 pt-2">
-                                                {(['breakfast', 'lunch', 'dinner'] as MealType[]).map(type => (
+                                                {getAllowedMealTypes(day.dayIndex).map(type => (
                                                     <button
                                                         key={type}
                                                         onClick={() => addMeal(day.dayIndex, type)}
