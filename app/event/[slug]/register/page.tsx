@@ -31,12 +31,19 @@ const toDateKey = (date: Date): string => {
   return `${year}-${month}-${day}`
 }
 
-const buildDefaultMealPreferences = (checkIn?: Date, checkOut?: Date): MealPreferenceFormItem[] => {
+const buildDefaultMealPreferences = (
+  checkIn?: Date,
+  checkOut?: Date,
+  eventStart?: Date,
+  eventEnd?: Date
+): MealPreferenceFormItem[] => {
   if (!checkIn || !checkOut) return []
 
   const start = new Date(checkIn.getFullYear(), checkIn.getMonth(), checkIn.getDate())
   const end = new Date(checkOut.getFullYear(), checkOut.getMonth(), checkOut.getDate())
   if (end < start) return []
+  const eventStartKey = eventStart ? toDateKey(eventStart) : null
+  const eventEndKey = eventEnd ? toDateKey(eventEnd) : null
 
   const days: Date[] = []
   const current = new Date(start)
@@ -46,13 +53,12 @@ const buildDefaultMealPreferences = (checkIn?: Date, checkOut?: Date): MealPrefe
   }
 
   return days.map((date, index) => {
-    const isFirstDay = index === 0
-    const isLastDay = index === days.length - 1
-    const canLunch = !isFirstDay
-    const canDinner = !isLastDay
+    const dateKey = toDateKey(date)
+    const canLunch = dateKey !== eventStartKey
+    const canDinner = dateKey !== eventEndKey
 
     return {
-      date: toDateKey(date),
+      date: dateKey,
       label: date.toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' }),
       lunch: canLunch,
       dinner: canDinner,
@@ -93,8 +99,13 @@ export default function RegisterPage() {
   }, [isAuthenticated, userProfile])
 
   useEffect(() => {
-    setMealPreferences(buildDefaultMealPreferences(checkedInDate, checkedOutDate))
-  }, [checkedInDate, checkedOutDate])
+    setMealPreferences(buildDefaultMealPreferences(
+      checkedInDate,
+      checkedOutDate,
+      session?.start_date ? new Date(session.start_date) : undefined,
+      session?.end_date ? new Date(session.end_date) : undefined
+    ))
+  }, [checkedInDate, checkedOutDate, session?.start_date, session?.end_date])
 
   const fetchEvent = async () => {
     try {

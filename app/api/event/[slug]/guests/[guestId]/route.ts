@@ -20,11 +20,6 @@ function normalizeMealPreferences(value: unknown): { date: string; lunch: boolea
         })
         .filter((item) => /^\d{4}-\d{2}-\d{2}$/.test(item.date))
         .sort((a, b) => a.date.localeCompare(b.date))
-        .map((item, index, all) => ({
-            date: item.date,
-            lunch: index > 0 && item.lunch,
-            dinner: index < all.length - 1 && item.dinner,
-        }))
 }
 
 // PATCH /api/event/[slug]/guests/[guestId] - Update guest dates

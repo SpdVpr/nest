@@ -28,7 +28,9 @@ const toDateKey = (date: Date): string => {
 const buildMealPreferences = (
   checkIn?: Date,
   checkOut?: Date,
-  savedPreferences: GuestMealPreference[] = []
+  savedPreferences: GuestMealPreference[] = [],
+  eventStart?: Date,
+  eventEnd?: Date
 ): MealPreferenceFormItem[] => {
   if (!checkIn || !checkOut) return []
 
@@ -37,6 +39,8 @@ const buildMealPreferences = (
   if (end < start) return []
 
   const savedByDate = new Map(savedPreferences.map(item => [item.date, item]))
+  const eventStartKey = eventStart ? toDateKey(eventStart) : null
+  const eventEndKey = eventEnd ? toDateKey(eventEnd) : null
   const days: Date[] = []
   const current = new Date(start)
   while (current <= end) {
@@ -47,10 +51,8 @@ const buildMealPreferences = (
   return days.map((date, index) => {
     const dateKey = toDateKey(date)
     const saved = savedByDate.get(dateKey)
-    const isFirstDay = index === 0
-    const isLastDay = index === days.length - 1
-    const canLunch = !isFirstDay
-    const canDinner = !isLastDay
+    const canLunch = dateKey !== eventStartKey
+    const canDinner = dateKey !== eventEndKey
 
     return {
       date: dateKey,
@@ -152,7 +154,13 @@ export default function GuestsPage() {
     setEditCheckIn(checkIn)
     setEditCheckOut(checkOut)
     setEditArrivalTime(guest.arrival_time || session?.start_time || '')
-    setEditMealPreferences(buildMealPreferences(checkIn, checkOut, guest.meal_preferences || []))
+    setEditMealPreferences(buildMealPreferences(
+      checkIn,
+      checkOut,
+      guest.meal_preferences || [],
+      session?.start_date ? new Date(session.start_date) : undefined,
+      session?.end_date ? new Date(session.end_date) : undefined
+    ))
   }
 
   useEffect(() => {
@@ -160,9 +168,11 @@ export default function GuestsPage() {
     setEditMealPreferences(prev => buildMealPreferences(
       editCheckIn,
       editCheckOut,
-      prev.length > 0 ? prev : editingGuest.meal_preferences || []
+      prev.length > 0 ? prev : editingGuest.meal_preferences || [],
+      session?.start_date ? new Date(session.start_date) : undefined,
+      session?.end_date ? new Date(session.end_date) : undefined
     ))
-  }, [editCheckIn, editCheckOut, editingGuest])
+  }, [editCheckIn, editCheckOut, editingGuest, session?.start_date, session?.end_date])
 
   const toggleEditMealPreference = (date: string, meal: 'lunch' | 'dinner') => {
     setEditMealPreferences(prev => prev.map(item => {
