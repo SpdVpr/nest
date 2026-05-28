@@ -3,14 +3,65 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
-import { Users, UserCheck, Calendar, Moon, Armchair, LogOut, Pencil, X, Check } from 'lucide-react'
-import { Session, Guest } from '@/types/database.types'
+import { Users, UserCheck, Calendar, Moon, Armchair, LogOut, Pencil, X, Check, Clock, Utensils } from 'lucide-react'
+import { Session, Guest, GuestMealPreference } from '@/types/database.types'
 import { formatDate } from '@/lib/utils'
 import { guestStorage } from '@/lib/guest-storage'
 import { useGuestAuth, useCurrentGuest } from '@/lib/auth-context'
 import NestPage from '@/components/NestPage'
 import NestLoading from '@/components/NestLoading'
 import DateRangeCalendar from '@/components/DateRangeCalendar'
+
+type MealPreferenceFormItem = GuestMealPreference & {
+  label: string
+  canLunch: boolean
+  canDinner: boolean
+}
+
+const toDateKey = (date: Date): string => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const buildMealPreferences = (
+  checkIn?: Date,
+  checkOut?: Date,
+  savedPreferences: GuestMealPreference[] = []
+): MealPreferenceFormItem[] => {
+  if (!checkIn || !checkOut) return []
+
+  const start = new Date(checkIn.getFullYear(), checkIn.getMonth(), checkIn.getDate())
+  const end = new Date(checkOut.getFullYear(), checkOut.getMonth(), checkOut.getDate())
+  if (end < start) return []
+
+  const savedByDate = new Map(savedPreferences.map(item => [item.date, item]))
+  const days: Date[] = []
+  const current = new Date(start)
+  while (current <= end) {
+    days.push(new Date(current))
+    current.setDate(current.getDate() + 1)
+  }
+
+  return days.map((date, index) => {
+    const dateKey = toDateKey(date)
+    const saved = savedByDate.get(dateKey)
+    const isFirstDay = index === 0
+    const isLastDay = index === days.length - 1
+    const canLunch = !isFirstDay
+    const canDinner = !isLastDay
+
+    return {
+      date: dateKey,
+      label: date.toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' }),
+      lunch: canLunch ? saved?.lunch ?? true : false,
+      dinner: canDinner ? saved?.dinner ?? true : false,
+      canLunch,
+      canDinner,
+    }
+  })
+}
 
 export default function GuestsPage() {
   const params = useParams()
@@ -32,6 +83,8 @@ export default function GuestsPage() {
   const [editingGuest, setEditingGuest] = useState<Guest | null>(null)
   const [editCheckIn, setEditCheckIn] = useState<Date | undefined>(undefined)
   const [editCheckOut, setEditCheckOut] = useState<Date | undefined>(undefined)
+  const [editArrivalTime, setEditArrivalTime] = useState('')
+  const [editMealPreferences, setEditMealPreferences] = useState<MealPreferenceFormItem[]>([])
   const [savingDays, setSavingDays] = useState(false)
 
   useEffect(() => {
@@ -93,9 +146,35 @@ export default function GuestsPage() {
   }
 
   const openEditDays = (guest: Guest) => {
+    const checkIn = guest.check_in_date ? new Date(guest.check_in_date) : undefined
+    const checkOut = guest.check_out_date ? new Date(guest.check_out_date) : undefined
     setEditingGuest(guest)
-    setEditCheckIn(guest.check_in_date ? new Date(guest.check_in_date) : undefined)
-    setEditCheckOut(guest.check_out_date ? new Date(guest.check_out_date) : undefined)
+    setEditCheckIn(checkIn)
+    setEditCheckOut(checkOut)
+    setEditArrivalTime(guest.arrival_time || session?.start_time || '')
+    setEditMealPreferences(buildMealPreferences(checkIn, checkOut, guest.meal_preferences || []))
+  }
+
+  useEffect(() => {
+    if (!editingGuest) return
+    setEditMealPreferences(prev => buildMealPreferences(
+      editCheckIn,
+      editCheckOut,
+      prev.length > 0 ? prev : editingGuest.meal_preferences || []
+    ))
+  }, [editCheckIn, editCheckOut, editingGuest])
+
+  const toggleEditMealPreference = (date: string, meal: 'lunch' | 'dinner') => {
+    setEditMealPreferences(prev => prev.map(item => {
+      if (item.date !== date) return item
+      if (meal === 'lunch' && item.canLunch) {
+        return { ...item, lunch: !item.lunch }
+      }
+      if (meal === 'dinner' && item.canDinner) {
+        return { ...item, dinner: !item.dinner }
+      }
+      return item
+    }))
   }
 
   const saveEditDays = async () => {
@@ -114,6 +193,8 @@ export default function GuestsPage() {
           check_in_date: editCheckIn.toISOString(),
           check_out_date: editCheckOut.toISOString(),
           nights_count: nightsCount,
+          arrival_time: editArrivalTime,
+          meal_preferences: editMealPreferences.map(({ date, lunch, dinner }) => ({ date, lunch, dinner })),
         }),
       })
       if (res.ok) {
@@ -310,18 +391,32 @@ export default function GuestsPage() {
                               <span className="text-[var(--nest-white-40)]">Příjezd:</span>{' '}
                               <span className="font-medium text-[var(--nest-white)]">
                                 {new Date(guest.check_in_date).toLocaleDateString('cs-CZ', {
-                                  day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                                  day: 'numeric', month: 'short', year: 'numeric'
                                 })}
                               </span>
                             </div>
+                            {guest.arrival_time && (
+                              <div>
+                                <span className="text-[var(--nest-white-40)]">Čas příjezdu:</span>{' '}
+                                <span className="font-medium text-[var(--nest-white)]">{guest.arrival_time}</span>
+                              </div>
+                            )}
                             <div>
                               <span className="text-[var(--nest-white-40)]">Odjezd:</span>{' '}
                               <span className="font-medium text-[var(--nest-white)]">
                                 {new Date(guest.check_out_date).toLocaleDateString('cs-CZ', {
-                                  day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                                  day: 'numeric', month: 'short', year: 'numeric'
                                 })}
                               </span>
                             </div>
+                            {Array.isArray(guest.meal_preferences) && guest.meal_preferences.length > 0 && (
+                              <div className="mt-1 text-[var(--nest-white-40)]">
+                                Jídlo:{' '}
+                                <span className="font-medium text-[var(--nest-white)]">
+                                  oběd {guest.meal_preferences.filter(item => item.lunch).length}×, večeře {guest.meal_preferences.filter(item => item.dinner).length}×
+                                </span>
+                              </div>
+                            )}
                           </div>
                           {canEditGuest(guest) && (
                             <button
@@ -398,7 +493,7 @@ export default function GuestsPage() {
           onClick={() => setEditingGuest(null)}
         >
           <div
-            className="w-full max-w-md rounded-2xl overflow-hidden"
+            className="w-full max-w-md rounded-2xl overflow-hidden max-h-[90vh] flex flex-col"
             style={{ backgroundColor: 'var(--nest-surface)', border: '1px solid var(--nest-border)' }}
             onClick={e => e.stopPropagation()}
           >
@@ -417,7 +512,7 @@ export default function GuestsPage() {
             </div>
 
             {/* Calendar */}
-            <div className="p-5">
+            <div className="p-5 overflow-y-auto">
               <DateRangeCalendar
                 startDate={new Date(session.start_date)}
                 endDate={session.end_date ? new Date(session.end_date) : undefined}
@@ -436,6 +531,74 @@ export default function GuestsPage() {
                     </span>
                     {' '}nocí
                   </p>
+                </div>
+              )}
+
+              {editCheckIn && editCheckOut && (
+                <div className="mt-5 space-y-5">
+                  <div>
+                    <label htmlFor="editArrivalTime" className="block text-xs font-medium text-[var(--nest-white-60)] mb-1.5">
+                      Čas příjezdu
+                    </label>
+                    <div className="relative">
+                      <Clock className="w-4 h-4 text-[var(--nest-yellow)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input
+                        type="time"
+                        id="editArrivalTime"
+                        value={editArrivalTime}
+                        onChange={(e) => setEditArrivalTime(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 bg-[var(--nest-dark-3)] border border-[var(--nest-dark-4)] rounded-xl focus:ring-2 focus:ring-[var(--nest-yellow)]/50 focus:border-[var(--nest-yellow)]/50 text-[var(--nest-white)] text-sm outline-none transition-all"
+                        disabled={savingDays}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Utensils className="w-4 h-4 text-[var(--nest-yellow)]" />
+                      <p className="text-xs font-medium text-[var(--nest-white-60)]">Jídlo</p>
+                    </div>
+                    <div className="space-y-2">
+                      {editMealPreferences.map(item => (
+                        <div key={item.date} className="p-2.5 rounded-xl border border-[var(--nest-dark-4)] bg-[var(--nest-dark-3)]">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-xs font-semibold text-[var(--nest-white)]">{item.label}</p>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => toggleEditMealPreference(item.date, 'lunch')}
+                                disabled={!item.canLunch || savingDays}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors ${item.lunch
+                                  ? 'bg-[var(--nest-yellow)] text-[var(--nest-dark)] border-[var(--nest-yellow)]'
+                                  : item.canLunch
+                                    ? 'bg-transparent text-[var(--nest-white-60)] border-[var(--nest-dark-4)] hover:border-[var(--nest-yellow)]/50'
+                                    : 'bg-transparent text-[var(--nest-white-25)] border-[var(--nest-dark-4)] cursor-not-allowed'
+                                  }`}
+                              >
+                                Oběd
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => toggleEditMealPreference(item.date, 'dinner')}
+                                disabled={!item.canDinner || savingDays}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors ${item.dinner
+                                  ? 'bg-[var(--nest-yellow)] text-[var(--nest-dark)] border-[var(--nest-yellow)]'
+                                  : item.canDinner
+                                    ? 'bg-transparent text-[var(--nest-white-60)] border-[var(--nest-dark-4)] hover:border-[var(--nest-yellow)]/50'
+                                    : 'bg-transparent text-[var(--nest-white-25)] border-[var(--nest-dark-4)] cursor-not-allowed'
+                                  }`}
+                              >
+                                Večeře
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-[var(--nest-white-40)] mt-2">
+                      První den začíná večeří, poslední den končí obědem. Dny mezi tím mají oběd i večeři.
+                    </p>
+                  </div>
                 </div>
               )}
             </div>

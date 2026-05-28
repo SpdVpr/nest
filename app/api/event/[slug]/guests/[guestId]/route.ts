@@ -3,6 +3,30 @@ import { getFirebaseAdminDb } from '@/lib/firebase/admin'
 import { getSessionBySlug } from '@/lib/firebase/queries'
 import { verifyGuestRequest } from '@/lib/verify-guest'
 
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/
+
+function normalizeMealPreferences(value: unknown): { date: string; lunch: boolean; dinner: boolean }[] {
+    if (!Array.isArray(value)) return []
+
+    return value
+        .filter((item) => item && typeof item === 'object')
+        .map((item) => {
+            const preference = item as Record<string, unknown>
+            return {
+                date: typeof preference.date === 'string' ? preference.date : '',
+                lunch: preference.lunch === true,
+                dinner: preference.dinner === true,
+            }
+        })
+        .filter((item) => /^\d{4}-\d{2}-\d{2}$/.test(item.date))
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map((item, index, all) => ({
+            date: item.date,
+            lunch: index > 0 && item.lunch,
+            dinner: index < all.length - 1 && item.dinner,
+        }))
+}
+
 // PATCH /api/event/[slug]/guests/[guestId] - Update guest dates
 export async function PATCH(
     request: NextRequest,
@@ -53,7 +77,7 @@ export async function PATCH(
         }
 
         const body = await request.json()
-        const { check_in_date, check_out_date, nights_count, room } = body
+        const { check_in_date, check_out_date, nights_count, room, arrival_time, meal_preferences } = body
 
         const updateData: Record<string, any> = {}
 
@@ -68,6 +92,18 @@ export async function PATCH(
         }
         if (room !== undefined) {
             updateData.room = room || null
+        }
+        if (arrival_time !== undefined) {
+            const normalizedArrivalTime = typeof arrival_time === 'string' && arrival_time.trim()
+                ? arrival_time.trim()
+                : null
+            if (normalizedArrivalTime && !TIME_PATTERN.test(normalizedArrivalTime)) {
+                return NextResponse.json({ error: 'arrival_time must be in HH:MM format' }, { status: 400 })
+            }
+            updateData.arrival_time = normalizedArrivalTime
+        }
+        if (meal_preferences !== undefined) {
+            updateData.meal_preferences = normalizeMealPreferences(meal_preferences)
         }
 
         if (Object.keys(updateData).length === 0) {
