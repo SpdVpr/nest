@@ -81,6 +81,7 @@ export interface Guest {
   dietary_restrictions?: string[]  // ['vegan', 'vegetarian', 'gluten-free', 'lactose-free']
   dietary_note?: string | null     // free text for custom allergies
   room?: string | null         // room ID selected for accommodation (e.g. 'dolni', 'horni-vlevo')
+  hardware_declined?: boolean  // true when the guest explicitly does not want any hardware
   deposit?: number             // amount of deposit already paid (Kč)
   user_id?: string | null      // Firebase Auth UID when claimed by a registered user
   is_active: boolean

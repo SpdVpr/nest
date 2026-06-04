@@ -9,7 +9,7 @@ import { Session, Guest, GameLibraryItem } from '@/types/database.types'
 import { HardwareItem } from '@/types/hardware.types'
 import { formatDate } from '@/lib/utils'
 import { guestStorage } from '@/lib/guest-storage'
-import { useCurrentGuest } from '@/lib/auth-context'
+import { useCurrentGuest, useGuestAuth } from '@/lib/auth-context'
 import NestLoading from '@/components/NestLoading'
 import GuestSelectionModal from '@/components/GuestSelectionModal'
 
@@ -80,7 +80,9 @@ export default function EventHardwarePage() {
   const [savingGameInstalls, setSavingGameInstalls] = useState(false)
   const [existingGameInstalls, setExistingGameInstalls] = useState<string[]>([])
   const [customGameName, setCustomGameName] = useState('')
+  const [savingHardwareDecline, setSavingHardwareDecline] = useState(false)
 
+  const { firebaseUser } = useGuestAuth()
   const storedGuest = useCurrentGuest(slug)
 
   useEffect(() => {
@@ -293,6 +295,41 @@ export default function EventHardwarePage() {
     }
   }
 
+  const handleHardwareDecline = async (declined: boolean) => {
+    if (!selectedGuest || !session || savingHardwareDecline || myLocked) return
+
+    setSavingHardwareDecline(true)
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (firebaseUser) {
+        const token = await firebaseUser.getIdToken()
+        headers.Authorization = `Bearer ${token}`
+      }
+
+      const response = await fetch(`/api/event/${slug}/guests/${selectedGuest.id}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ hardware_declined: declined }),
+      })
+
+      if (response.ok) {
+        setSelectedQuantities({})
+        setSelectedGuest(prev => prev ? { ...prev, hardware_declined: declined } : prev)
+        setGuests(prev => prev.map(guest =>
+          guest.id === selectedGuest.id ? { ...guest, hardware_declined: declined } : guest
+        ))
+      } else {
+        const errorData = await response.json()
+        alert(`Chyba: ${errorData.error || 'Neznámá chyba'}`)
+      }
+    } catch (error) {
+      console.error('Error saving hardware choice:', error)
+      alert(`Chyba: ${error instanceof Error ? error.message : 'Neznámá chyba'}`)
+    } finally {
+      setSavingHardwareDecline(false)
+    }
+  }
+
   const handleEditReservation = (reservationId: string, currentNights: number) => {
     setEditingReservationId(reservationId)
     setEditNightsCount(currentNights)
@@ -361,6 +398,11 @@ export default function EventHardwarePage() {
   const filteredItems = availableItems.filter(item => item.category === selectedCategory)
   const totalPrice = getTotalPrice()
   const totalSelected = getTotalSelectedCount()
+  const selectedGuestActiveReservations = selectedGuest
+    ? reservations.filter(r => r.guest_id === selectedGuest.id && r.status !== 'cancelled')
+    : []
+  const selectedGuestHasHardwareReservations = selectedGuestActiveReservations.length > 0
+  const selectedGuestHardwareDeclined = selectedGuest?.hardware_declined === true && !selectedGuestHasHardwareReservations
 
   // Has any PC type selected?
   const hasPcSelected = Object.entries(selectedQuantities)
@@ -491,9 +533,56 @@ export default function EventHardwarePage() {
         </div>
       </div>
 
+      {selectedGuest && !selectedGuestHasHardwareReservations && (
+        <div className="nest-card-elevated p-5 mb-6">
+          {selectedGuestHardwareDeclined ? (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center flex-shrink-0">
+                  <Check className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-[var(--nest-text-primary)]">Nechci nic</h2>
+                  <p className="text-xs text-[var(--nest-text-secondary)] mt-1">
+                    HW krok máš splněný. Když si to rozmyslíš, můžeš si níž vybrat konkrétní zařízení.
+                  </p>
+                </div>
+              </div>
+              {!myLocked && (
+                <button
+                  onClick={() => handleHardwareDecline(false)}
+                  disabled={savingHardwareDecline}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-[var(--nest-border)] text-xs font-semibold text-[var(--nest-text-secondary)] hover:text-[var(--nest-yellow)] hover:border-[var(--nest-yellow)]/40 transition-colors disabled:opacity-50"
+                >
+                  <X className="w-4 h-4" />
+                  {savingHardwareDecline ? 'Ukládám...' : 'Zrušit volbu'}
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-sm font-bold text-[var(--nest-text-primary)]">Nepotřebuješ žádný hardware?</h2>
+                <p className="text-xs text-[var(--nest-text-secondary)] mt-1">
+                  Potvrď volbu a HW krok se označí jako splněný.
+                </p>
+              </div>
+              <button
+                onClick={() => handleHardwareDecline(true)}
+                disabled={savingHardwareDecline || myLocked}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[var(--nest-yellow)] text-[var(--nest-bg)] text-xs font-bold hover:bg-[var(--nest-yellow-dark)] transition-colors disabled:opacity-50"
+              >
+                <X className="w-4 h-4" />
+                {savingHardwareDecline ? 'Ukládám...' : 'Nechci nic'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* My Reservations Section */}
       {selectedGuest && (() => {
-        const myReservations = reservations.filter(r => r.guest_id === selectedGuest.id && r.status !== 'cancelled')
+        const myReservations = selectedGuestActiveReservations
           .sort((a, b) => {
             const typeOrder = (t?: string) => t === 'pc' ? 0 : t === 'monitor' ? 1 : 2
             return typeOrder(a.hardware_items?.type) - typeOrder(b.hardware_items?.type)
@@ -845,16 +934,16 @@ export default function EventHardwarePage() {
         const activeReservations = reservations.filter(r => r.status !== 'cancelled')
         const typeOrder = (t?: string) => t === 'pc' ? 0 : t === 'monitor' ? 1 : 2
         // Build a map of ALL guests (not just those with reservations)
-        const guestMap: Record<string, { guestId: string; name: string; items: { id: string; name: string; type: string; qty: number; nights: number; price: number }[] }> = {}
+        const guestMap: Record<string, { guestId: string; name: string; declined: boolean; items: { id: string; name: string; type: string; qty: number; nights: number; price: number }[] }> = {}
         // First add ALL registered guests
         guests.forEach(g => {
-          guestMap[g.id] = { guestId: g.id, name: g.name, items: [] }
+          guestMap[g.id] = { guestId: g.id, name: g.name, declined: g.hardware_declined === true, items: [] }
         })
         // Then add reservation items to their respective guests
         activeReservations.forEach(r => {
           const gid = r.guest_id
           if (!guestMap[gid]) {
-            guestMap[gid] = { guestId: gid, name: r.guests?.name || 'Neznámý host', items: [] }
+            guestMap[gid] = { guestId: gid, name: r.guests?.name || 'Neznámý host', declined: false, items: [] }
           }
           guestMap[gid].items.push({
             id: r.id,
@@ -897,6 +986,7 @@ export default function EventHardwarePage() {
               {sortedGuests.map((guest, idx) => {
                 const isMe = selectedGuest?.id === guest.guestId
                 const hasReservations = guest.items.length > 0
+                const declinedHardware = guest.declined && !hasReservations
                 const guestLocked = isGuestLocked(guest.guestId)
                 return (
                   <div key={idx} className={`py-3 ${isMe ? 'bg-[var(--nest-yellow)]/10 -mx-2 px-2 rounded-lg' : ''}`}>
@@ -970,6 +1060,11 @@ export default function EventHardwarePage() {
                               )
                             })()}
                           </div>
+                        ) : declinedHardware ? (
+                          <span className="inline-flex items-center gap-1.5 text-sm text-emerald-400">
+                            <Check className="w-3.5 h-3.5" />
+                            Nechci nic
+                          </span>
                         ) : (
                           <span className="text-sm text-[var(--nest-text-tertiary)] italic">Bez rezervací</span>
                         )}

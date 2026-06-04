@@ -25,12 +25,13 @@ interface EventChecklistProps {
     guest: Guest | null
     seatReserved: boolean
     hwReserved: boolean
+    hwDeclined?: boolean
     gamesVoted: boolean
     roomSelected?: boolean
 }
 
 export default function EventChecklist({
-    slug, session, guest, seatReserved, hwReserved, gamesVoted, roomSelected,
+    slug, session, guest, seatReserved, hwReserved, hwDeclined, gamesVoted, roomSelected,
 }: EventChecklistProps) {
     const [collapsed, setCollapsed] = useState(false)
 
@@ -68,10 +69,14 @@ export default function EventChecklist({
             {
                 id: 'hardware',
                 label: 'Hardware',
-                description: hwReserved ? 'Máš rezervovaný HW ✓' : 'Potřebuješ monitor, PC nebo jiný HW?',
+                description: hwReserved
+                    ? 'Máš rezervovaný HW ✓'
+                    : hwDeclined
+                        ? 'Nechci nic ✓'
+                        : 'Potřebuješ monitor, PC nebo jiný HW?',
                 icon: MonitorSmartphone,
                 href: `/event/${slug}/hardware`,
-                done: hwReserved,
+                done: hwReserved || !!hwDeclined,
                 optional: true,
                 hidden: session.hardware_enabled === false,
             },
@@ -94,7 +99,7 @@ export default function EventChecklist({
                 optional: true,
             },
         ].filter(s => !s.hidden)
-    }, [slug, session, guest, seatReserved, hwReserved, gamesVoted, roomSelected])
+    }, [slug, session, guest, seatReserved, hwReserved, hwDeclined, gamesVoted, roomSelected])
 
     const completedCount = steps.filter(s => s.done).length
     const totalRequired = steps.filter(s => !s.optional).length

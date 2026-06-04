@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server'
 import { getFirebaseAdminDb } from '@/lib/firebase/admin'
-import { Timestamp } from 'firebase-admin/firestore'
+import { Timestamp, FieldValue } from 'firebase-admin/firestore'
 import { verifyGuestRequest } from '@/lib/verify-guest'
 import { getGuestById } from '@/lib/firebase/queries'
 
@@ -171,7 +171,6 @@ export async function POST(request: NextRequest) {
     // Reset hw_prepared flag for this guest (admin needs to re-check)
     if (activeSessionId) {
       try {
-        const { FieldValue } = await import('firebase-admin/firestore')
         await db.collection('sessions').doc(activeSessionId).update({
           [`hw_prepared.${guest_id}`]: FieldValue.delete(),
         })
@@ -179,6 +178,10 @@ export async function POST(request: NextRequest) {
         console.log('Could not reset hw_prepared flag:', e)
       }
     }
+
+    await db.collection('guests').doc(guest_id).update({
+      hardware_declined: FieldValue.delete(),
+    })
 
     return NextResponse.json({ reservations: createdReservations })
   } catch (error) {

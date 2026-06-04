@@ -447,6 +447,7 @@ export default function EventPage() {
           guest={currentGuest}
           seatReserved={seatReserved}
           hwReserved={hwReserved}
+          hwDeclined={!!currentGuest.hardware_declined}
           gamesVoted={gamesVoted}
           roomSelected={!!currentGuest.room}
         />

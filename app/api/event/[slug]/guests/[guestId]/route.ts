@@ -72,7 +72,7 @@ export async function PATCH(
         }
 
         const body = await request.json()
-        const { check_in_date, check_out_date, nights_count, room, arrival_time, meal_preferences } = body
+        const { check_in_date, check_out_date, nights_count, room, arrival_time, meal_preferences, hardware_declined } = body
 
         const updateData: Record<string, any> = {}
 
@@ -99,6 +99,9 @@ export async function PATCH(
         }
         if (meal_preferences !== undefined) {
             updateData.meal_preferences = normalizeMealPreferences(meal_preferences)
+        }
+        if (hardware_declined !== undefined) {
+            updateData.hardware_declined = Boolean(hardware_declined)
         }
 
         if (Object.keys(updateData).length === 0) {
