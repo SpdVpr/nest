@@ -1,9 +1,15 @@
 {
   "redirects": [
     {
-      "source": "/:path*",
+      "source": "/",
       "has": [{ "type": "host", "value": "nest-rust.vercel.app" }],
-      "destination": "https://thenest.cz/:path*",
+      "destination": "https://thenest.cz/",
+      "permanent": true
+    },
+    {
+      "source": "/:path+",
+      "has": [{ "type": "host", "value": "nest-rust.vercel.app" }],
+      "destination": "https://thenest.cz/:path+",
       "permanent": true
     }
   ]
